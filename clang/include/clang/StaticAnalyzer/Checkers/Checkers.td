@@ -217,6 +217,10 @@ def UndefResultChecker : Checker<"UndefinedBinaryOperatorResult">,
   HelpText<"Check for undefined results of binary operators">,
   Documentation<HasDocumentation>;
 
+def SimpleOverflowChecker : Checker<"SimpleOverflow">,
+  HelpText<"Check for overflows in signed operations">,
+  Documentation<HasDocumentation>;
+
 def StackAddrEscapeBase : Checker<"StackAddrEscapeBase">,
   HelpText<"Generate information about stack address escapes.">,
   Documentation<NotDocumented>,
