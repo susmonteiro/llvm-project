@@ -5,6 +5,9 @@
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 
+// TODO remove following import
+#include <iostream>
+
 using namespace clang;
 using namespace ento;
 using namespace taint;
@@ -55,30 +58,35 @@ void SimpleOverflowChecker::checkPreStmt(const BinaryOperator *B,
   if (Op != BO_Add) 
     return;
 
+  SVal left = C.getSVal(B->getLHS());
+  SVal right = C.getSVal(B->getRHS());
+  Optional<DefinedSVal> DVL = left.getAs<DefinedSVal>();
+  Optional<DefinedSVal> DVR = right.getAs<DefinedSVal>();
+
+  std::cout << "Print please?" << std::endl;
+
+  // If one of the values is undefined, don't report Bug
+  if (!DVL || !DVR)
+    return;
   
 
-  SVal Denom = C.getSVal(B->getRHS());
-  Optional<DefinedSVal> DV = Denom.getAs<DefinedSVal>();
-
-  // Divide-by-undefined handled in the generic checking for uses of
-  // undefined values.
-  if (!DV)
-    return;
-
-  if (Op == BO_Add) {
-    reportBug("Add is forbidden", stateZero, C);
-  }
-
-  // Check for divide by zero.
+  // Check if a + b == 0
   ConstraintManager &CM = C.getConstraintManager();
-  // ProgramStateRef stateNotZero, stateZero;
-  // Returns a pair of states (StInRange, StOutOfRange) where the given value is assumed to be in the range or out of the range, respectively.
-  std::tie(stateNotZero, stateZero) = CM.assumeDual(C.getState(), *DV);
+  ProgramStateRef stateNotZero, stateZero;
+  
+  SValBuilder &SVB = C.getSValBuilder();
+  SVal EqualZero = SVB.evalBinOp(C.getState(), BO_Add, left, right, SVB.getConditionType());
 
-  if (!stateNotZero) {
-    assert(stateZero);
-    reportBug("Division by zero", stateZero, C);
-    return;
+  if (Optional<DefinedSVal> EqualZeroDVal =
+          EqualZero.getAs<DefinedSVal>()) {
+    // Returns a pair of states (StInRange, StOutOfRange) where the given value is assumed to be in the range or out of the range, respectively.
+    std::tie(stateNotZero, stateZero) = CM.assumeDual(C.getState(), *EqualZeroDVal);
+
+    if (!stateNotZero) {
+      assert(stateZero);
+      reportBug("Add is forbidden", stateZero, C);
+      return;
+    }
   }
 
   // If we get here, then the denom should not be zero. We abandon the implicit
