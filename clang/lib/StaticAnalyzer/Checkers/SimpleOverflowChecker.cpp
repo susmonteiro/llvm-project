@@ -1,17 +1,12 @@
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
-#include "clang/StaticAnalyzer/Checkers/Taint.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include <limits.h>
 
-// TODO remove following import
-#include <iostream>
-
 using namespace clang;
 using namespace ento;
-using namespace taint;
 
 namespace {
 class SimpleOverflowChecker : public Checker<check::PreStmt<BinaryOperator>> {
@@ -24,15 +19,13 @@ class SimpleOverflowChecker : public Checker<check::PreStmt<BinaryOperator>> {
   };
 } // end anonymous namespace
 
-// TODO change this
+// TODO change this?
 static const Expr *getExpr(const ExplodedNode *N) {
   const Stmt *S = N->getLocationAs<PreStmt>()->getStmt();
   if (const auto *BE = dyn_cast<BinaryOperator>(S))
     return BE->getRHS();
   return nullptr;
 }
-
-
 
 void SimpleOverflowChecker::reportBug(
     const char *Msg, ProgramStateRef StateZero, CheckerContext &C,
@@ -53,42 +46,62 @@ void SimpleOverflowChecker::checkPreStmt(const BinaryOperator *B,
   BinaryOperator::Opcode Op = B->getOpcode();
 
   if (Op != BO_Add && Op != BO_AddAssign && 
-      Op != BO_Sub && Op != BO_SubAssign && 
-      Op != BO_Mul && Op != BO_MulAssign &&
-      Op != BO_Div && Op != BO_DivAssign) 
+       Op != BO_Sub && Op != BO_SubAssign /* && 
+      Op != BO_Mul && Op != BO_MulAssign */) 
     return;
   
   if (!B->getRHS()->getType()->isScalarType())
     return;
 
-
-  // Check if result of a Op b < INT_MAX
   ConstraintManager &CM = C.getConstraintManager();
-  ProgramStateRef stateNotZero, stateZero;
+  ProgramStateRef stateNotOverflow, stateOverflow;
 
   SVal left = C.getSVal(B->getLHS());
   SVal right = C.getSVal(B->getRHS());
   
-  SValBuilder &SVB = C.getSValBuilder();
-  SVal applyOperation = SVB.evalBinOp(C.getState(), Op, left, right, SVB.getConditionType());
+  // doesn't work
+  // SVal isOverflow = SVB.evalBinOp(C.getState(), BO_LT, applyOperation, SVB.makeIntVal(INT_MAX, false), SVB.getConditionType());  
 
-  SVal isOverflow = SVB.evalBinOp(C.getState(), BO_LT, applyOperation, SVB.makeIntVal(INT_MAX, false), SVB.getConditionType());  
+  SValBuilder &SVB = C.getSValBuilder();
+  SVal finalExpression;
+
+  if (Op == BO_Add || Op == BO_AddAssign) {
+    // overflow if r > 0 && l > INT_MAX - r
+    // r > 0
+    SVal positive = SVB.evalBinOp(C.getState(), BO_GT, right, SVB.makeIntVal(0, false), SVB.getConditionType());
+    // INT_MAX - r
+    SVal applyOperation = SVB.evalBinOp(C.getState(), BO_Sub, SVB.makeIntVal(INT_MAX, false), right, SVB.getConditionType());
+    // l > INT_MAX - r
+    SVal compareOperation = SVB.evalBinOp(C.getState(), BO_GT, left, applyOperation, SVB.getConditionType());
+    // r > 0 && l > INT_MAX - r
+    finalExpression = SVB.evalBinOp(C.getState(), BO_And, positive, compareOperation, SVB.getConditionType());
+  } else if (Op == BO_Sub || Op == BO_SubAssign) {
+    // overflow if r < 0 && l > INT_MAX + r
+    // r < 0
+    SVal positive = SVB.evalBinOp(C.getState(), BO_LT, right, SVB.makeIntVal(0, false), SVB.getConditionType());
+    // INT_MAX + r
+    SVal applyOperation = SVB.evalBinOp(C.getState(), BO_Add, SVB.makeIntVal(INT_MAX, false), right, SVB.getConditionType());
+    // l > INT_MAX + r
+    SVal compareOperation = SVB.evalBinOp(C.getState(), BO_GT, left, applyOperation, SVB.getConditionType());
+    // r < 0 && l > INT_MAX + r
+    finalExpression = SVB.evalBinOp(C.getState(), BO_And, positive, compareOperation, SVB.getConditionType());
+  }
+
 
   if (Optional<DefinedSVal> isOverflowDVal =
-          isOverflow.getAs<DefinedSVal>()) {
+          finalExpression.getAs<DefinedSVal>()) {
     // Returns a pair of states (StInRange, StOutOfRange) where the given value is assumed to be in the range or out of the range, respectively.
-    std::tie(stateNotZero, stateZero) = CM.assumeDual(C.getState(), *isOverflowDVal);
+    std::tie(stateOverflow, stateNotOverflow) = CM.assumeDual(C.getState(), *isOverflowDVal);
 
-    if (!stateNotZero) {
-      assert(stateZero);
-      reportBug("Found overflow", stateZero, C);
+    if (!stateNotOverflow) {
+      assert(stateOverflow);
+      reportBug("Found overflow", stateOverflow, C);
       return;
     }
   }
 
-  // If we get here, then the denom should not be zero. We abandon the implicit
-  // zero denom case for now.
-  C.addTransition(stateNotZero);
+  // If we get here, then the overflow should never happen. 
+  C.addTransition(stateNotOverflow);
 }
 
 void ento::registerSimpleOverflowChecker(CheckerManager &mgr) {
