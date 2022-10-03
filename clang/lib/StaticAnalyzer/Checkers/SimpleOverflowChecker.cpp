@@ -20,6 +20,7 @@ class SimpleOverflowChecker : public Checker<check::PreStmt<BinaryOperator>> {
   };
 } // end anonymous namespace
 
+// TODO change this
 static const Expr *getDenomExpr(const ExplodedNode *N) {
   const Stmt *S = N->getLocationAs<PreStmt>()->getStmt();
   if (const auto *BE = dyn_cast<BinaryOperator>(S))
@@ -32,7 +33,8 @@ void SimpleOverflowChecker::reportBug(
     std::unique_ptr<BugReporterVisitor> Visitor) const {
   if (ExplodedNode *N = C.generateErrorNode(StateZero)) {
     if (!BT)
-      BT.reset(new BuiltinBug(this, "Division by zero"));
+    // TODO remove xxx
+      BT.reset(new BuiltinBug(this, "Overflow xxx"));
 
     auto R = std::make_unique<PathSensitiveBugReport>(*BT, Msg, N);
     R->addVisitor(std::move(Visitor));
@@ -44,11 +46,16 @@ void SimpleOverflowChecker::reportBug(
 void SimpleOverflowChecker::checkPreStmt(const BinaryOperator *B,
                                          CheckerContext &C) const {
   BinaryOperator::Opcode Op = B->getOpcode();
-  if (Op != BO_Div && Op != BO_Rem && Op != BO_DivAssign && Op != BO_RemAssign)
+  // if (Op != BO_Div && Op != BO_Rem && Op != BO_DivAssign && Op != BO_RemAssign)
+  //   return;
+
+  // if (!B->getRHS()->getType()->isScalarType())
+  //   return;
+
+  if (Op != BO_Add) 
     return;
 
-  if (!B->getRHS()->getType()->isScalarType())
-    return;
+  
 
   SVal Denom = C.getSVal(B->getRHS());
   Optional<DefinedSVal> DV = Denom.getAs<DefinedSVal>();
@@ -58,21 +65,19 @@ void SimpleOverflowChecker::checkPreStmt(const BinaryOperator *B,
   if (!DV)
     return;
 
+  if (Op == BO_Add) {
+    reportBug("Add is forbidden", stateZero, C);
+  }
+
   // Check for divide by zero.
   ConstraintManager &CM = C.getConstraintManager();
-  ProgramStateRef stateNotZero, stateZero;
+  // ProgramStateRef stateNotZero, stateZero;
+  // Returns a pair of states (StInRange, StOutOfRange) where the given value is assumed to be in the range or out of the range, respectively.
   std::tie(stateNotZero, stateZero) = CM.assumeDual(C.getState(), *DV);
 
   if (!stateNotZero) {
     assert(stateZero);
     reportBug("Division by zero", stateZero, C);
-    return;
-  }
-
-  bool TaintedD = isTainted(C.getState(), *DV);
-  if ((stateNotZero && stateZero && TaintedD)) {
-    reportBug("Division by a tainted value, possibly zero", stateZero, C,
-              std::make_unique<taint::TaintBugVisitor>(*DV));
     return;
   }
 
