@@ -58,9 +58,6 @@ void SimpleOverflowChecker::checkPreStmt(const BinaryOperator *B,
 
   SVal left = C.getSVal(B->getLHS());
   SVal right = C.getSVal(B->getRHS());
-  
-  // doesn't work
-  // SVal isOverflow = SVB.evalBinOp(C.getState(), BO_LT, applyOperation, SVB.makeIntVal(INT_MAX, false), SVB.getConditionType());  
 
   SValBuilder &SVB = C.getSValBuilder();
   SVal finalExpression;
@@ -91,12 +88,12 @@ void SimpleOverflowChecker::checkPreStmt(const BinaryOperator *B,
   if (Optional<DefinedSVal> isOverflowDVal =
           finalExpression.getAs<DefinedSVal>()) {
     // Returns a pair of states (StInRange, StOutOfRange) where the given value is assumed to be in the range or out of the range, respectively.
-    std::tie(stateOverflow, stateNotOverflow) = CM.assumeDual(C.getState(), *isOverflowDVal);
+    auto [stateOverflow, stateNotOverflow] = CM.assumeDual(C.getState(), *isOverflowDVal);
 
-    if (!stateNotOverflow) {
+    if (stateOverflow && !stateNotOverflow) {
       assert(stateOverflow);
       reportBug("Found overflow", stateOverflow, C);
-      return;
+      return; 
     }
   }
 
