@@ -109,6 +109,11 @@ New checks
 
   FIXME: add release notes.
 
+- New :doc:`misc-taint-without-cleanup
+  <clang-tidy/checks/misc/taint-without-cleanup>` check.
+
+  FIXME: add release notes.
+
 New check aliases
 ^^^^^^^^^^^^^^^^^
 
