@@ -10,6 +10,8 @@
 #define LLVM_CLANG_TOOLS_EXTRA_CLANG_TIDY_MISC_TAINTWITHOUTCLEANUPCHECK_H
 
 #include "../ClangTidyCheck.h"
+#include "llvm/ADT/DenseMap.h"
+
 
 namespace clang {
 namespace tidy {
@@ -25,6 +27,10 @@ public:
       : ClangTidyCheck(Name, Context) {}
   void registerMatchers(ast_matchers::MatchFinder *Finder) override;
   void check(const ast_matchers::MatchFinder::MatchResult &Result) override;
+  // void onEndOfTranslationUnit() override;
+
+  // private:
+  //   llvm::DenseMap<const BinaryOperator *, CharSourceRange> FoundDecls;
 };
 
 } // namespace misc

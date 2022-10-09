@@ -9,6 +9,8 @@
 #include "TaintWithoutCleanupCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
+#include "clang/Lex/Lexer.h"
+
 
 using namespace clang::ast_matchers;
 
@@ -17,10 +19,16 @@ namespace tidy {
 namespace misc {
 
 void TaintWithoutCleanupCheck::registerMatchers(MatchFinder *Finder) {
+
+  // implement checker only for cpp
+  if (!getLangOpts().CPlusPlus)
+    return;
+
+
   Finder->addMatcher(binaryOperator(
     isExpansionInMainFile(),hasOperatorName("="),hasRHS(
-      callExpr(callee(functionDecl(hasName("clean"))))
-    )).bind("clean"), this);
+      callExpr(callee(functionDecl(hasName("dirty"))))
+    )).bind("dirty"), this);
 
       
 
@@ -28,21 +36,25 @@ void TaintWithoutCleanupCheck::registerMatchers(MatchFinder *Finder) {
 }
 
 void TaintWithoutCleanupCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  // if function cleanup
-    // mark variable as safe
-  // if var usage
-    // check if safe
-    // if not, show warn
-    // if it is, do nothing
+  // if (const auto *bopNode = Result.Nodes.getNodeAs<BinaryOperator>("dirty")) {
+  //   // const auto lhs = bopNode->getLHS();
+  //   FoundDecls[bopNode] = CharSourceRange::getCharRange(
+  //       bopNode->getLHS()->getBeginLoc(),
+  //       Lexer::findLocationAfterToken(
+  //           bopNode->getLHS()->getEndLoc(), tok::semi, *Result.SourceManager,
+  //           getLangOpts(),
+  //           /*SkipTrailingWhitespaceAndNewLine=*/true));
+  //   return;
+  // }
 
   // TODO change this
-  const auto *bopNode = Result.Nodes.getNodeAs<BinaryOperator>("clean");
+  const auto *bopNode = Result.Nodes.getNodeAs<BinaryOperator>("dirty");
   // get the left operand
   const auto lhs = bopNode->getLHS()->getBeginLoc();
-  auto start = bopNode->getBeginLoc();
-  // auto Diag = diag(start, "found the clean function");
-  auto Diag = diag(lhs, "this var should be clean");
+  // auto start = bopNode->getBeginLoc();
+  // auto Diag = diag(lhs, "variable is dirty");
+  auto Diag = diag(lhs, "variable %0 is dirty")
+        << bopNode->getLHS();
 
   // if (!MatchedDecl->getIdentifier() || MatchedDecl->getName().startswith("awesome_"))
   //   return;
@@ -51,6 +63,16 @@ void TaintWithoutCleanupCheck::check(const MatchFinder::MatchResult &Result) {
   // diag(MatchedDecl->getLocation(), "insert 'awesome'", DiagnosticIDs::Note)
   //     << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
 }
+
+// void TaintWithoutCleanupCheck::onEndOfTranslationUnit() {
+//   for (const auto &FoundDecl : FoundDecls) {
+//     if (FoundDecl.second.isValid()) {
+//       diag(FoundDecl.second->getLocation(), "variable %0 is dirty, should not be used")
+//         << FoundDecl.first;
+//         return;
+//     }
+//   }
+// }
 
 } // namespace misc
 } // namespace tidy
