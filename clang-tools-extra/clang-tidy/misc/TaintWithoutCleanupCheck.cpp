@@ -24,11 +24,17 @@ void TaintWithoutCleanupCheck::registerMatchers(MatchFinder *Finder) {
   if (!getLangOpts().CPlusPlus)
     return;
 
+  // variable initialization
+  Finder->addMatcher(varDecl(
+    isExpansionInMainFile(),hasInitializer(
+      callExpr(callee(functionDecl(hasName("dirty"))))
+    )).bind("dirty_decl"), this);
 
+  // variable attribution
   Finder->addMatcher(binaryOperator(
     isExpansionInMainFile(),hasOperatorName("="),hasRHS(
       callExpr(callee(functionDecl(hasName("dirty"))))
-    )).bind("dirty"), this);
+    )).bind("dirty_assign"), this);
 
       
 
@@ -47,14 +53,21 @@ void TaintWithoutCleanupCheck::check(const MatchFinder::MatchResult &Result) {
   //   return;
   // }
 
+  if (const auto *bopNode = Result.Nodes.getNodeAs<VarDecl>("dirty_decl")) {
+    auto Diag = diag(bopNode->getBeginLoc(), "variable %0 is dirty")<< bopNode;
+  }
+
+  if (const auto *bopNode = Result.Nodes.getNodeAs<BinaryOperator>("dirty_assign")) {
+    const auto lhs = bopNode->getLHS();
+    auto Diag = diag(lhs->getBeginLoc(), "variable %0 is dirty")<< lhs;
+  }
+
   // TODO change this
-  const auto *bopNode = Result.Nodes.getNodeAs<BinaryOperator>("dirty");
   // get the left operand
-  const auto lhs = bopNode->getLHS()->getBeginLoc();
+  // const auto lhs = bopNode->getLHS();
   // auto start = bopNode->getBeginLoc();
   // auto Diag = diag(lhs, "variable is dirty");
-  auto Diag = diag(lhs, "variable %0 is dirty")
-        << bopNode->getLHS();
+  // auto Diag = diag(lhs->getBeginLoc(), "variable %0 is dirty")<< lhs;
 
   // if (!MatchedDecl->getIdentifier() || MatchedDecl->getName().startswith("awesome_"))
   //   return;

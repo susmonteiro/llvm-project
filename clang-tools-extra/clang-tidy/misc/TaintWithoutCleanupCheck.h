@@ -30,7 +30,7 @@ public:
   // void onEndOfTranslationUnit() override;
 
   // private:
-  //   llvm::DenseMap<const BinaryOperator *, CharSourceRange> FoundDecls;
+  //   llvm::DenseMap<const VarDecls *, CharSourceRange> FoundDecls;
 };
 
 } // namespace misc
