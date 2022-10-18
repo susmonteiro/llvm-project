@@ -15,7 +15,7 @@ namespace clang {
 namespace tidy {
 namespace misc {
 
-/// FIXME: Write a short description.
+/// Warns when a tainted value is used in a critical function
 ///
 /// For the user-facing documentation see:
 /// http://clang.llvm.org/extra/clang-tidy/checks/misc/taint-dataflow.html
