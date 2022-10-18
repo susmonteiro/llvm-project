@@ -28,12 +28,58 @@
 #include <vector>
 
 
-using namespace clang::ast_matchers;
-
 namespace clang {
+namespace dataflow {
+namespace {
+  using namespace ast_matchers;
+
+  struct ValueLattice {
+
+    enum class ValueState : bool {
+      Taint,
+      Clean,
+    };
+
+    ValueState State;
+
+    // ? do I need this
+    // When `None`, the lattice is either at top or bottom, based on `State`.
+    // llvm::Optional<int64_t> Value;
+
+    constexpr ValueLattice() : State(ValueState::Taint) {}
+    constexpr ValueLattice(ValueState S) : State(S) {}
+
+    static constexpr ValueLattice bottom() {
+      return ValueLattice(ValueState::Taint);
+    }
+
+    friend bool operator==(const ValueLattice &Lhs, const ValueLattice &Rhs) {
+      return Lhs.State == Rhs.State;
+    }
+
+    friend bool operator!=(const ValueLattice &Lhs, const ValueLattice &Rhs) {
+      return !(Lhs == Rhs);
+    }
+
+    // ? unsure about this join function
+    LatticeJoinEffect join(const ValueLattice &Other) {
+      if (this->State != ValueState::Clean && *this != Other) {
+        return LatticeJoinEffect::Unchanged;
+      }
+        
+      *this = bottom();
+      return LatticeJoinEffect::Changed;
+    }
+  };
+
+  // using TaintDataflowLattice = VarMapLattice<ValueLattice>;
+
+
+}
+} // namespace dataflow
+
 namespace tidy {
 namespace misc {
-// namespace dataflow {
 using ast_matchers::MatchFinder;
 
 
@@ -49,24 +95,28 @@ using ast_matchers::MatchFinder;
 void TaintDataflowCheck::registerMatchers(MatchFinder *Finder) {
   using namespace ast_matchers;
 
-  // ? want to analyze all variables declared?
-  Finder->addMatcher(varDecl(
-    isExpansionInMainFile(),hasInitializer(
-      callExpr(callee(functionDecl(hasName("readInput"))))
-    )).bind("tainted"), this);
+  /* Finder->addMatcher(binaryOperator(
+    isExpansionInMainFile(),hasOperatorName("="),hasRHS(
+      callExpr(callee(functionDecl(hasName("dirty"))))
+    )).bind("dirty_assign"), this); */
 
-    // TODO missing other kinds of assignment
+  Finder->addMatcher(callExpr(callee(functionDecl(hasName("critical"))))
+    .bind("call_critical"), this);
+
+
 }
 
 void TaintDataflowCheck::check(const MatchFinder::MatchResult &Result) {
   if (Result.SourceManager->getDiagnostics().hasUncompilableErrorOccurred())
     return;
 
-  
+  // TODO delete me
+  if (const auto *bopNode = Result.Nodes.getNodeAs<CallExpr>("call_critical")) {
+    auto Diag = diag(bopNode->getBeginLoc(), "found call to critical function");
+  }  
 }
 
 
 } // namespace misc
 } // namespace tidy
-// } // namespace dataflow
 } // namespace clang
