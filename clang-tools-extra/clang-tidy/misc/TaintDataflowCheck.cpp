@@ -72,7 +72,76 @@ namespace {
     }
   };
 
+  // TODO understand why this is needed and change name of ValueLattice if it is not needed
   // using TaintDataflowLattice = VarMapLattice<ValueLattice>;
+
+  constexpr char kVar[] = "var";
+  constexpr char kAssignment[] = "assignment";
+  constexpr char kRHS[] = "rhs";
+
+
+  auto refToVar() { return declRefExpr(to(varDecl().bind(kVar))); }
+
+  class TaintDataflowAnalysis
+    : public DataflowAnalysis<TaintDataflowAnalysis,
+                              ValueLattice> {
+    public:
+      explicit TaintDataflowAnalysis(ASTContext &Context)
+          : DataflowAnalysis<TaintDataflowAnalysis,
+                            ValueLattice>(Context) {}
+
+      static ValueLattice initialElement() {
+        return ValueLattice::bottom();
+      }
+
+      void transfer(const CFGElement *E, ValueLattice &Vars,
+                    Environment &Env) {
+        auto CS = E->getAs<CFGStmt>();
+        if (!CS)
+          return;
+        auto S = CS->getStmt();
+        auto matcher =
+            stmt(binaryOperator(hasOperatorName("="), hasLHS(refToVar()),
+                                      hasRHS(expr().bind(kRHS)))
+                          .bind(kAssignment));
+
+
+    ASTContext &Context = getASTContext();
+    auto Results = match(matcher, *S, Context);
+    if (Results.empty())
+      return;
+    // const BoundNodes &Nodes = Results[0];
+
+    // const auto *Var = Nodes.getNodeAs<clang::VarDecl>(kVar);
+    // assert(Var != nullptr);
+
+    // if (Nodes.getNodeAs<clang::VarDecl>(kDecl) != nullptr) {
+    //   if (const auto *E = Nodes.getNodeAs<clang::Expr>(kInit)) {
+    //     Expr::EvalResult R;
+    //     Vars[Var] = (E->EvaluateAsInt(R, Context) && R.Val.isInt())
+    //                     ? ValueLattice(R.Val.getInt().getExtValue())
+    //                     : ValueLattice::top();
+    //   } else {
+    //     // An unitialized variable holds *some* value, but we don't know what it
+    //     // is (it is implementation defined), so we set it to top.
+    //     Vars[Var] = ValueLattice::top();
+    //   }
+    // } else if (Nodes.getNodeAs<clang::Expr>(kJustAssignment)) {
+    //   const auto *E = Nodes.getNodeAs<clang::Expr>(kRHS);
+    //   assert(E != nullptr);
+
+    //   Expr::EvalResult R;
+    //   Vars[Var] = (E->EvaluateAsInt(R, Context) && R.Val.isInt())
+    //                   ? ValueLattice(R.Val.getInt().getExtValue())
+    //                   : ValueLattice::top();
+    // } else if (Nodes.getNodeAs<clang::Expr>(kAssignment)) {
+    //   // Any assignment involving the expression itself resets the variable to
+    //   // "unknown". A more advanced analysis could try to evaluate the compound
+    //   // assignment. For example, `x += 0` need not invalidate `x`.
+    //   Vars[Var] = ValueLattice::top();
+    // }
+  }
+};
 
 
 }
