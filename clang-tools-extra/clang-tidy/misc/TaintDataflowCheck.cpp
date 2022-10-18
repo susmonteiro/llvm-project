@@ -33,14 +33,16 @@ using namespace clang::ast_matchers;
 namespace clang {
 namespace tidy {
 namespace misc {
+// namespace dataflow {
 using ast_matchers::MatchFinder;
 
-static std::vector<SourceLocation> analyzeVariable(const VarDecl &VarDecl, ASTContext &ASTCtx) {
-  using dataflow::ControlFlowContext;
-  using dataflow::DataflowAnalysisState;
+
+
+
+/* static std::vector<SourceLocation> analyzeVariable(const VarDecl &VarDecl, ASTContext &ASTCtx) {
   
 
-}
+} */
 
 
 
@@ -63,6 +65,8 @@ void TaintDataflowCheck::check(const MatchFinder::MatchResult &Result) {
   
 }
 
+
 } // namespace misc
 } // namespace tidy
+// } // namespace dataflow
 } // namespace clang
