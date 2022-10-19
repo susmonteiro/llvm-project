@@ -144,6 +144,21 @@ public:
   }
 };
 
+class TaintDataflowDiagnoser {
+public:
+  // ? erased "options"
+  TaintDataflowDiagnoser() : DiagnoseMatchSwitch() {}
+
+  std::vector<SourceLocation> diagnose(ASTContext &Ctx, const CFGElement *Elt,
+                                       const Environment &Env) {
+    return DiagnoseMatchSwitch(*Elt, Ctx, Env);
+  }
+
+private:
+  CFGMatchSwitch<const Environment, std::vector<SourceLocation>>
+      DiagnoseMatchSwitch;
+};
+
 // } // namespace
 } // namespace dataflow
 
@@ -151,8 +166,8 @@ namespace tidy {
 namespace misc {
 using ast_matchers::MatchFinder;
 // TODO change/remove me
-using dataflow::UncheckedOptionalAccessDiagnoser;
-using dataflow::UncheckedOptionalAccessModel;
+using dataflow::TaintDataflowAnalysis;
+using dataflow::TaintDataflowDiagnoser;
 using dataflow::ValueLattice;
 using llvm::Optional;
 
@@ -170,20 +185,19 @@ analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
   dataflow::DataflowAnalysisContext AnalysisContext(
       std::make_unique<dataflow::WatchedLiteralsSolver>());
   dataflow::Environment Env(AnalysisContext, FuncDecl);
+  TaintDataflowAnalysis Analysis(ASTCtx);
   // TODO this
-  UncheckedOptionalAccessModel Analysis(ASTCtx);
-  // TODO this
-  UncheckedOptionalAccessDiagnoser Diagnoser;
+  TaintDataflowDiagnoser Diagnoser;
   std::vector<SourceLocation> Diagnostics;
 
   // TODO change function
   Expected<std::vector<
-      Optional<DataflowAnalysisState<UncheckedOptionalAccessModel::Lattice>>>>
+      Optional<DataflowAnalysisState<TaintDataflowAnalysis::Lattice>>>>
       BlockToOutputState = dataflow::runDataflowAnalysis(
           *Context, Analysis, Env,
           [&ASTCtx, &Diagnoser, &Diagnostics](
               const CFGElement &Elt,
-              const DataflowAnalysisState<UncheckedOptionalAccessModel::Lattice>
+              const DataflowAnalysisState<TaintDataflowAnalysis::Lattice>
                   &State) mutable {
             auto EltDiagnostics = Diagnoser.diagnose(ASTCtx, &Elt, State.Env);
             llvm::move(EltDiagnostics, std::back_inserter(Diagnostics));
@@ -217,8 +231,8 @@ analyzeFunction(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
           *Context, Analysis, Env,
           [&ASTCtx, &Diagnoser, &Diagnostics](
               const CFGElement &Elt,
-              const DataflowAnalysisState<UncheckedOptionalAccessModel::Lattice>
-                  &State) mutable {
+              const
+DataflowAnalysisState<UncheckedOptionalAccessModel::Lattice> &State) mutable {
             auto EltDiagnostics = Diagnoser.diagnose(ASTCtx, &Elt, State.Env);
             llvm::move(EltDiagnostics, std::back_inserter(Diagnostics));
           });
