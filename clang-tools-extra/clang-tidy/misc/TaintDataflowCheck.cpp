@@ -204,50 +204,33 @@ public:
     auto matcher = stmt(callExpr(callee(functionDecl(hasName("critical"))))
                             .bind(kCallCritical));
 
-    // m callExpr(callee(functionDecl(hasName("critical"))))
-    // m callExpr(callee(functionDecl(hasName("critical"))), hasArgument())
-
     auto Results = match(matcher, *S, Ctx);
 
-    if (Results.empty()) {
-      cout << "> Did not find critical call" << endl;
+    if (Results.empty())
       return {};
-    } else {
-      cout << "> Found critical call" << endl;
-      const BoundNodes &Nodes = Results[0];
 
-      if (const auto *CE = Nodes.getNodeAs<CallExpr>(kCallCritical)) {
-        if (CE->getNumArgs() != 1)
-          return {};
-        const auto *Arg = CE->getArg(0);
-        if (const auto *Decl = Arg->getReferencedDeclOfCallee()) {
-          if (const auto *ArgDecl = dyn_cast<VarDecl>(Decl)) {
-            // Vars[ArgDecl] = ValueLattice::taint();
-            if (Vars.contains(ArgDecl) &&
-                Vars.lookup(ArgDecl) == ValueLattice::taint()) {
-              // const bool whatever = Vars.compare(ArgDecl);
-              // const auto whatever = Vars.get(ArgDecl);
-              // const auto whatever = Vars.lookup(ArgDecl);
+    const BoundNodes &Nodes = Results[0];
 
-              cout << "=== Found in the Lattice Map ===" << endl;
-              return {CE->getBeginLoc()};
-            }
-            return {};
+    if (const auto *CE = Nodes.getNodeAs<CallExpr>(kCallCritical)) {
+      if (CE->getNumArgs() != 1)
+        return {};
+
+      const auto *Arg = CE->getArg(0);
+
+      if (const auto *Decl = Arg->getReferencedDeclOfCallee()) {
+        // check if it is a variable
+        // TODO check it this works
+        if (const auto *ArgDecl = dyn_cast<VarDecl>(Decl)) {
+
+          if (Vars.contains(ArgDecl) &&
+              Vars.lookup(ArgDecl) == ValueLattice::taint()) {
+
+            return {CE->getBeginLoc()};
           }
         }
-
-        // if (Vars[ArgDecl] != null) {
-        //   cout << "=== Found in the Lattice Map ===" << endl;
-        // }
-
-        // const auto *Args = CE->getArgs();
-        cout << "Could get CallExpr!!" << endl;
-        return {CE->getBeginLoc()};
       }
     }
-
-    // TODO change this
-    return {};
+      return {};
   }
 };
 } // namespace dataflow
