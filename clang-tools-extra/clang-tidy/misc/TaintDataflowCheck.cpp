@@ -17,6 +17,7 @@
 #include "clang/Analysis/FlowSensitive/DataflowAnalysisContext.h"
 #include "clang/Analysis/FlowSensitive/DataflowEnvironment.h"
 #include "clang/Analysis/FlowSensitive/DataflowLattice.h"
+#include "clang/Analysis/FlowSensitive/MapLattice.h"
 #include "clang/Analysis/FlowSensitive/WatchedLiteralsSolver.h"
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/Any.h"
@@ -59,6 +60,14 @@ struct ValueLattice {
     return ValueLattice(ValueState::Taint);
   }
 
+  static constexpr ValueLattice taint() {
+    return ValueLattice(ValueState::Taint);
+  }
+
+  static constexpr ValueLattice clean() {
+    return ValueLattice(ValueState::Clean);
+  }
+
   friend bool operator==(const ValueLattice &Lhs, const ValueLattice &Rhs) {
     return Lhs.State == Rhs.State;
   }
@@ -78,6 +87,8 @@ struct ValueLattice {
   }
 };
 
+using TaintDataflowLattice = VarMapLattice<ValueLattice>;
+
 // TODO understand why this is needed and change name of ValueLattice if it is
 // not needed using TaintDataflowLattice = VarMapLattice<ValueLattice>;
 
@@ -88,107 +99,142 @@ constexpr char kTaint[] = "taint";
 constexpr char kCleanup[] = "cleanup";
 constexpr char readInput[] = "readInput";
 constexpr char cleanup[] = "cleanup";
-
+constexpr char kCallCritical[] = "critical";
 
 auto refToVar() { return declRefExpr(to(varDecl().bind(kVar))); }
 
-auto funcCall(const char name[]) { return callExpr(callee(functionDecl(hasName(name)))); }
-
+auto funcCall(const char name[]) {
+  return callExpr(callee(functionDecl(hasName(name))));
+}
 
 class TaintDataflowAnalysis
-    : public DataflowAnalysis<TaintDataflowAnalysis, ValueLattice> {
+    : public DataflowAnalysis<TaintDataflowAnalysis, TaintDataflowLattice> {
 public:
   explicit TaintDataflowAnalysis(ASTContext &Context)
-      : DataflowAnalysis<TaintDataflowAnalysis, ValueLattice>(Context) {}
+      : DataflowAnalysis<TaintDataflowAnalysis, TaintDataflowLattice>(Context) {
+  }
 
-  static ValueLattice initialElement() { return ValueLattice::bottom(); }
+  static TaintDataflowLattice initialElement() {
+    return TaintDataflowLattice::bottom();
+  }
 
-  void transfer(const CFGElement *E, ValueLattice &Vars, Environment &Env) {
+  void transfer(const CFGElement *E, TaintDataflowLattice &Vars,
+                Environment &Env) {
     auto CS = E->getAs<CFGStmt>();
     if (!CS)
       return;
     auto S = CS->getStmt();
-    auto matcher = stmt(binaryOperator(hasOperatorName("="), hasLHS(refToVar()),
-                                       hasRHS(anyOf(funcCall("readInput").bind(kTaint), funcCall("cleanup").bind(kCleanup), expr().bind(kRHS))))
-                            .bind(kAssignment));
+    auto matcher =
+        stmt(binaryOperator(hasOperatorName("="), hasLHS(refToVar()),
+                            hasRHS(anyOf(funcCall("readInput").bind(kTaint),
+                                         funcCall("cleanup").bind(kCleanup),
+                                         expr().bind(kRHS))))
+                 .bind(kAssignment));
 
     // find any assignment
-    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(expr())))
+    // m stmt(binaryOperator(hasOperatorName("="),
+    // hasLHS(declRefExpr(to(varDecl()))), hasRHS(expr())))
 
     // find any assignment with readInput() dirty function
-    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(callExpr(callee(functionDecl(hasName("readInput")))))))
+    // m stmt(binaryOperator(hasOperatorName("="),
+    // hasLHS(declRefExpr(to(varDecl()))),
+    // hasRHS(callExpr(callee(functionDecl(hasName("readInput")))))))
 
     // find any assignment with cleanup() clean function
-    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(callExpr(callee(functionDecl(hasName("cleanup")))))))
+    // m stmt(binaryOperator(hasOperatorName("="),
+    // hasLHS(declRefExpr(to(varDecl()))),
+    // hasRHS(callExpr(callee(functionDecl(hasName("cleanup")))))))
 
-    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(anyOf(expr(), callExpr(callee(functionDecl(hasName("readInput"))))))))
+    // m stmt(binaryOperator(hasOperatorName("="),
+    // hasLHS(declRefExpr(to(varDecl()))), hasRHS(anyOf(expr(),
+    // callExpr(callee(functionDecl(hasName("readInput"))))))))
 
     ASTContext &Context = getASTContext();
     auto Results = match(matcher, *S, Context);
     if (Results.empty()) {
-      cout << "> There are no results for the matcher" << endl;
+      // cout << "> There are no results for the matcher" << endl;
 
       return;
     }
 
-    
-
-
     const BoundNodes &Nodes = Results[0];
 
-    if (const auto *CallExpression = Nodes.getNodeAs<CallExpr>(kTaint)) {
+    const auto *Var = Nodes.getNodeAs<clang::VarDecl>(kVar);
+    assert(Var != nullptr);
+
+    if (Nodes.getNodeAs<CallExpr>(kTaint)) {
       cout << "> Found a TAINT call expression match" << endl;
+      Vars[Var] = ValueLattice::taint();
 
-      // then set the left part of the variable to taint
-
-    } else if (const auto *CallExpression = Nodes.getNodeAs<CallExpr>(kCleanup)){
+    } else if (Nodes.getNodeAs<CallExpr>(kCleanup)) {
       cout << "> Found a CLEAN call expression match" << endl;
-
-      // then set the left part of the variable to clean
+      Vars[Var] = ValueLattice::clean();
 
     } else {
-      cout << "> Found a expression match" << endl;
+      // cout << "> Found a expression match" << endl;
 
-      // then set the left part of the variable to taint/clean depending on the expr
-      // if any of the vars in the expression is taint not clean, then set the lhs to taint
-      // beware of values (instead of vars). Those are always clean
+      // then set the left part of the variable to taint/clean depending on the
+      // expr if any of the vars in the expression is taint not clean, then set
+      // the lhs to taint beware of values (instead of vars). Those are always
+      // clean
 
-      const auto *Assignment = Nodes.getNodeAs<BinaryOperator>(kAssignment);
+      // const auto *Assignment = Nodes.getNodeAs<BinaryOperator>(kAssignment);
 
-      if (Assignment != nullptr) {
-        const auto *E = Nodes.getNodeAs<Expr>(kRHS);
-        assert(E != nullptr);
-      }
+      // if (Assignment != nullptr) {
+      //   const auto *E = Nodes.getNodeAs<Expr>(kRHS);
+      //   assert(E != nullptr);
+      // }
+      //
+      // TODO for now do nothing
     }
-
-    
-
   }
 };
 
 class TaintDataflowDiagnoser {
 public:
-  // ? erased "options"
-  TaintDataflowDiagnoser() : DiagnoseMatchSwitch() {}
+  TaintDataflowDiagnoser() {}
 
-  std::vector<SourceLocation> diagnose(ASTContext &Ctx, const CFGElement *Elt,
+  std::vector<SourceLocation> diagnose(ASTContext &Ctx, const CFGElement *E,
                                        const Environment &Env) {
-    return DiagnoseMatchSwitch(*Elt, Ctx, Env);
+    auto CS = E->getAs<CFGStmt>();
+    if (!CS)
+      return {};
+    auto S = CS->getStmt();
+    auto matcher = stmt(callExpr(callee(functionDecl(hasName("critical"))))
+                            .bind(kCallCritical));
+
+    m callExpr(callee(functionDecl(hasName("critical"))))
+    m callExpr(callee(functionDecl(hasName("critical"))), )
+
+
+    auto Results = match(matcher, *S, Ctx);
+
+    if (Results.empty()) {
+      cout << "> Did not find critical call" << endl;
+      return {};
+    } else {
+      cout << "> Found critical call" << endl;
+      const BoundNodes &Nodes = Results[0];
+
+      if (const auto *CE = Nodes.getNodeAs<CallExpr>(kCallCritical)) {
+        
+        // const auto *Args = CE->getArgs();
+        cout << "Could get CallExpr!!" << endl;
+        return { CE->getBeginLoc() };
+      } 
+    }
+
+    // TODO change this
+    return {};
   }
-
-private:
-  CFGMatchSwitch<const Environment, std::vector<SourceLocation>>
-      DiagnoseMatchSwitch;
 };
-
-// } // namespace
 } // namespace dataflow
 
 namespace tidy {
 namespace misc {
 using ast_matchers::MatchFinder;
-// TODO change/remove me
 using dataflow::TaintDataflowAnalysis;
+// TODO change/remove me
 using dataflow::TaintDataflowDiagnoser;
 using dataflow::ValueLattice;
 using llvm::Optional;
@@ -197,7 +243,6 @@ static Optional<std::vector<SourceLocation>>
 analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
 
   cout << "Analyzing code..." << endl;
-
 
   using dataflow::ControlFlowContext;
   using dataflow::DataflowAnalysisState;
@@ -216,9 +261,8 @@ analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
   TaintDataflowDiagnoser Diagnoser;
   std::vector<SourceLocation> Diagnostics;
 
-
-  cout << "\tWill run dataflow analysis now. Everything should be fine up until this point." << endl;
-
+  // cout << "\tWill run dataflow analysis now. Everything should be fine up
+  // until this point." << endl;
 
   // TODO change function
   Expected<std::vector<
@@ -273,7 +317,6 @@ void TaintDataflowCheck::check(const MatchFinder::MatchResult &Result) {
 
   cout << "Checking..." << endl;
 
-
   // ? we want the function where critical is called?
   // ? or do we want the critical call itself
   const auto *FuncDecl = Result.Nodes.getNodeAs<FunctionDecl>(FuncID);
@@ -283,7 +326,7 @@ void TaintDataflowCheck::check(const MatchFinder::MatchResult &Result) {
   if (Optional<std::vector<SourceLocation>> Errors =
           analyzeCode(*FuncDecl, *Result.Context))
     for (const SourceLocation &Loc : *Errors)
-      diag(Loc, "unchecked access to optional value");
+      diag(Loc, "calling critical function with taint value");
 }
 
 } // namespace misc
