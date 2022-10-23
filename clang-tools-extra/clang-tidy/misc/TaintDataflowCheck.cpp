@@ -30,6 +30,8 @@
 #include "clang/Analysis/FlowSensitive/Models/UncheckedOptionalAccessModel.h"
 #include <iostream>
 
+using namespace std;
+
 static constexpr llvm::StringLiteral FuncID("fun");
 
 namespace clang {
@@ -82,8 +84,16 @@ struct ValueLattice {
 constexpr char kVar[] = "var";
 constexpr char kAssignment[] = "assignment";
 constexpr char kRHS[] = "rhs";
+constexpr char kTaint[] = "taint";
+constexpr char kCleanup[] = "cleanup";
+constexpr char readInput[] = "readInput";
+constexpr char cleanup[] = "cleanup";
+
 
 auto refToVar() { return declRefExpr(to(varDecl().bind(kVar))); }
+
+auto funcCall(const char name[]) { return callExpr(callee(functionDecl(hasName(name)))); }
+
 
 class TaintDataflowAnalysis
     : public DataflowAnalysis<TaintDataflowAnalysis, ValueLattice> {
@@ -99,48 +109,50 @@ public:
       return;
     auto S = CS->getStmt();
     auto matcher = stmt(binaryOperator(hasOperatorName("="), hasLHS(refToVar()),
-                                       hasRHS(expr().bind(kRHS)))
+                                       hasRHS(anyOf(funcCall("readInput").bind(kTaint), funcCall("cleanup").bind(kCleanup), expr().bind(kRHS))))
                             .bind(kAssignment));
+
+    // find any assignment
+    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(expr())))
+
+    // find any assignment with readInput() dirty function
+    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(callExpr(callee(functionDecl(hasName("readInput")))))))
+
+    // find any assignment with cleanup() clean function
+    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(callExpr(callee(functionDecl(hasName("cleanup")))))))
+
+    // m stmt(binaryOperator(hasOperatorName("="), hasLHS(declRefExpr(to(varDecl()))), hasRHS(anyOf(expr(), callExpr(callee(functionDecl(hasName("readInput"))))))))
 
     ASTContext &Context = getASTContext();
     auto Results = match(matcher, *S, Context);
-    if (Results.empty())
+    if (Results.empty()) {
+      cout << "> There are no results for the matcher" << endl;
+
       return;
+    }
+
+    
+
+
     const BoundNodes &Nodes = Results[0];
 
-    const auto *Var = Nodes.getNodeAs<BinaryOperator>(kAssignment);
-    assert(Var != nullptr);
+    if (const auto *CallExpression = Nodes.getNodeAs<CallExpr>(kTaint)) {
+      cout << "> Found a TAINT call expression match" << endl;
+      
+    } else if (const auto *CallExpression = Nodes.getNodeAs<CallExpr>(kCleanup)){
+      cout << "> Found a CLEAN call expression match" << endl;
+    } else {
+      cout << "> Found a expression match" << endl;
+      const auto *Assignment = Nodes.getNodeAs<BinaryOperator>(kAssignment);
 
-    // std::cout << "Found a binary operation" << std::endl;
+      if (Assignment != nullptr) {
+        const auto *E = Nodes.getNodeAs<Expr>(kRHS);
+        assert(E != nullptr);
+      }
+    }
 
-    // if (Nodes.getNodeAs<clang::VarDecl>(kDecl) != nullptr) {
-    //   if (const auto *E = Nodes.getNodeAs<clang::Expr>(kInit)) {
-    //     Expr::EvalResult R;
-    //     Vars[Var] = (E->EvaluateAsInt(R, Context) && R.Val.isInt())
-    //                     ? ValueLattice(R.Val.getInt().getExtValue())
-    //                     : ValueLattice::top();
-    //   } else {
-    //     // An unitialized variable holds *some* value, but we don't know what
-    //     it
-    //     // is (it is implementation defined), so we set it to top.
-    //     Vars[Var] = ValueLattice::top();
-    //   }
-    // } else if (Nodes.getNodeAs<clang::Expr>(kJustAssignment)) {
-    //   const auto *E = Nodes.getNodeAs<clang::Expr>(kRHS);
-    //   assert(E != nullptr);
+    
 
-    //   Expr::EvalResult R;
-    //   Vars[Var] = (E->EvaluateAsInt(R, Context) && R.Val.isInt())
-    //                   ? ValueLattice(R.Val.getInt().getExtValue())
-    //                   : ValueLattice::top();
-    // } else if (Nodes.getNodeAs<clang::Expr>(kAssignment)) {
-    //   // Any assignment involving the expression itself resets the variable
-    //   to
-    //   // "unknown". A more advanced analysis could try to evaluate the
-    //   compound
-    //   // assignment. For example, `x += 0` need not invalidate `x`.
-    //   Vars[Var] = ValueLattice::top();
-    // }
   }
 };
 
@@ -173,6 +185,10 @@ using llvm::Optional;
 
 static Optional<std::vector<SourceLocation>>
 analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
+
+  cout << "Analyzing code..." << endl;
+
+
   using dataflow::ControlFlowContext;
   using dataflow::DataflowAnalysisState;
   using llvm::Expected;
@@ -189,6 +205,10 @@ analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
   // TODO this
   TaintDataflowDiagnoser Diagnoser;
   std::vector<SourceLocation> Diagnostics;
+
+
+  cout << "\tWill run dataflow analysis now. Everything should be fine up until this point." << endl;
+
 
   // TODO change function
   Expected<std::vector<
@@ -208,40 +228,6 @@ analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
   return Diagnostics;
 }
 
-/* static Optional<std::vector<SourceLocation>>
-analyzeFunction(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
-  using dataflow::ControlFlowContext;
-  using dataflow::DataflowAnalysisState;
-  using llvm::Expected;
-
-  Expected<ControlFlowContext> Context =
-      ControlFlowContext::build(&FuncDecl, FuncDecl.getBody(), &ASTCtx);
-  if (!Context)
-    return llvm::None;
-
-  dataflow::DataflowAnalysisContext AnalysisContext(
-      std::make_unique<dataflow::WatchedLiteralsSolver>());
-  dataflow::Environment Env(AnalysisContext, FuncDecl);
-  UncheckedOptionalAccessModel Analysis(ASTCtx);
-  UncheckedOptionalAccessDiagnoser Diagnoser;
-  std::vector<SourceLocation> Diagnostics;
-  Expected<std::vector<
-      Optional<DataflowAnalysisStateValue>>>>
-      BlockToOutputState = dataflow::runDataflowAnalysis(
-          *Context, Analysis, Env,
-          [&ASTCtx, &Diagnoser, &Diagnostics](
-              const CFGElement &Elt,
-              const
-DataflowAnalysisState<UncheckedOptionalAccessModel::Lattice> &State) mutable {
-            auto EltDiagnostics = Diagnoser.diagnose(ASTCtx, &Elt, State.Env);
-            llvm::move(EltDiagnostics, std::back_inserter(Diagnostics));
-          });
-  if (!BlockToOutputState)
-    return llvm::None;
-
-  return Diagnostics;
-} */
-
 void TaintDataflowCheck::registerMatchers(MatchFinder *Finder) {
   using namespace ast_matchers;
 
@@ -253,6 +239,8 @@ void TaintDataflowCheck::registerMatchers(MatchFinder *Finder) {
   // Finder->addMatcher(
   //     callExpr(callee(functionDecl(hasName("critical")))).bind("call_critical"),
   //     this);
+
+  cout << "Beginning..." << endl;
 
   auto HasOptionalCallDescendant =
       hasDescendant(callExpr(callee(functionDecl(hasName("critical")))));
@@ -272,6 +260,9 @@ void TaintDataflowCheck::registerMatchers(MatchFinder *Finder) {
 void TaintDataflowCheck::check(const MatchFinder::MatchResult &Result) {
   if (Result.SourceManager->getDiagnostics().hasUncompilableErrorOccurred())
     return;
+
+  cout << "Checking..." << endl;
+
 
   // ? we want the function where critical is called?
   // ? or do we want the critical call itself
