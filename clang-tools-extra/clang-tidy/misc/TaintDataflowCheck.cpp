@@ -78,12 +78,15 @@ struct ValueLattice {
 
   // ? unsure about this join function
   LatticeJoinEffect join(const ValueLattice &Other) {
-    if (this->State != ValueState::Clean && *this != Other) {
-      return LatticeJoinEffect::Unchanged;
+
+    cout << "Join function called!" << endl;
+
+    if (*this == clean() && Other == taint()) {
+      *this = bottom();
+      return LatticeJoinEffect::Changed;
     }
 
-    *this = bottom();
-    return LatticeJoinEffect::Changed;
+    return LatticeJoinEffect::Unchanged;
   }
 };
 
@@ -152,8 +155,6 @@ public:
     ASTContext &Context = getASTContext();
     auto Results = match(matcher, *S, Context);
     if (Results.empty()) {
-      // cout << "> There are no results for the matcher" << endl;
-
       return;
     }
 
@@ -163,14 +164,17 @@ public:
     assert(Var != nullptr);
 
     if (Nodes.getNodeAs<CallExpr>(kTaint)) {
-      cout << "> Found a TAINT call expression match" << endl;
       Vars[Var] = ValueLattice::taint();
 
     } else if (Nodes.getNodeAs<CallExpr>(kCleanup)) {
-      cout << "> Found a CLEAN call expression match" << endl;
       Vars[Var] = ValueLattice::clean();
 
     } else {
+      const auto *E = Nodes.getNodeAs<clang::Expr>(kRHS);
+      assert(E != nullptr);
+
+      Expr::EvalResult R;
+      // Vars[Var] =
       // cout << "> Found a expression match" << endl;
 
       // then set the left part of the variable to taint/clean depending on the
@@ -230,7 +234,7 @@ public:
         }
       }
     }
-      return {};
+    return {};
   }
 };
 } // namespace dataflow
