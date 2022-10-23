@@ -138,11 +138,21 @@ public:
 
     if (const auto *CallExpression = Nodes.getNodeAs<CallExpr>(kTaint)) {
       cout << "> Found a TAINT call expression match" << endl;
-      
+
+      // then set the left part of the variable to taint
+
     } else if (const auto *CallExpression = Nodes.getNodeAs<CallExpr>(kCleanup)){
       cout << "> Found a CLEAN call expression match" << endl;
+
+      // then set the left part of the variable to clean
+
     } else {
       cout << "> Found a expression match" << endl;
+
+      // then set the left part of the variable to taint/clean depending on the expr
+      // if any of the vars in the expression is taint not clean, then set the lhs to taint
+      // beware of values (instead of vars). Those are always clean
+
       const auto *Assignment = Nodes.getNodeAs<BinaryOperator>(kAssignment);
 
       if (Assignment != nullptr) {
