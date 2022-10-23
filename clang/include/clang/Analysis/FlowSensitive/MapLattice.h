@@ -87,6 +87,8 @@ public:
   iterator find(const key_type &K) { return C.find(K); }
   const_iterator find(const key_type &K) const { return C.find(K); }
 
+  mapped_type lookup(const key_type &K) const { return C.lookup(K); }
+
   mapped_type &operator[](const key_type &K) { return C[K]; }
 
   /// If an entry exists in one map but not the other, the missing entry is

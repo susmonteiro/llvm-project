@@ -195,7 +195,8 @@ public:
   TaintDataflowDiagnoser() {}
 
   std::vector<SourceLocation> diagnose(ASTContext &Ctx, const CFGElement *E,
-                                       const Environment &Env) {
+                                       const Environment &Env,
+                                       const TaintDataflowLattice &Vars) {
     auto CS = E->getAs<CFGStmt>();
     if (!CS)
       return {};
@@ -203,9 +204,8 @@ public:
     auto matcher = stmt(callExpr(callee(functionDecl(hasName("critical"))))
                             .bind(kCallCritical));
 
-    m callExpr(callee(functionDecl(hasName("critical"))))
-    m callExpr(callee(functionDecl(hasName("critical"))), )
-
+    // m callExpr(callee(functionDecl(hasName("critical"))))
+    // m callExpr(callee(functionDecl(hasName("critical"))), hasArgument())
 
     auto Results = match(matcher, *S, Ctx);
 
@@ -217,11 +217,33 @@ public:
       const BoundNodes &Nodes = Results[0];
 
       if (const auto *CE = Nodes.getNodeAs<CallExpr>(kCallCritical)) {
-        
+        if (CE->getNumArgs() != 1)
+          return {};
+        const auto *Arg = CE->getArg(0);
+        if (const auto *Decl = Arg->getReferencedDeclOfCallee()) {
+          if (const auto *ArgDecl = dyn_cast<VarDecl>(Decl)) {
+            // Vars[ArgDecl] = ValueLattice::taint();
+            if (Vars.contains(ArgDecl) &&
+                Vars.lookup(ArgDecl) == ValueLattice::taint()) {
+              // const bool whatever = Vars.compare(ArgDecl);
+              // const auto whatever = Vars.get(ArgDecl);
+              // const auto whatever = Vars.lookup(ArgDecl);
+
+              cout << "=== Found in the Lattice Map ===" << endl;
+              return {CE->getBeginLoc()};
+            }
+            return {};
+          }
+        }
+
+        // if (Vars[ArgDecl] != null) {
+        //   cout << "=== Found in the Lattice Map ===" << endl;
+        // }
+
         // const auto *Args = CE->getArgs();
         cout << "Could get CallExpr!!" << endl;
-        return { CE->getBeginLoc() };
-      } 
+        return {CE->getBeginLoc()};
+      }
     }
 
     // TODO change this
@@ -273,7 +295,8 @@ analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
               const CFGElement &Elt,
               const DataflowAnalysisState<TaintDataflowAnalysis::Lattice>
                   &State) mutable {
-            auto EltDiagnostics = Diagnoser.diagnose(ASTCtx, &Elt, State.Env);
+            auto EltDiagnostics =
+                Diagnoser.diagnose(ASTCtx, &Elt, State.Env, State.Lattice);
             llvm::move(EltDiagnostics, std::back_inserter(Diagnostics));
           });
   if (!BlockToOutputState)
