@@ -23,7 +23,6 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Error.h"
-#include <iostream>
 #include <vector>
 
 using namespace std;
@@ -66,7 +65,6 @@ struct ValueLattice {
     return !(Lhs == Rhs);
   }
 
-  // ? unsure about this join function
   LatticeJoinEffect join(const ValueLattice &Other) {
 
     if (*this == clean() && Other == taint()) {
@@ -208,7 +206,6 @@ public:
       const auto *Arg = CE->getArg(0);
 
       if (const auto *Decl = Arg->getReferencedDeclOfCallee()) {
-        cout << "HERE" << endl;
         // check if it is a variable
         if (const auto *ArgDecl = dyn_cast<VarDecl>(Decl)) {
 
