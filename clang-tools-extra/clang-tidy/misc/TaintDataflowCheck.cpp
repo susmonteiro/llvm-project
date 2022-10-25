@@ -8,7 +8,6 @@
 
 #include "TaintDataflowCheck.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
@@ -24,10 +23,8 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Error.h"
-#include <vector>
-
-// TODO remove me
 #include <iostream>
+#include <vector>
 
 using namespace std;
 
@@ -72,8 +69,6 @@ struct ValueLattice {
   // ? unsure about this join function
   LatticeJoinEffect join(const ValueLattice &Other) {
 
-    cout << "Join function called!" << endl;
-
     if (*this == clean() && Other == taint()) {
       *this = bottom();
       return LatticeJoinEffect::Changed;
@@ -86,10 +81,8 @@ struct ValueLattice {
 using TaintDataflowLattice = VarMapLattice<ValueLattice>;
 
 constexpr char kVar[] = "var";
-constexpr char kVarRHS[] = "varRHS";
 constexpr char kAssignment[] = "assignment";
-constexpr char kRHS[] = "rhs";
-constexpr char kExpr[] = "expr";
+constexpr char kFuncCall[] = "functionCall";
 constexpr char kTaint[] = "taint";
 constexpr char kCleanup[] = "cleanup";
 constexpr char readInput[] = "readInput";
@@ -98,11 +91,11 @@ constexpr char kCallCritical[] = "critical";
 
 auto refToVar() { return declRefExpr(to(varDecl().bind(kVar))); }
 
+auto funcCall() { return callExpr(callee(functionDecl())); }
+
 auto funcCall(const char name[]) {
   return callExpr(callee(functionDecl(hasName(name))));
 }
-
-auto usingVar() { return declRefExpr(to(varDecl().bind(kVarRHS))); }
 
 class TaintDataflowAnalysis
     : public DataflowAnalysis<TaintDataflowAnalysis, TaintDataflowLattice> {
@@ -121,14 +114,14 @@ public:
     if (!CS)
       return;
     auto S = CS->getStmt();
-    auto matcher =
-        stmt(binaryOperator(
-                 hasOperatorName("="), hasLHS(refToVar()),
-                 hasRHS(stmt(eachOf(findAll(funcCall("readInput").bind(kTaint)),
-                                    findAll(funcCall("cleanup").bind(kCleanup)),
-                                    expr()))
-                            .bind("stmt")))
-                 .bind(kAssignment));
+    auto matcher = stmt(
+        binaryOperator(
+            hasOperatorName("="), hasLHS(refToVar()),
+            hasRHS(stmt(eachOf(findAll(funcCall("readInput").bind(kTaint)),
+                               findAll(funcCall("cleanup").bind(kCleanup)),
+                               findAll(funcCall().bind(kFuncCall)), expr()))
+                       .bind("stmt")))
+            .bind(kAssignment));
 
     ASTContext &Context = getASTContext();
     auto Results = match(matcher, *S, Context);
@@ -141,17 +134,10 @@ public:
     const auto *Var = Nodes.getNodeAs<clang::VarDecl>(kVar);
     assert(Var != nullptr);
 
-    // const auto *stmt = Nodes.getNodeAs<Stmt>("stmt");
-    // stmt->viewAST();
-
-    if (Nodes.getNodeAs<CallExpr>(kTaint)) {
+    if (Nodes.getNodeAs<CallExpr>(kTaint) ||
+        Nodes.getNodeAs<CallExpr>(kFuncCall)) {
       Vars[Var] = ValueLattice::taint();
-    } else if (Nodes.getNodeAs<CallExpr>(kCleanup)) {
-      Vars[Var] = ValueLattice::clean();
-    } else {
-      cout << "HELLOOOO" << endl;
-      const auto *S = Nodes.getNodeAs<Stmt>("stmt");
-      assert(S != nullptr);
+    } else if (const auto *S = Nodes.getNodeAs<Stmt>("stmt")) {
 
       // const auto *stmt = Nodes.getNodeAs<Stmt>("stmt");
       // stmt->viewAST();
@@ -159,8 +145,7 @@ public:
       ValueLattice L = ValueLattice(ValueLattice::clean());
 
       for (const auto *s : S->children()) {
-        cout << s->getStmtClassName() << endl;
-        const auto stmtClass = s->getStmtClass();
+        // cout << s->getStmtClassName() << endl;
         const auto *E = dyn_cast<Expr>(s);
         assert(E != nullptr);
 
@@ -168,20 +153,29 @@ public:
         if (dyn_cast<IntegerLiteral>(E))
           continue;
 
-        if (dyn_cast<CallExpr>(E)) {
-          // TODO ?
-          L = ValueLattice::taint();
-        }
+        else if (const auto *CE = dyn_cast<CallExpr>(E)) {
 
-        if (const auto *ICE = E->getReferencedDeclOfCallee()) {
-          cout << "YESSSSSSSSSSSSSS!" << endl;
-
+          if (CE->getDirectCallee()->getNameInfo().getAsString() == "cleanup")
+            L.join(ValueLattice::clean());
+          else {
+            L.join(ValueLattice::taint());
+            break;
+          }
+        } else if (const auto *ICE = E->getReferencedDeclOfCallee()) {
           if (const auto *VD = dyn_cast<VarDecl>(ICE)) {
+
             L.join(Vars[VD]);
           }
+        } else {
+          L.join(ValueLattice::taint());
+          break;
         }
       }
       Vars[Var] = L;
+    } else if (Nodes.getNodeAs<CallExpr>(kCleanup)) {
+      Vars[Var] = ValueLattice::clean();
+    } else {
+      Vars[Var] = ValueLattice::taint();
     }
   }
 };
@@ -214,6 +208,7 @@ public:
       const auto *Arg = CE->getArg(0);
 
       if (const auto *Decl = Arg->getReferencedDeclOfCallee()) {
+        cout << "HERE" << endl;
         // check if it is a variable
         if (const auto *ArgDecl = dyn_cast<VarDecl>(Decl)) {
 
@@ -223,6 +218,10 @@ public:
             return {CE->getBeginLoc()};
           }
         }
+        // check if it is a function call
+      } else if (const auto *CE = dyn_cast<CallExpr>(Arg)) {
+        if (CE->getDirectCallee()->getNameInfo().getAsString() != "cleanup")
+          return {CE->getBeginLoc()};
       }
     }
     return {};
@@ -278,17 +277,6 @@ analyzeCode(const FunctionDecl &FuncDecl, ASTContext &ASTCtx) {
 void TaintDataflowCheck::registerMatchers(MatchFinder *Finder) {
   using namespace ast_matchers;
 
-  /* Finder->addMatcher(binaryOperator(
-    isExpansionInMainFile(),hasOperatorName("="),hasRHS(
-      callExpr(callee(functionDecl(hasName("dirty"))))
-    )).bind("dirty_assign"), this); */
-
-  // Finder->addMatcher(
-  //     callExpr(callee(functionDecl(hasName("critical")))).bind("call_critical"),
-  //     this);
-
-  cout << "Beginning..." << endl;
-
   auto HasOptionalCallDescendant =
       hasDescendant(callExpr(callee(functionDecl(hasName("critical")))));
 
@@ -309,8 +297,6 @@ void TaintDataflowCheck::check(const MatchFinder::MatchResult &Result) {
   if (Result.SourceManager->getDiagnostics().hasUncompilableErrorOccurred())
     return;
 
-  cout << "Checking..." << endl;
-
   const auto *FuncDecl = Result.Nodes.getNodeAs<FunctionDecl>(FuncID);
   if (FuncDecl->isTemplated())
     return;
@@ -318,7 +304,7 @@ void TaintDataflowCheck::check(const MatchFinder::MatchResult &Result) {
   if (Optional<std::vector<SourceLocation>> Errors =
           analyzeCode(*FuncDecl, *Result.Context))
     for (const SourceLocation &Loc : *Errors)
-      diag(Loc, "calling critical function with taint value");
+      diag(Loc, "calling critical function with possible taint value");
 }
 
 } // namespace misc
