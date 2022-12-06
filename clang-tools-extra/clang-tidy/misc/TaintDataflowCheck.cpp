@@ -42,16 +42,13 @@ struct ValueLattice {
 
   ValueState State;
 
-  constexpr ValueLattice() : State(ValueState::Taint) {}
-  constexpr ValueLattice(ValueState S) : State(S) {}
+  constexpr ValueLattice(ValueState S = ValueState::Taint) : State(S) {}
 
   static constexpr ValueLattice bottom() {
     return ValueLattice(ValueState::Taint);
   }
 
-  static constexpr ValueLattice taint() {
-    return ValueLattice(ValueState::Taint);
-  }
+  static constexpr ValueLattice taint() { return ValueState::Taint; }
 
   static constexpr ValueLattice clean() {
     return ValueLattice(ValueState::Clean);
@@ -140,7 +137,7 @@ public:
       // const auto *stmt = Nodes.getNodeAs<Stmt>("stmt");
       // stmt->viewAST();
 
-      ValueLattice L = ValueLattice(ValueLattice::clean());
+      ValueLattice L = ValueLattice::clean();
 
       for (const auto *s : S->children()) {
         // cout << s->getStmtClassName() << endl;
@@ -161,7 +158,6 @@ public:
           }
         } else if (const auto *ICE = E->getReferencedDeclOfCallee()) {
           if (const auto *VD = dyn_cast<VarDecl>(ICE)) {
-
             L.join(Vars[VD]);
           }
         } else {
@@ -209,9 +205,7 @@ public:
         // check if it is a variable
         if (const auto *ArgDecl = dyn_cast<VarDecl>(Decl)) {
 
-          if (Vars.contains(ArgDecl) &&
-              Vars.lookup(ArgDecl) == ValueLattice::taint()) {
-
+          if (Vars.lookup(ArgDecl) == ValueLattice::taint()) {
             return {CE->getBeginLoc()};
           }
         }
