@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <iostream>
+
 #include "LifetimeAnnotationsCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
@@ -16,21 +18,17 @@ namespace clang {
 namespace tidy {
 namespace misc {
 
+// DEBUG
+void debug(std::string text) {
+  std::cout << "\033[1;33m>> \033[0m" << text << std::endl;
+}
+
 void LifetimeAnnotationsCheck::registerMatchers(MatchFinder *Finder) {
-  // FIXME: Add matchers.
-  Finder->addMatcher(functionDecl().bind("x"), this);
+  Finder->addMatcher(functionDecl().bind("fun"), this);
 }
 
 void LifetimeAnnotationsCheck::check(const MatchFinder::MatchResult &Result) {
-  // FIXME: Add callback implementation.
-  const auto *MatchedDecl = Result.Nodes.getNodeAs<FunctionDecl>("x");
-  if (!MatchedDecl->getIdentifier() ||
-      MatchedDecl->getName().startswith("awesome_"))
-    return;
-  diag(MatchedDecl->getLocation(), "function %0 is insufficiently awesome")
-      << MatchedDecl;
-  diag(MatchedDecl->getLocation(), "insert 'awesome'", DiagnosticIDs::Note)
-      << FixItHint::CreateInsertion(MatchedDecl->getLocation(), "awesome_");
+  debug("Found a function");
 }
 
 } // namespace misc
