@@ -229,7 +229,7 @@ void RunDataflow(llvm::StringRef Code, Matcher Expectations) {
                           const AnalysisOutputs &) {
             EXPECT_THAT(Results, Expectations);
           }),
-      llvm::Succeeded());
+      llvm::Succeeded()); 
 }
 
 TEST(MultiVarConstantPropagationTest, JustInit) {

@@ -63,6 +63,7 @@ public:
   /// Bounded join-semilattice that is used in the analysis.
   using Lattice = LatticeT;
 
+  // colon and after --> initialization list
   explicit DataflowAnalysis(ASTContext &Context) : Context(Context) {}
 
   /// Deprecated. Use the `DataflowAnalysisOptions` constructor instead.
@@ -127,6 +128,8 @@ llvm::Expected<std::vector<
 runDataflowAnalysis(
     const ControlFlowContext &CFCtx, AnalysisT &Analysis,
     const Environment &InitEnv,
+    // This is a function wrapper.
+    // It stores a callable object which is called the "target" of std::function.
     std::function<void(const CFGElement &, const DataflowAnalysisState<
                                                typename AnalysisT::Lattice> &)>
         PostVisitCFG = nullptr) {
