@@ -244,6 +244,7 @@ Clang-Tidy Checks
    `misc-confusable-identifiers <misc/confusable-identifiers.html>`_,
    `misc-const-correctness <misc/const-correctness.html>`_, "Yes"
    `misc-definitions-in-headers <misc/definitions-in-headers.html>`_, "Yes"
+   `misc-lifetime-annotations <misc/lifetime-annotations.html>`_, "Yes"
    `misc-misleading-bidirectional <misc/misleading-bidirectional.html>`_,
    `misc-misleading-identifier <misc/misleading-identifier.html>`_,
    `misc-misplaced-const <misc/misplaced-const.html>`_,
@@ -253,7 +254,7 @@ Clang-Tidy Checks
    `misc-non-private-member-variables-in-classes <misc/non-private-member-variables-in-classes.html>`_,
    `misc-redundant-expression <misc/redundant-expression.html>`_, "Yes"
    `misc-static-assert <misc/static-assert.html>`_, "Yes"
-   `misc-taint-dataflow <misc/taint-dataflow.html>`_, "Yes"
+   `misc-taint-dataflow <misc/taint-dataflow.html>`_,
    `misc-throw-by-value-catch-by-reference <misc/throw-by-value-catch-by-reference.html>`_,
    `misc-unconventional-assign-operator <misc/unconventional-assign-operator.html>`_,
    `misc-uniqueptr-reset-release <misc/uniqueptr-reset-release.html>`_, "Yes"

@@ -115,6 +115,11 @@ New checks
 
   Warns when using ``do-while`` loops.
 
+- New :doc:`misc-lifetime-annotations
+  <clang-tidy/checks/misc/lifetime-annotations>` check.
+
+  FIXME: add release notes.
+
 - New :doc:`misc-taint-dataflow
   <clang-tidy/checks/misc/taint-dataflow>` check.
 
