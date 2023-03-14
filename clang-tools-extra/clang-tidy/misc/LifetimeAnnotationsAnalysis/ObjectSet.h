@@ -4,8 +4,11 @@
 
 #include <initializer_list>
 #include <string>
+#include <vector>
 
 #include "Object.h"
+// TODO uncomment this when I have abseil
+// #include "absl/strings/str_join.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 
@@ -34,13 +37,17 @@ public:
   }
 
   // Returns a human-readable string representation of the object set.
-  std::string ObjectSet::DebugString() const {
-    std::vector<std::string> parts;
-    for (const Object *object : objects_) {
-      parts.push_back(object->DebugString());
-    }
-    return absl::StrJoin(parts, ", ");
-  }
+  // TODO uncomment this when I have abseil
+  // std::string ObjectSet::DebugString() const {
+  //   std::vector<std::string> parts;
+  //   for (const Object *object : objects_) {
+  //     parts.push_back(object->DebugString());
+  //   }
+  //   return absl::StrJoin(parts, ", ");
+  // }
+
+  // TODO remove this when I have abseil
+  std::string DebugString() const { return "Sorry no debug"; }
 
   const_iterator begin() const { return objects_.begin(); }
 
