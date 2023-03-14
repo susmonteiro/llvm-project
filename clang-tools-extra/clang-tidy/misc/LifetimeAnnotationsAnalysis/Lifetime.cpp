@@ -75,7 +75,7 @@ bool Lifetime::IsValid() const {
 }
 
 std::ostream &operator<<(std::ostream &os, Lifetime lifetime) {
-  return os << lifetime.DebugString();
+  return os << lifetime.ToString();
 }
 
 } // namespace lifetimes
