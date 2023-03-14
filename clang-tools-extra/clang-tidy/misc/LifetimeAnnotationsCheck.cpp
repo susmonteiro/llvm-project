@@ -8,6 +8,7 @@
 
 #include <iostream>
 
+#include "LifetimeAnnotationsAnalysis.h"
 #include "LifetimeAnnotationsCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
@@ -30,6 +31,37 @@ namespace dataflow {
 namespace tidy {
 namespace misc {
 
+void AnalyzeFunctionBody(const clang::FunctionDecl *func) {
+  // TODO do I need this?
+  // clang::dataflow::DataflowAnalysisContext analysis_context(
+  //     std::make_unique<clang::dataflow::WatchedLiteralsSolver>());
+  // clang::dataflow::Environment environment(analysis_context);
+
+  // TODO initialize analysis correctly
+  // LifetimeAnnotationsAnalysis analysis(func);
+}
+
+void AnalyzeFunction(const clang::FunctionDecl *func) {
+  // Make sure we're always using the canonical declaration when using the
+  // function as a key in maps and sets.
+  // ? what is the canonical function declaration
+  func = func->getCanonicalDecl();
+
+  // TODO necessary?
+  // if (func->getBuiltinID() != 0) {
+  //   return;
+  // }
+
+  if (func->getBody()) {
+    AnalyzeFunctionBody(func);
+  }
+
+  // TODO take care of callees -> probably make recursive
+  // TODO:
+  // compare with AnalyzeFunctionRecursive from crubit to see if we have all the
+  // necessary checks
+}
+
 void LifetimeAnnotationsCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(functionDecl().bind(FuncID), this);
 }
@@ -41,6 +73,8 @@ void LifetimeAnnotationsCheck::check(const MatchFinder::MatchResult &Result) {
   const auto *FuncDecl = Result.Nodes.getNodeAs<FunctionDecl>(FuncID);
   if (FuncDecl->isTemplated())
     return; // TODO implement this
+
+  AnalyzeFunction(FuncDecl);
 
   // if (Optional<std::vector<SourceLocation>> Errors =
   //         analyzeCode(*FuncDecl, *Result.Context))

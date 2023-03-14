@@ -16,7 +16,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace clang {
-namespace dataflow {
+namespace tidy {
+namespace lifetimes {
 // TODO
 // Function to call to report a diagnostic.
 // This has the same interface as ClangTidyCheck::diag().
@@ -24,12 +25,13 @@ namespace dataflow {
 //     clang::SourceLocation, clang::StringRef, clang::DiagnosticIDs::Level)>;
 
 class LifetimeAnnotationsAnalysis
-    : public DataflowAnalysis<LifetimeAnnotationsAnalysis,
-                              LifetimeAnnotationsLattice> {
+    : public clang::dataflow::DataflowAnalysis<LifetimeAnnotationsAnalysis,
+                                               LifetimeAnnotationsLattice> {
   // TODO implement this
 };
 
-} // namespace dataflow
+} // namespace lifetimes
+} // namespace tidy
 } // namespace clang
 
 class ObjectRepository {
