@@ -56,7 +56,12 @@ void AnalyzeFunction(const clang::FunctionDecl *func) {
     AnalyzeFunctionBody(func);
   }
 
-  // TODO take care of callees -> probably make recursive
+  // TODO take care of callees -> probably don't need to make recursive
+  // We already have the lifetimes of the other functions, so we just need to
+  // find if this function's lifetimes are correct based on the assumed
+  // lifetimes from the other functions therefore we don't even have to find the
+  // callees to run this recursively -> the only thing we need from the callees
+  // is the lifetime annotations
   // TODO:
   // compare with AnalyzeFunctionRecursive from crubit to see if we have all the
   // necessary checks
