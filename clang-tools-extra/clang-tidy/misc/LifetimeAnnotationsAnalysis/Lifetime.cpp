@@ -3,36 +3,34 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "Lifetime.h"
-#include "absl/strings/str_cat.h"
 
 namespace clang {
 namespace tidy {
 namespace lifetimes {
 
 // TODO do I need this?
-constexpr int INVALID_LIFETIME_ID_EMPTY = 0;
-constexpr int INVALID_LIFETIME_ID_TOMBSTONE = 1;
-constexpr int STATIC_LIFETIME_ID = -1;
-constexpr int FIRST_VARIABLE_LIFETIME_ID = 2;
-constexpr int FIRST_LOCAL_LIFETIME_ID = -2;
+constexpr int INVALID_LIFETIME_NAME_EMPTY = 0;
+// TODO do I need this?
 
-std::atomic<int> Lifetime::next_variable_id_{FIRST_VARIABLE_LIFETIME_ID};
+constexpr int INVALID_LIFETIME_NAME_TOMBSTONE = -1;
+constexpr int STATIC_LIFETIME = 1;
+constexpr int LOCAL_LIFETIME = 2;
+constexpr int VARIABLE_LIFETIME = 3;
 
-std::atomic<int> Lifetime::next_local_id_{FIRST_LOCAL_LIFETIME_ID};
+// TODO need this?
+// Lifetime::Lifetime() : id_(INVALID_LIFETIME_NAME_EMPTY) {}
 
-Lifetime::Lifetime() : id_(INVALID_LIFETIME_ID_EMPTY) {}
+Lifetime Lifetime::CreateVariable(std::string name) {
+  return Lifetime(name, VARIABLE_LIFETIME);
+}
 
-Lifetime Lifetime::CreateVariable() { return Lifetime(next_variable_id_++); }
+Lifetime Lifetime::Static() { return Lifetime(STATIC_LIFETIME); }
 
-// TODO implement static lifetimes
-// Lifetime Lifetime::Static() { return Lifetime(STATIC_LIFETIME_ID); }
-
-// TODO implement local lifetimes
-// Lifetime Lifetime::CreateLocal() { return Lifetime(next_local_id_--); }
+Lifetime Lifetime::CreateLocal() { return Lifetime(LOCAL_LIFETIME); }
 
 bool Lifetime::IsVariable() const {
   assert(IsValid());
-  return id_ > 0;
+  return type_ == VARIABLE_LIFETIME;
 }
 
 bool Lifetime::IsConstant() const {
@@ -40,44 +38,40 @@ bool Lifetime::IsConstant() const {
   return !IsVariable();
 }
 
-// TODO implement local lifetimes
-// bool Lifetime::IsLocal() const {
-//   assert(IsValid());
-//   return id_ <= FIRST_LOCAL_LIFETIME_ID;
-// }
-
-std::string Lifetime::DebugString() const {
+bool Lifetime::IsLocal() const {
   assert(IsValid());
+  return type_ == LOCAL_LIFETIME;
+}
 
-  switch (id_) {
-  case INVALID_LIFETIME_ID_EMPTY:
+std::string Lifetime::ToString() const {
+  assert(IsValid());
+  switch (type_) {
+  case INVALID_LIFETIME_NAME_EMPTY:
     return "INVALID_EMPTY";
-  case INVALID_LIFETIME_ID_TOMBSTONE:
+  case INVALID_LIFETIME_NAME_TOMBSTONE:
     return "INVALID_TOMBSTONE";
-  case STATIC_LIFETIME_ID:
+  case STATIC_LIFETIME:
     return "'static";
+  case LOCAL_LIFETIME:
+    return "'local";
   default:
-    if (id_ <= FIRST_LOCAL_LIFETIME_ID) {
-      return absl::StrCat("'local", -id_);
-    } else {
-      return absl::StrCat("'", id_);
-    }
+    return "'" + lifetime_;
   }
 }
 
-Lifetime::Lifetime(int id) : id_(id) {}
+Lifetime::Lifetime(std::string name, int type) : lifetime_(name), type_(type) {}
 
 Lifetime Lifetime::InvalidEmpty() {
-  return Lifetime(INVALID_LIFETIME_ID_EMPTY);
+  return Lifetime(INVALID_LIFETIME_NAME_EMPTY);
 }
 
 Lifetime Lifetime::InvalidTombstone() {
-  return Lifetime(INVALID_LIFETIME_ID_TOMBSTONE);
+  return Lifetime(INVALID_LIFETIME_NAME_TOMBSTONE);
 }
 
 bool Lifetime::IsValid() const {
-  return id_ != INVALID_LIFETIME_ID_EMPTY &&
-         id_ != INVALID_LIFETIME_ID_TOMBSTONE;
+  return type_ != INVALID_LIFETIME_NAME_EMPTY &&
+         type_ != INVALID_LIFETIME_NAME_TOMBSTONE;
 }
 
 std::ostream &operator<<(std::ostream &os, Lifetime lifetime) {

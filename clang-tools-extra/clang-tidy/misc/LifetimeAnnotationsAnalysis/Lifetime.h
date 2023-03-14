@@ -28,21 +28,19 @@ public:
   //
   // Use one of the static member functions below to create a valid lifetime.
   // TODO need this?
-  Lifetime();
+  //   Lifetime();
 
   Lifetime(const Lifetime &) = default;
   Lifetime &operator=(const Lifetime &) = default;
 
   // Creates a new lifetime variable.
-  static Lifetime CreateVariable();
+  static Lifetime CreateVariable(std::string name);
 
-  // TODO implement static lifetimes
   // Returns the 'static lifetime constant.
-  //   static Lifetime Static();
+  static Lifetime Static();
 
-  // TODO implement local lifetimes
   // Creates a new local lifetime constant.
-  //   static Lifetime CreateLocal();
+  static Lifetime CreateLocal();
 
   // Returns whether this lifetime is a lifetime variable.
   bool IsVariable() const;
@@ -50,38 +48,38 @@ public:
   // Returns whether this lifetime is a constant lifetime.
   bool IsConstant() const;
 
-  // TODO implement local lifetimes
   // Returns whether this lifetime is a local lifetime.
-  //   bool IsLocal() const;
+  bool IsLocal() const;
 
-  // Returns a unique numeric ID for the lifetime.
-  int Id() const { return id_; }
-
-  // Returns a textual representation of the lifetime for debug logging.
-  std::string DebugString() const;
+  // Returns a textual representation of the lifetime
+  std::string ToString() const;
 
   bool operator==(Lifetime other) const {
     assert(IsValid());
     assert(other.IsValid());
-    return id_ == other.id_;
+    return !ToString().compare(other.ToString());
   }
 
   bool operator!=(Lifetime other) const { return !(*this == other); }
 
 private:
-  explicit Lifetime(int id);
+  explicit Lifetime(int type);
+  explicit Lifetime(std::string name, int type);
 
   static Lifetime InvalidEmpty();
   static Lifetime InvalidTombstone();
 
   bool IsValid() const;
 
-  friend class llvm::DenseMapInfo<Lifetime, void>;
-  friend class std::less<Lifetime>;
+  // TODO need this?
+  //   friend class llvm::DenseMapInfo<Lifetime, void>;
+  //   friend class std::less<Lifetime>;
 
-  int id_;
-  static std::atomic<int> next_variable_id_;
-  static std::atomic<int> next_local_id_;
+  int type_;                    // variable, static, local
+  std::string lifetime_ = null; // lifetime name
+  // TODO do I need this?
+  //   static std::atomic<int> next_variable_id_;
+  //   static std::atomic<int> next_local_id_;
 };
 
 std::ostream &operator<<(std::ostream &os, Lifetime lifetime);
@@ -91,39 +89,39 @@ std::ostream &operator<<(std::ostream &os, Lifetime lifetime);
 } // namespace clang
 
 // TODO do I need this?
-namespace llvm {
+// namespace llvm {
 
-template <> struct DenseMapInfo<clang::tidy::lifetimes::Lifetime, void> {
-  static clang::tidy::lifetimes::Lifetime getEmptyKey() {
-    return clang::tidy::lifetimes::Lifetime::InvalidEmpty();
-  }
+// template <> struct DenseMapInfo<clang::tidy::lifetimes::Lifetime, void> {
+//   static clang::tidy::lifetimes::Lifetime getEmptyKey() {
+//     return clang::tidy::lifetimes::Lifetime::InvalidEmpty();
+//   }
 
-  static clang::tidy::lifetimes::Lifetime getTombstoneKey() {
-    return clang::tidy::lifetimes::Lifetime::InvalidTombstone();
-  }
+//   static clang::tidy::lifetimes::Lifetime getTombstoneKey() {
+//     return clang::tidy::lifetimes::Lifetime::InvalidTombstone();
+//   }
 
-  static unsigned getHashValue(clang::tidy::lifetimes::Lifetime lifetime) {
-    return llvm::hash_value(lifetime.id_);
-  }
+//   static unsigned getHashValue(clang::tidy::lifetimes::Lifetime lifetime) {
+//     return llvm::hash_value(lifetime.id_);
+//   }
 
-  static bool isEqual(clang::tidy::lifetimes::Lifetime lhs,
-                      clang::tidy::lifetimes::Lifetime rhs) {
-    return lhs.id_ == rhs.id_;
-  }
-};
+//   static bool isEqual(clang::tidy::lifetimes::Lifetime lhs,
+//                       clang::tidy::lifetimes::Lifetime rhs) {
+//     return lhs.id_ == rhs.id_;
+//   }
+// };
 
-} // namespace llvm
+// } // namespace llvm
 
 // TODO do I need this?
-namespace std {
+// namespace std {
 
-template <> struct less<clang::tidy::lifetimes::Lifetime> {
-  bool operator()(const clang::tidy::lifetimes::Lifetime &l1,
-                  const clang::tidy::lifetimes::Lifetime &l2) const {
-    return l1.id_ < l2.id_;
-  }
-};
+// template <> struct less<clang::tidy::lifetimes::Lifetime> {
+//   bool operator()(const clang::tidy::lifetimes::Lifetime &l1,
+//                   const clang::tidy::lifetimes::Lifetime &l2) const {
+//     return l1.id_ < l2.id_;
+//   }
+// };
 
-} // namespace std
+// } // namespace std
 
 #endif // CRUBIT_LIFETIME_ANNOTATIONS_LIFETIME_H_
