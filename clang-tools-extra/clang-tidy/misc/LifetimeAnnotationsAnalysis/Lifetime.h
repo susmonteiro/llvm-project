@@ -27,6 +27,7 @@ public:
   // delete it.
   //
   // Use one of the static member functions below to create a valid lifetime.
+  // TODO need this?
   Lifetime();
 
   Lifetime(const Lifetime &) = default;
@@ -35,11 +36,13 @@ public:
   // Creates a new lifetime variable.
   static Lifetime CreateVariable();
 
+  // TODO implement static lifetimes
   // Returns the 'static lifetime constant.
-  static Lifetime Static();
+  //   static Lifetime Static();
 
+  // TODO implement local lifetimes
   // Creates a new local lifetime constant.
-  static Lifetime CreateLocal();
+  //   static Lifetime CreateLocal();
 
   // Returns whether this lifetime is a lifetime variable.
   bool IsVariable() const;
@@ -47,8 +50,9 @@ public:
   // Returns whether this lifetime is a constant lifetime.
   bool IsConstant() const;
 
+  // TODO implement local lifetimes
   // Returns whether this lifetime is a local lifetime.
-  bool IsLocal() const;
+  //   bool IsLocal() const;
 
   // Returns a unique numeric ID for the lifetime.
   int Id() const { return id_; }
@@ -86,6 +90,7 @@ std::ostream &operator<<(std::ostream &os, Lifetime lifetime);
 } // namespace tidy
 } // namespace clang
 
+// TODO do I need this?
 namespace llvm {
 
 template <> struct DenseMapInfo<clang::tidy::lifetimes::Lifetime, void> {
@@ -109,6 +114,7 @@ template <> struct DenseMapInfo<clang::tidy::lifetimes::Lifetime, void> {
 
 } // namespace llvm
 
+// TODO do I need this?
 namespace std {
 
 template <> struct less<clang::tidy::lifetimes::Lifetime> {
