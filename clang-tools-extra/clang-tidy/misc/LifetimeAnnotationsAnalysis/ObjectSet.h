@@ -34,7 +34,13 @@ public:
   }
 
   // Returns a human-readable string representation of the object set.
-  std::string DebugString() const;
+  std::string ObjectSet::DebugString() const {
+    std::vector<std::string> parts;
+    for (const Object *object : objects_) {
+      parts.push_back(object->DebugString());
+    }
+    return absl::StrJoin(parts, ", ");
+  }
 
   const_iterator begin() const { return objects_.begin(); }
 
