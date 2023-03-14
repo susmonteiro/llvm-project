@@ -51,8 +51,9 @@ public:
   // Returns a textual representation of the object for debug logging.
   std::string DebugString() const;
 
+  // TODO implement func
   // Returns the function that this object represents, if any.
-  const clang::FunctionDecl *GetFunc() const { return func_; }
+  //   const clang::FunctionDecl *GetFunc() const { return func_; }
 
   // Returns the lifetimes of function that this object represents, if known;
   // note that lifetimes may not be known even if GetFunc() returns non-null.
@@ -71,7 +72,8 @@ public:
 private:
   Lifetime lifetime_;
   clang::QualType type_;
-  const clang::FunctionDecl *func_;
+  // TODO implement function
+  //   const clang::FunctionDecl *func_;
   // TODO uncomment this (or erase)
   //   std::optional<FunctionLifetimes> func_lifetimes_;
 };
