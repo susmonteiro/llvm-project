@@ -75,8 +75,11 @@ private:
   //   friend class llvm::DenseMapInfo<Lifetime, void>;
   //   friend class std::less<Lifetime>;
 
-  int type_;                    // variable, static, local
-  std::string lifetime_ = null; // lifetime name
+  int type_; // variable, static, local
+  // TODO another option could be to keep a dict with all lifetimes and their
+  // TODO respective id and then assign the correct id given a lifetime name
+  std::string lifetime_ = ""; // lifetime name
+  // TODO check if local lifetimes need any kind of id
   // TODO do I need this?
   //   static std::atomic<int> next_variable_id_;
   //   static std::atomic<int> next_local_id_;
