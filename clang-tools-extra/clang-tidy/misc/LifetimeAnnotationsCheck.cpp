@@ -8,7 +8,7 @@
 
 #include <iostream>
 
-#include "LifetimeAnnotationsAnalysis.h"
+#include "LifetimeAnnotationsAnalysis/LifetimeAnnotationsAnalysis.h"
 #include "LifetimeAnnotationsCheck.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"

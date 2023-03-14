@@ -6,7 +6,7 @@
 #include <string>
 #include <variant>
 
-#include "LifetimeAnnotationsLattice.h"
+#include "LifetimeAnnotationsAnalysis/LifetimeAnnotationsLattice.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
