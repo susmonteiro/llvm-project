@@ -51,13 +51,20 @@ public:
   // Returns whether this lifetime is a local lifetime.
   bool IsLocal() const;
 
+  std::string GetName() { return lifetime_; }
+
+  int GetType() { return type_; }
+
   // Returns a textual representation of the lifetime
-  std::string ToString() const;
+  std::string DebugString() const;
 
   bool operator==(Lifetime other) const {
     assert(IsValid());
     assert(other.IsValid());
-    return !ToString().compare(other.ToString());
+    if (IsVariable()) {
+      return type_ == other.GetType() && !lifetime_.compare(other.GetName());
+    }
+    return !lifetime_.compare(other.GetName());
   }
 
   bool operator!=(Lifetime other) const { return !(*this == other); }

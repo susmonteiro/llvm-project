@@ -43,7 +43,7 @@ bool Lifetime::IsLocal() const {
   return type_ == LOCAL_LIFETIME;
 }
 
-std::string Lifetime::ToString() const {
+std::string Lifetime::DebugString() const {
   assert(IsValid());
   switch (type_) {
   case INVALID_LIFETIME_NAME_EMPTY:
