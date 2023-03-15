@@ -6,8 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "LifetimeAnnotationsCheck.h"
+
 #include <iostream>
 
+#include "LifetimeAnnotationsAnalysis/Lifetime.h"
 #include "LifetimeAnnotationsAnalysis/LifetimeAnnotationsAnalysis.h"
 #include "LifetimeAnnotationsCheck.h"
 #include "clang/AST/ASTContext.h"
@@ -29,9 +32,15 @@ namespace dataflow {
 }
 
 namespace tidy {
-namespace misc {
 
-void AnalyzeFunctionBody(const clang::FunctionDecl *func) {
+namespace lifetimes {
+
+llvm::Error AnalyzeFunctionBody(const clang::FunctionDecl *func) {
+  auto cfctx = clang::dataflow::ControlFlowContext::build(
+      func, *func->getBody(), func->getASTContext());
+  if (!cfctx)
+    return cfctx.takeError();
+
   // TODO do I need this?
   // clang::dataflow::DataflowAnalysisContext analysis_context(
   //     std::make_unique<clang::dataflow::WatchedLiteralsSolver>());
@@ -39,6 +48,14 @@ void AnalyzeFunctionBody(const clang::FunctionDecl *func) {
 
   // TODO initialize analysis correctly
   // LifetimeAnnotationsAnalysis analysis(func);
+
+  // llvm::Expected<std::vector<llvm::Optional<
+  //     clang::dataflow::DataflowAnalysisState<LifetimeAnnotationsLattice>>>>
+  //     maybe_block_to_output_state =
+  //         clang::dataflow::runDataflowAnalysis(*cfctx, analysis,
+  //         environment);
+
+  return llvm::Error::success();
 }
 
 void AnalyzeFunction(const clang::FunctionDecl *func) {
@@ -53,7 +70,7 @@ void AnalyzeFunction(const clang::FunctionDecl *func) {
   // }
 
   if (func->getBody()) {
-    AnalyzeFunctionBody(func);
+    llvm::Error err = AnalyzeFunctionBody(func);
   }
 
   // TODO take care of callees -> probably don't need to make recursive
@@ -66,6 +83,9 @@ void AnalyzeFunction(const clang::FunctionDecl *func) {
   // compare with AnalyzeFunctionRecursive from crubit to see if we have all the
   // necessary checks
 }
+} // namespace lifetimes
+
+namespace misc {
 
 void LifetimeAnnotationsCheck::registerMatchers(MatchFinder *Finder) {
   Finder->addMatcher(functionDecl().bind(FuncID), this);
@@ -79,7 +99,7 @@ void LifetimeAnnotationsCheck::check(const MatchFinder::MatchResult &Result) {
   if (FuncDecl->isTemplated())
     return; // TODO implement this
 
-  AnalyzeFunction(FuncDecl);
+  clang::tidy::lifetimes::AnalyzeFunction(FuncDecl);
 
   // if (Optional<std::vector<SourceLocation>> Errors =
   //         analyzeCode(*FuncDecl, *Result.Context))
@@ -88,7 +108,6 @@ void LifetimeAnnotationsCheck::check(const MatchFinder::MatchResult &Result) {
   // }
   debug("Found a function");
 }
-
 } // namespace misc
 } // namespace tidy
 } // namespace clang
