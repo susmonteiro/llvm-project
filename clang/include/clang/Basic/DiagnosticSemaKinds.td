@@ -11716,4 +11716,11 @@ def err_non_designated_init_used : Error<
   "a randomized struct can only be initialized with a designated initializer">;
 def err_cast_from_randomized_struct : Error<
   "casting from randomized structure pointer type %0 to %1">;
+
+
+// TODO remove this
+def warn_if_condition_too_complex : Warning<
+  "condition of the 'if' statement is too complex">;
+
+
 } // end of sema component.

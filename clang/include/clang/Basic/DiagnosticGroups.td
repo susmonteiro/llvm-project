@@ -1388,3 +1388,7 @@ def BranchProtection : DiagGroup<"branch-protection">;
 // HLSL diagnostic groups
 // Warnings for HLSL Clang extensions
 def HLSLExtension : DiagGroup<"hlsl-extensions">;
+
+// TODO remove this
+def ComplexCondition : DiagGroup<
+  "complex-condition">;
