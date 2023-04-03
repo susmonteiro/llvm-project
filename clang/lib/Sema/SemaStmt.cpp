@@ -899,8 +899,8 @@ StmtResult Sema::ActOnIfStmt(SourceLocation IfLoc,
   // TODO try with Diag
   // TODO remove this
   // ** This is for debug
-  llvm::dbgs() << "In ActOnIfStmt, we found the condition:\n";
-  CondExpr->dump();
+  // llvm::dbgs() << "In ActOnIfStmt, we found the condition:\n";
+  // CondExpr->dump();
 
   // ** This is for the user warning
   if (!Diags.isIgnored(diag::warn_if_condition_too_complex,
