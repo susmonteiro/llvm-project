@@ -11720,7 +11720,8 @@ def err_cast_from_randomized_struct : Error<
 
 // TODO remove this
 def warn_if_condition_too_complex : Warning<
-  "condition of the 'if' statement is too complex">;
+  "condition of the 'if' statement is too complex">,
+	InGroup<ComplexCondition>, DefaultIgnore;
 
 
 } // end of sema component.
