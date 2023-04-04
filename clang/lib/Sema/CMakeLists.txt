@@ -18,6 +18,7 @@ add_clang_library(clangSema
   HLSLExternalSemaSource.cpp
   IdentifierResolver.cpp
   JumpDiagnostics.cpp
+  LifetimeAnnotationsChecker.cpp
   MultiplexExternalSemaSource.cpp
   ParsedAttr.cpp
   Scope.cpp
