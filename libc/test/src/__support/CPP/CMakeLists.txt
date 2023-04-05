@@ -11,6 +11,16 @@ add_libc_unittest(
 )
 
 add_libc_unittest(
+  cstddef_test
+  SUITE
+    libc_cpp_utils_unittests
+  SRCS
+    cstddef_test.cpp
+  DEPENDS
+    libc.src.__support.CPP.cstddef
+)
+
+add_libc_unittest(
   stringview_test
   SUITE
     libc_cpp_utils_unittests
@@ -29,16 +39,6 @@ add_libc_unittest(
   DEPENDS
     libc.src.__support.CPP.limits
     libc.src.__support.uint
-)
-
-add_libc_unittest(
-  vector_test
-  SUITE
-    libc_cpp_utils_unittests
-  SRCS
-    vector_test.cpp
-  DEPENDS
-    libc.src.__support.CPP.vector
 )
 
 add_libc_unittest(
@@ -79,7 +79,7 @@ add_libc_unittest(
   SRCS
     optional_test.cpp
   DEPENDS
-  libc.src.__support.CPP.optional
+    libc.src.__support.CPP.optional
 )
 
 add_libc_unittest(
@@ -89,5 +89,16 @@ add_libc_unittest(
   SRCS
     span_test.cpp
   DEPENDS
-  libc.src.__support.CPP.span
+    libc.src.__support.CPP.span
+)
+
+add_libc_unittest(
+  string_test
+  SUITE
+    libc_cpp_utils_unittests
+  SRCS
+    string_test.cpp
+  DEPENDS
+  libc.src.__support.CPP.string
+  libc.src.__support.CPP.string_view
 )

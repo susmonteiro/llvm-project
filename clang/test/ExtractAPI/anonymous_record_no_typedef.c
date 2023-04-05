@@ -56,22 +56,26 @@ struct Vehicle {
     {
       "kind": "memberOf",
       "source": "c:@S@Vehicle@E@input.h@64@Bicycle",
-      "target": "c:@S@Vehicle@E@input.h@64"
+      "target": "c:@S@Vehicle@E@input.h@64",
+      "targetFallback": "Vehicle::enum (unnamed)"
     },
     {
       "kind": "memberOf",
       "source": "c:@S@Vehicle@E@input.h@64@Car",
-      "target": "c:@S@Vehicle@E@input.h@64"
+      "target": "c:@S@Vehicle@E@input.h@64",
+      "targetFallback": "Vehicle::enum (unnamed)"
     },
     {
       "kind": "memberOf",
       "source": "c:@S@Vehicle@FI@type",
-      "target": "c:@S@Vehicle"
+      "target": "c:@S@Vehicle",
+      "targetFallback": "Vehicle"
     },
     {
       "kind": "memberOf",
       "source": "c:@S@Vehicle@FI@information",
-      "target": "c:@S@Vehicle"
+      "target": "c:@S@Vehicle",
+      "targetFallback": "Vehicle"
     }
   ],
   "symbols": [
@@ -90,6 +94,10 @@ struct Vehicle {
           "kind": "typeIdentifier",
           "preciseIdentifier": "c:i",
           "spelling": "unsigned int"
+        },
+        {
+          "kind": "text",
+          "spelling": ";"
         }
       ],
       "docComment": {
@@ -237,6 +245,10 @@ struct Vehicle {
         {
           "kind": "identifier",
           "spelling": "Vehicle"
+        },
+        {
+          "kind": "text",
+          "spelling": ";"
         }
       ],
       "docComment": {

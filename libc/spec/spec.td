@@ -59,10 +59,16 @@ def SizeTType : NamedType<"size_t">;
 def SizeTPtr : PtrType<SizeTType>;
 def RestrictedSizeTPtr : RestrictedPtrType<SizeTType>;
 
+def WCharType : NamedType<"wchar_t">;
+def WIntType : NamedType<"wint_t">;
+
 def LongDoublePtr : PtrType<LongDoubleType>;
 
 def IntMaxTType : NamedType<"intmax_t">;
 def UIntMaxTType : NamedType<"uintmax_t">;
+
+def UInt16Type : NamedType<"uint16_t">;
+def UInt32Type : NamedType<"uint32_t">;
 
 def OffTType : NamedType<"off_t">;
 def OffTPtr : PtrType<OffTType>;
@@ -120,6 +126,12 @@ def RestrictedPidTPtr : RestrictedPtrType<PidT>;
 
 def StructRUsage : NamedType<"struct rusage">;
 def StructRUsagePtr : PtrType<StructRUsage>;
+
+def StructTimevalType : NamedType<"struct timeval">;
+def StructTimevalPtr : PtrType<StructTimevalType>;
+def RestrictedStructTimevalPtr : RestrictedPtrType<StructTimevalType>;
+
+def SuSecondsT : NamedType<"suseconds_t">;
 
 //added because __assert_fail needs it.
 def UnsignedType : NamedType<"unsigned">;

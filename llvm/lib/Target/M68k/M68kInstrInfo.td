@@ -429,12 +429,12 @@ def NearData     : Predicate<"TM.getCodeModel() == CodeModel::Small ||"
                              "TM.getCodeModel() == CodeModel::Kernel">;
 def IsPIC        : Predicate<"TM.isPositionIndependent()">;
 def IsNotPIC     : Predicate<"!TM.isPositionIndependent()">;
-def IsM68000     : Predicate<"Subtarget.IsM68000()">;
-def IsM68010     : Predicate<"Subtarget.IsM68010()">;
-def IsM68020     : Predicate<"Subtarget.IsM68020()">;
-def IsM68030     : Predicate<"Subtarget.IsM68030()">;
-def IsM68040     : Predicate<"Subtarget.IsM68040()">;
 
+// ISA versions
+foreach i = [0,1,2,4,6] in
+def AtLeastM680 # i # "0" : Predicate<"Subtarget->atLeastM680"#i#"0()">,
+                            AssemblerPredicate<(all_of
+                                                !cast<SubtargetFeature>("FeatureISA"#i#"0"))>;
 
 //===----------------------------------------------------------------------===//
 // Condition Codes
@@ -522,7 +522,7 @@ def Mxloadi16 : PatFrag<(ops node:$ptr), (i16 (unindexedload node:$ptr)), [{
   if (ExtType == ISD::NON_EXTLOAD)
     return true;
   if (ExtType == ISD::EXTLOAD)
-    return LD->getAlignment() >= 2 && !LD->isSimple();
+    return LD->getAlign() >= 2 && !LD->isSimple();
   return false;
 }]>;
 
@@ -532,7 +532,7 @@ def Mxloadi32 : PatFrag<(ops node:$ptr), (i32 (unindexedload node:$ptr)), [{
   if (ExtType == ISD::NON_EXTLOAD)
     return true;
   if (ExtType == ISD::EXTLOAD)
-    return LD->getAlignment() >= 4 && !LD->isSimple();
+    return LD->getAlign() >= 4 && !LD->isSimple();
   return false;
 }]>;
 
@@ -781,5 +781,6 @@ include "M68kInstrShiftRotate.td"
 include "M68kInstrBits.td"
 include "M68kInstrArithmetic.td"
 include "M68kInstrControl.td"
+include "M68kInstrAtomics.td"
 
 include "M68kInstrCompiler.td"

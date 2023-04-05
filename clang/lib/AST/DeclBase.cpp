@@ -843,6 +843,7 @@ unsigned Decl::getIdentifierNamespaceForKind(Kind DeclKind) {
     case LinkageSpec:
     case Export:
     case FileScopeAsm:
+    case TopLevelStmt:
     case StaticAssert:
     case ObjCPropertyImpl:
     case PragmaComment:
@@ -874,6 +875,7 @@ unsigned Decl::getIdentifierNamespaceForKind(Kind DeclKind) {
     case Empty:
     case LifetimeExtendedTemporary:
     case RequiresExprBody:
+    case ImplicitConceptSpecialization:
       // Never looked up by name.
       return 0;
   }
@@ -1044,6 +1046,18 @@ const FunctionType *Decl::getFunctionType(bool BlocksToo) const {
     Ty = Ty->castAs<BlockPointerType>()->getPointeeType();
 
   return Ty->getAs<FunctionType>();
+}
+
+bool Decl::isFunctionPointerType() const {
+  QualType Ty;
+  if (const auto *D = dyn_cast<ValueDecl>(this))
+    Ty = D->getType();
+  else if (const auto *D = dyn_cast<TypedefNameDecl>(this))
+    Ty = D->getUnderlyingType();
+  else
+    return false;
+
+  return Ty.getCanonicalType()->isFunctionPointerType();
 }
 
 DeclContext *Decl::getNonTransparentDeclContext() {

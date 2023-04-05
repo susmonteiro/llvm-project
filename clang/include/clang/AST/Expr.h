@@ -36,6 +36,7 @@
 #include "llvm/Support/AtomicOrdering.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace clang {
   class APValue;
@@ -134,8 +135,8 @@ protected:
   void setDependence(ExprDependence Deps) {
     ExprBits.Dependent = static_cast<unsigned>(Deps);
   }
-  friend class ASTImporter; // Sets dependence dircetly.
-  friend class ASTStmtReader; // Sets dependence dircetly.
+  friend class ASTImporter;   // Sets dependence directly.
+  friend class ASTStmtReader; // Sets dependence directly.
 
 public:
   QualType getType() const { return TR; }
@@ -170,7 +171,7 @@ public:
   }
 
   /// Determines whether the type of this expression depends on
-  ///   - a template paramter (C++ [temp.dep.expr], which means that its type
+  ///   - a template parameter (C++ [temp.dep.expr], which means that its type
   ///     could change from one template instantiation to the next)
   ///   - or an error
   ///
@@ -533,14 +534,15 @@ public:
       bool IgnoreTemplateOrMacroSubstitution = false) const;
 
   /// isIntegerConstantExpr - Return the value if this expression is a valid
-  /// integer constant expression.  If not a valid i-c-e, return None and fill
-  /// in Loc (if specified) with the location of the invalid expression.
+  /// integer constant expression.  If not a valid i-c-e, return std::nullopt
+  /// and fill in Loc (if specified) with the location of the invalid
+  /// expression.
   ///
   /// Note: This does not perform the implicit conversions required by C++11
   /// [expr.const]p5.
-  Optional<llvm::APSInt> getIntegerConstantExpr(const ASTContext &Ctx,
-                                                SourceLocation *Loc = nullptr,
-                                                bool isEvaluated = true) const;
+  std::optional<llvm::APSInt>
+  getIntegerConstantExpr(const ASTContext &Ctx, SourceLocation *Loc = nullptr,
+                         bool isEvaluated = true) const;
   bool isIntegerConstantExpr(const ASTContext &Ctx,
                              SourceLocation *Loc = nullptr) const;
 
@@ -663,8 +665,8 @@ public:
                        SideEffectsKind AllowSideEffects = SE_NoSideEffects,
                        bool InConstantContext = false) const;
 
-  /// EvaluateAsFloat - Return true if this is a constant which we can fold and
-  /// convert to a fixed point value.
+  /// EvaluateAsFixedPoint - Return true if this is a constant which we can fold
+  /// and convert to a fixed point value.
   bool EvaluateAsFixedPoint(EvalResult &Result, const ASTContext &Ctx,
                             SideEffectsKind AllowSideEffects = SE_NoSideEffects,
                             bool InConstantContext = false) const;
@@ -818,7 +820,7 @@ public:
   /// member expression.
   static QualType findBoundMemberType(const Expr *expr);
 
-  /// Skip past any invisble AST nodes which might surround this
+  /// Skip past any invisible AST nodes which might surround this
   /// statement, such as ExprWithCleanups or ImplicitCastExpr nodes,
   /// but also injected CXXMemberExpr and CXXConstructExpr which represent
   /// implicit conversions.
@@ -922,7 +924,7 @@ public:
     return const_cast<Expr *>(this)->IgnoreParenLValueCasts();
   }
 
-  /// Skip past any parenthese and casts which do not change the value
+  /// Skip past any parentheses and casts which do not change the value
   /// (including ptr->int casts of the same size) until reaching a fixed point.
   /// Skips:
   /// * What IgnoreParens() skips
@@ -1982,7 +1984,7 @@ public:
     LFunction, // Same as Function, but as wide string.
     FuncDName,
     FuncSig,
-    LFuncSig, // Same as FuncSig, but as as wide string
+    LFuncSig, // Same as FuncSig, but as wide string
     PrettyFunction,
     /// The same as PrettyFunction, except that the
     /// 'virtual' keyword is omitted for virtual member functions.
@@ -2813,7 +2815,7 @@ class CallExpr : public Expr {
   /// The number of arguments in the call expression.
   unsigned NumArgs;
 
-  /// The location of the right parenthese. This has a different meaning for
+  /// The location of the right parentheses. This has a different meaning for
   /// the derived classes of CallExpr.
   SourceLocation RParenLoc;
 
@@ -3019,7 +3021,7 @@ public:
   /// Compute and set dependence bits.
   void computeDependence() {
     setDependence(clang::computeDependence(
-        this, llvm::makeArrayRef(
+        this, llvm::ArrayRef(
                   reinterpret_cast<Expr **>(getTrailingStmts() + PREARGS_START),
                   getNumPreArgs())));
   }
@@ -3066,8 +3068,8 @@ public:
   /// interface.  This provides efficient reverse iteration of the
   /// subexpressions.  This is currently used for CFG construction.
   ArrayRef<Stmt *> getRawSubExprs() {
-    return llvm::makeArrayRef(getTrailingStmts(),
-                              PREARGS_START + getNumPreArgs() + getNumArgs());
+    return llvm::ArrayRef(getTrailingStmts(),
+                          PREARGS_START + getNumPreArgs() + getNumArgs());
   }
 
   /// Get FPOptionsOverride from trailing storage.
@@ -4683,13 +4685,14 @@ public:
 };
 
 /// Represents a function call to one of __builtin_LINE(), __builtin_COLUMN(),
-/// __builtin_FUNCTION(), __builtin_FILE(), or __builtin_source_location().
+/// __builtin_FUNCTION(), __builtin_FILE(), __builtin_FILE_NAME(),
+/// or __builtin_source_location().
 class SourceLocExpr final : public Expr {
   SourceLocation BuiltinLoc, RParenLoc;
   DeclContext *ParentContext;
 
 public:
-  enum IdentKind { Function, File, Line, Column, SourceLocStruct };
+  enum IdentKind { Function, File, FileName, Line, Column, SourceLocStruct };
 
   SourceLocExpr(const ASTContext &Ctx, IdentKind Type, QualType ResultTy,
                 SourceLocation BLoc, SourceLocation RParenLoc,
@@ -4713,6 +4716,7 @@ public:
   bool isIntType() const {
     switch (getIdentKind()) {
     case File:
+    case FileName:
     case Function:
     case SourceLocStruct:
       return false;
@@ -4833,12 +4837,10 @@ public:
     return reinterpret_cast<Expr * const *>(InitExprs.data());
   }
 
-  ArrayRef<Expr *> inits() {
-    return llvm::makeArrayRef(getInits(), getNumInits());
-  }
+  ArrayRef<Expr *> inits() { return llvm::ArrayRef(getInits(), getNumInits()); }
 
   ArrayRef<Expr *> inits() const {
-    return llvm::makeArrayRef(getInits(), getNumInits());
+    return llvm::ArrayRef(getInits(), getNumInits());
   }
 
   const Expr *getInit(unsigned Init) const {
@@ -5580,9 +5582,7 @@ public:
     return reinterpret_cast<Expr **>(getTrailingObjects<Stmt *>());
   }
 
-  ArrayRef<Expr *> exprs() {
-    return llvm::makeArrayRef(getExprs(), getNumExprs());
-  }
+  ArrayRef<Expr *> exprs() { return llvm::ArrayRef(getExprs(), getNumExprs()); }
 
   SourceLocation getLParenLoc() const { return LParenLoc; }
   SourceLocation getRParenLoc() const { return RParenLoc; }
@@ -6433,7 +6433,7 @@ public:
 
   ArrayRef<Expr *> subExpressions() {
     auto *B = getTrailingObjects<Expr *>();
-    return llvm::makeArrayRef(B, B + NumExprs);
+    return llvm::ArrayRef(B, B + NumExprs);
   }
 
   ArrayRef<const Expr *> subExpressions() const {

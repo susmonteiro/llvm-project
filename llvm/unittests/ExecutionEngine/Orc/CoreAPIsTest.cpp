@@ -99,7 +99,7 @@ TEST_F(CoreAPIsStandardTest, MaterializationSideEffctsOnlyBasic) {
   // results.
 
   std::unique_ptr<MaterializationResponsibility> FooR;
-  Optional<SymbolMap> Result;
+  std::optional<SymbolMap> Result;
 
   cantFail(JD.define(std::make_unique<SimpleMaterializationUnit>(
       SymbolFlagsMap(
@@ -237,9 +237,30 @@ TEST_F(CoreAPIsStandardTest, RemoveSymbolsTest) {
   EXPECT_TRUE(OnCompletionRun) << "OnCompletion should have been run";
 }
 
+TEST_F(CoreAPIsStandardTest, DiscardInitSymbol) {
+  SymbolStringPtr ForwardedDiscardSym = nullptr;
+
+  auto MU = std::make_unique<SimpleMaterializationUnit>(
+      SymbolFlagsMap({{Foo, FooSym.getFlags()}, {Bar, BarSym.getFlags()}}),
+      [](std::unique_ptr<MaterializationResponsibility> R) {
+        llvm_unreachable("Materialize called unexpectedly?");
+      },
+      Foo,
+      [&](const JITDylib &, SymbolStringPtr Sym) {
+        ForwardedDiscardSym = std::move(Sym);
+      });
+
+  MU->doDiscard(JD, Foo);
+
+  EXPECT_EQ(ForwardedDiscardSym, Foo);
+  EXPECT_EQ(MU->getSymbols().size(), 1U);
+  EXPECT_TRUE(MU->getSymbols().count(Bar));
+  EXPECT_EQ(MU->getInitializerSymbol(), nullptr);
+}
+
 TEST_F(CoreAPIsStandardTest, LookupWithHiddenSymbols) {
   auto BarHiddenFlags = BarSym.getFlags() & ~JITSymbolFlags::Exported;
-  auto BarHiddenSym = JITEvaluatedSymbol(BarSym.getAddress(), BarHiddenFlags);
+  auto BarHiddenSym = ExecutorSymbolDef(BarSym.getAddress(), BarHiddenFlags);
 
   cantFail(JD.define(absoluteSymbols({{Foo, FooSym}, {Bar, BarHiddenSym}})));
 
@@ -1018,6 +1039,21 @@ TEST_F(CoreAPIsStandardTest, TestBasicWeakSymbolMaterialization) {
       << "Duplicate bar definition not discarded";
 }
 
+TEST_F(CoreAPIsStandardTest, RedefineBoundWeakSymbol) {
+  // Check that redefinition of a bound weak symbol fails.
+
+  JITSymbolFlags WeakExported(JITSymbolFlags::Exported);
+  WeakExported |= JITSymbolFlags::Weak;
+
+  // Define "Foo" as weak, force materialization.
+  cantFail(JD.define(absoluteSymbols({{Foo, {FooAddr, WeakExported}}})));
+  cantFail(ES.lookup({&JD}, Foo));
+
+  // Attempt to redefine "Foo". Expect failure, despite "Foo" being weak,
+  // since it has already been bound.
+  EXPECT_THAT_ERROR(JD.define(absoluteSymbols({{Foo, FooSym}})), Failed());
+}
+
 TEST_F(CoreAPIsStandardTest, DefineMaterializingSymbol) {
   bool ExpectNoMoreMaterialization = false;
   ES.setDispatchTask([&](std::unique_ptr<Task> T) {
@@ -1048,8 +1084,8 @@ TEST_F(CoreAPIsStandardTest, DefineMaterializingSymbol) {
 }
 
 TEST_F(CoreAPIsStandardTest, GeneratorTest) {
-  JITEvaluatedSymbol BazHiddenSym(
-      BazSym.getAddress(), BazSym.getFlags() & ~JITSymbolFlags::Exported);
+  ExecutorSymbolDef BazHiddenSym(BazSym.getAddress(),
+                                 BazSym.getFlags() & ~JITSymbolFlags::Exported);
   cantFail(JD.define(absoluteSymbols({{Foo, FooSym}, {Baz, BazHiddenSym}})));
 
   class TestGenerator : public DefinitionGenerator {

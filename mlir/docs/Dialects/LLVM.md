@@ -105,6 +105,7 @@ values for thread-safety and concept parsimony reasons. Instead, regular values
 are produced by dedicated operations that have the corresponding semantics:
 [`llvm.mlir.constant`](#llvmmlirconstant-mlirllvmconstantop),
 [`llvm.mlir.undef`](#llvmmlirundef-mlirllvmundefop),
+[`llvm.mlir.poison`](#llvmmlirpoison-mlirllvmpoisonop),
 [`llvm.mlir.null`](#llvmmlirnull-mlirllvmnullop). Note how these operations are
 prefixed with `mlir.` to indicate that they don't belong to LLVM IR but are only
 necessary to model it in MLIR. The values produced by these operations are
@@ -482,3 +483,13 @@ modeled as first-class operations in the LLVM dialect. Target-specific LLVM IR
 intrinsics, e.g., NVVM or ROCDL, are modeled as separate dialects.
 
 [include "Dialects/LLVMIntrinsicOps.md"]
+
+### Debug Info
+
+Debug information within the LLVM dialect is represented using locations in
+combination with a set of attributes that mirror the DINode structure defined by
+the debug info metadata within LLVM IR. Debug scoping information is attached
+to LLVM IR dialect operations using a fused location (`FusedLoc`) whose metadata
+holds the DIScopeAttr representing the debug scope. Similarly, the subprogram
+of LLVM IR dialect `FuncOp` operations is attached using a fused location whose
+metadata is a DISubprogramAttr.

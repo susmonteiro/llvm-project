@@ -108,6 +108,10 @@ class DwarfCompileUnit final : public DwarfUnit {
 
   void finishNonUnitTypeDIE(DIE& D, const DICompositeType *CTy) override;
 
+  /// Add info for Wasm-global-based relocation.
+  void addWasmRelocBaseGlobal(DIELoc *Loc, StringRef GlobalName,
+                              uint64_t GlobalIndex);
+
 public:
   DwarfCompileUnit(unsigned UID, const DICompileUnit *Node, AsmPrinter *A,
                    DwarfDebug *DW, DwarfFile *DWU,
@@ -192,6 +196,7 @@ public:
   /// variables in this scope then create and insert DIEs for these
   /// variables.
   DIE &updateSubprogramScopeDIE(const DISubprogram *SP);
+  DIE &updateSubprogramScopeDIEImpl(const DISubprogram *SP, DIE *SPDie);
 
   void constructScopeDIE(LexicalScope *Scope, DIE &ParentScopeDIE);
 

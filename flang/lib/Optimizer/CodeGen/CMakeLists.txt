@@ -3,24 +3,27 @@ add_flang_library(FIRCodeGen
   CGOps.cpp
   CodeGen.cpp
   PreCGRewrite.cpp
+  TBAABuilder.cpp
   Target.cpp
   TargetRewrite.cpp
 
   DEPENDS
-  FIRBuilder
   FIRDialect
-  FIRSupport
   FIROptCodeGenPassIncGen
   CGOpsIncGen
 
   LINK_LIBS
   FIRBuilder
   FIRDialect
+  FIRDialectSupport
   FIRSupport
+  MLIRComplexToLLVM
+  MLIRComplexToStandard
   MLIRMathToFuncs
   MLIRMathToLLVM
   MLIRMathToLibm
   MLIROpenMPToLLVM
+  MLIRBuiltinToLLVMIRTranslation
   MLIRLLVMToLLVMIRTranslation
   MLIRTargetLLVMIRExport
 
@@ -28,4 +31,5 @@ add_flang_library(FIRCodeGen
   AsmParser
   AsmPrinter
   Remarks
+  TargetParser
 )

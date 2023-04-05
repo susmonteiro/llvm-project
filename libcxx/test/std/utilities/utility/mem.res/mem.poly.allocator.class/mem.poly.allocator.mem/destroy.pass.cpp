@@ -7,8 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03, c++11, c++14
-// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx10.{{9|10|11|12|13|14|15}}
-// XFAIL: use_system_cxx_lib && target={{.+}}-apple-macosx{{11.0|12.0}}
+// XFAIL: availability-pmr-missing
 
 // <memory_resource>
 
@@ -19,7 +18,6 @@
 
 #include <memory_resource>
 #include <cassert>
-#include <cstdlib>
 #include <new>
 #include <type_traits>
 
@@ -39,11 +37,11 @@ int main(int, char**) {
     ASSERT_SAME_TYPE(decltype(a.destroy((destroyable*)nullptr)), void);
   }
   {
-    destroyable* ptr = ::new (std::malloc(sizeof(destroyable))) destroyable();
+    alignas(destroyable) char buffer[sizeof(destroyable)];
+    destroyable* ptr = ::new (buffer) destroyable();
     assert(count == 1);
     A{}.destroy(ptr);
     assert(count == 0);
-    std::free(ptr);
   }
 
   return 0;

@@ -10,8 +10,6 @@ from lldbsuite.test.lldbtest import *
 
 class AArch64LinuxMTEMemoryTagCoreFileTestCase(TestBase):
 
-    mydir = TestBase.compute_mydir(__file__)
-
     NO_DEBUG_INFO_TESTCASE = True
 
     MTE_BUF_ADDR = hex(0xffff82c74000)
@@ -168,3 +166,14 @@ class AArch64LinuxMTEMemoryTagCoreFileTestCase(TestBase):
         # the MTE core file which does support it but does not allow writing tags.
         self.expect("memory tag write 0 1",
                 substrs=["error: Process does not support memory tagging"], error=True)
+
+    @skipIfLLVMTargetMissing("AArch64")
+    def test_mte_tag_fault_reason(self):
+        """ Test that we correctly report the fault reason. """
+        self.runCmd("target create --core core.mte")
+
+        # There is no fault address shown here because core files do not include
+        # si_addr.
+        self.expect("bt", substrs=[
+                "* thread #1, name = 'a.out.mte', stop reason = signal SIGSEGV: "
+                "sync tag check fault"])

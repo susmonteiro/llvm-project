@@ -108,6 +108,7 @@ private:
 
   enum ELFX86RelocationKind : Edge::Kind {
     Branch32 = Edge::FirstRelocation,
+    Pointer32,
     Pointer32Signed,
     Pointer64,
     PCRel32,
@@ -123,6 +124,8 @@ private:
 
   static Expected<ELFX86RelocationKind> getRelocationKind(const uint32_t Type) {
     switch (Type) {
+    case ELF::R_X86_64_32:
+      return ELFX86RelocationKind::Pointer32;
     case ELF::R_X86_64_32S:
       return ELFX86RelocationKind::Pointer32Signed;
     case ELF::R_X86_64_PC32:
@@ -166,8 +169,8 @@ private:
             "No SHT_REL in valid x64 ELF object files",
             inconvertibleErrorCode());
 
-      if (Error Err = Base::forEachRelocation(RelSect, this,
-                                              &Self::addSingleRelocation))
+      if (Error Err = Base::forEachRelaRelocation(RelSect, this,
+                                                  &Self::addSingleRelocation))
         return Err;
     }
 
@@ -206,6 +209,9 @@ private:
       break;
     case Delta64:
       Kind = x86_64::Delta64;
+      break;
+    case Pointer32:
+      Kind = x86_64::Pointer32;
       break;
     case Pointer32Signed:
       Kind = x86_64::Pointer32Signed;

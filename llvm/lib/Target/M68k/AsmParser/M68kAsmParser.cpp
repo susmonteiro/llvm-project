@@ -43,9 +43,8 @@ class M68kAsmParser : public MCTargetAsmParser {
                       const uint64_t &ErrorInfo);
   bool missingFeature(const SMLoc &Loc, const uint64_t &ErrorInfo);
   bool emit(MCInst &Inst, SMLoc const &Loc, MCStreamer &Out) const;
-  bool parseRegisterName(unsigned int &RegNo, SMLoc Loc,
-                         StringRef RegisterName);
-  OperandMatchResultTy parseRegister(unsigned int &RegNo);
+  bool parseRegisterName(MCRegister &RegNo, SMLoc Loc, StringRef RegisterName);
+  OperandMatchResultTy parseRegister(MCRegister &RegNo);
 
   // Parser functions.
   void eatComma();
@@ -67,8 +66,9 @@ public:
 
   unsigned validateTargetOperandClass(MCParsedAsmOperand &Op,
                                       unsigned Kind) override;
-  bool ParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) override;
-  OperandMatchResultTy tryParseRegister(unsigned &RegNo, SMLoc &StartLoc,
+  bool parseRegister(MCRegister &RegNo, SMLoc &StartLoc,
+                     SMLoc &EndLoc) override;
+  OperandMatchResultTy tryParseRegister(MCRegister &RegNo, SMLoc &StartLoc,
                                         SMLoc &EndLoc) override;
   bool ParseInstruction(ParseInstructionInfo &Info, StringRef Name,
                         SMLoc NameLoc, OperandVector &Operands) override;
@@ -103,8 +103,8 @@ struct M68kMemOp {
   //   OuterDisp(%OuterReg, %InnerReg.Size * Scale, InnerDisp)
 
   Kind Op;
-  unsigned OuterReg;
-  unsigned InnerReg;
+  MCRegister OuterReg;
+  MCRegister InnerReg;
   const MCExpr *OuterDisp;
   const MCExpr *InnerDisp;
   uint8_t Size : 4;
@@ -177,6 +177,11 @@ public:
   static std::unique_ptr<M68kOperand> createImm(const MCExpr *Expr, SMLoc Start,
                                                 SMLoc End);
 
+  // Imm for TRAP instruction
+  bool isTrapImm() const;
+  // Imm for BKPT instruction
+  bool isBkptImm() const;
+
   // MoveMask
   bool isMoveMask() const;
   void addMoveMaskOperands(MCInst &Inst, unsigned N) const;
@@ -223,6 +228,7 @@ extern "C" LLVM_EXTERNAL_VISIBILITY void LLVMInitializeM68kAsmParser() {
   RegisterMCAsmParser<M68kAsmParser> X(getTheM68kTarget());
 }
 
+#define GET_REGISTER_MATCHER
 #define GET_MATCHER_IMPLEMENTATION
 #include "M68kGenAsmMatcher.inc"
 
@@ -348,6 +354,22 @@ std::unique_ptr<M68kOperand> M68kOperand::createImm(const MCExpr *Expr,
   auto Op = std::make_unique<M68kOperand>(KindTy::Imm, Start, End);
   Op->Expr = Expr;
   return Op;
+}
+
+bool M68kOperand::isTrapImm() const {
+  int64_t Value;
+  if (!isImm() || !Expr->evaluateAsAbsolute(Value))
+    return false;
+
+  return isUInt<4>(Value);
+}
+
+bool M68kOperand::isBkptImm() const {
+  int64_t Value;
+  if (!isImm() || !Expr->evaluateAsAbsolute(Value))
+    return false;
+
+  return isUInt<3>(Value);
 }
 
 // MoveMask
@@ -575,7 +597,7 @@ unsigned M68kAsmParser::validateTargetOperandClass(MCParsedAsmOperand &Op,
   return Match_InvalidOperand;
 }
 
-bool M68kAsmParser::parseRegisterName(unsigned &RegNo, SMLoc Loc,
+bool M68kAsmParser::parseRegisterName(MCRegister &RegNo, SMLoc Loc,
                                       StringRef RegisterName) {
   auto RegisterNameLower = RegisterName.lower();
 
@@ -624,7 +646,7 @@ bool M68kAsmParser::parseRegisterName(unsigned &RegNo, SMLoc Loc,
   return false;
 }
 
-OperandMatchResultTy M68kAsmParser::parseRegister(unsigned &RegNo) {
+OperandMatchResultTy M68kAsmParser::parseRegister(MCRegister &RegNo) {
   bool HasPercent = false;
   AsmToken PercentToken;
 
@@ -656,7 +678,7 @@ OperandMatchResultTy M68kAsmParser::parseRegister(unsigned &RegNo) {
   return MatchOperand_Success;
 }
 
-bool M68kAsmParser::ParseRegister(unsigned &RegNo, SMLoc &StartLoc,
+bool M68kAsmParser::parseRegister(MCRegister &RegNo, SMLoc &StartLoc,
                                   SMLoc &EndLoc) {
   auto Result = tryParseRegister(RegNo, StartLoc, EndLoc);
   if (Result != MatchOperand_Success) {
@@ -666,7 +688,7 @@ bool M68kAsmParser::ParseRegister(unsigned &RegNo, SMLoc &StartLoc,
   return false;
 }
 
-OperandMatchResultTy M68kAsmParser::tryParseRegister(unsigned &RegNo,
+OperandMatchResultTy M68kAsmParser::tryParseRegister(MCRegister &RegNo,
                                                      SMLoc &StartLoc,
                                                      SMLoc &EndLoc) {
   StartLoc = getLexer().getLoc();
@@ -841,7 +863,7 @@ M68kAsmParser::parseRegOrMoveMask(OperandVector &Operands) {
     bool IsFirstRegister =
         (MemOp.Op == M68kMemOp::Kind::RegMask) && (MemOp.RegMask == 0);
 
-    unsigned FirstRegister;
+    MCRegister FirstRegister;
     auto Result = parseRegister(FirstRegister);
     if (IsFirstRegister && (Result == llvm::MatchOperand_NoMatch)) {
       return MatchOperand_NoMatch;
@@ -851,7 +873,7 @@ M68kAsmParser::parseRegOrMoveMask(OperandVector &Operands) {
       return MatchOperand_ParseFail;
     }
 
-    unsigned LastRegister = FirstRegister;
+    MCRegister LastRegister = FirstRegister;
     if (getLexer().is(AsmToken::Minus)) {
       getLexer().Lex();
       Result = parseRegister(LastRegister);

@@ -76,6 +76,32 @@ public:
     return ES->getJITDylibByName(Name);
   }
 
+  /// Load a (real) dynamic library and make its symbols available through a
+  /// new JITDylib with the same name.
+  ///
+  /// If the given *executor* path contains a valid platform dynamic library
+  /// then that library will be loaded, and a new bare JITDylib whose name is
+  /// the given path will be created to make the library's symbols available to
+  /// JIT'd code.
+  Expected<JITDylib &> loadPlatformDynamicLibrary(const char *Path);
+
+  /// Link a static library into the given JITDylib.
+  ///
+  /// If the given MemoryBuffer contains a valid static archive (or a universal
+  /// binary with an archive slice that fits the LLJIT instance's platform /
+  /// architecture) then it will be added to the given JITDylib using a
+  /// StaticLibraryDefinitionGenerator.
+  Error linkStaticLibraryInto(JITDylib &JD,
+                              std::unique_ptr<MemoryBuffer> LibBuffer);
+
+  /// Link a static library into the given JITDylib.
+  ///
+  /// If the given *host* path contains a valid static archive (or a universal
+  /// binary with an archive slice that fits the LLJIT instance's platform /
+  /// architecture) then it will be added to the given JITDylib using a
+  /// StaticLibraryDefinitionGenerator.
+  Error linkStaticLibraryInto(JITDylib &JD, const char *Path);
+
   /// Create a new JITDylib with the given name and return a reference to it.
   ///
   /// JITDylib names must be unique. If the given name is derived from user
@@ -262,8 +288,8 @@ public:
 
   std::unique_ptr<ExecutorProcessControl> EPC;
   std::unique_ptr<ExecutionSession> ES;
-  Optional<JITTargetMachineBuilder> JTMB;
-  Optional<DataLayout> DL;
+  std::optional<JITTargetMachineBuilder> JTMB;
+  std::optional<DataLayout> DL;
   ObjectLinkingLayerCreator CreateObjectLinkingLayer;
   CompileFunctionCreator CreateCompileFunction;
   PlatformSetupFunction SetUpPlatform;
@@ -305,13 +331,13 @@ public:
 
   /// Return a reference to the JITTargetMachineBuilder.
   ///
-  Optional<JITTargetMachineBuilder> &getJITTargetMachineBuilder() {
+  std::optional<JITTargetMachineBuilder> &getJITTargetMachineBuilder() {
     return impl().JTMB;
   }
 
   /// Set a DataLayout for this instance. If no data layout is specified then
   /// the target's default data layout will be used.
-  SetterImpl &setDataLayout(Optional<DataLayout> DL) {
+  SetterImpl &setDataLayout(std::optional<DataLayout> DL) {
     impl().DL = std::move(DL);
     return impl();
   }

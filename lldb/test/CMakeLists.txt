@@ -1,5 +1,30 @@
 # Test runner infrastructure for LLDB. This configures the LLDB test trees
 # for use by Lit, and delegates to LLVM's lit test handlers.
+# Lit requires a Python3 interpreter, let's be careful and fail early if it's
+# not present.
+if (NOT DEFINED Python3_EXECUTABLE)
+  message(FATAL_ERROR
+    "LLDB test suite requires a Python3 interpreter but none "
+    "was found. Please install Python3 or disable tests with "
+    "`LLDB_INCLUDE_TESTS=OFF`.")
+endif()
+
+if(LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS)
+  message(STATUS "Enforcing strict test requirements for LLDB")
+  set(useful_python_modules
+    psutil # Lit uses psutil to do per-test timeouts.
+  )
+  foreach(module ${useful_python_modules})
+    lldb_find_python_module(${module})
+    if (NOT PY_${module}_FOUND)
+      message(FATAL_ERROR
+        "Python module '${module}' not found. Please install it via pip or via "
+        "your operating system's package manager. Alternatively, disable "
+        "strict testing requirements with "
+        "`LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS=OFF`")
+    endif()
+  endforeach()
+endif()
 
 if(LLDB_BUILT_STANDALONE)
   # In order to run check-lldb-* we need the correct map_config directives in
@@ -95,8 +120,19 @@ endif()
 if(TARGET clang)
   add_lldb_test_dependency(clang)
 
+  # TestFullLtoStepping depends on LTO, and only runs when the compiler is clang.
+  add_lldb_test_dependency(LTO)
+
   if (TARGET libcxx OR ("libcxx" IN_LIST LLVM_ENABLE_RUNTIMES))
     set(LLDB_HAS_LIBCXX ON)
+    if(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR AND NOT APPLE)
+      set(LIBCXX_LIBRARY_DIR ${LLVM_LIBRARY_OUTPUT_INTDIR}/${LLVM_DEFAULT_TARGET_TRIPLE})
+      set(LIBCXX_GENERATED_INCLUDE_DIR "${LLVM_BINARY_DIR}/include/c++/v1")
+      set(LIBCXX_GENERATED_INCLUDE_TARGET_DIR "${LLVM_BINARY_DIR}/include/${LLVM_DEFAULT_TARGET_TRIPLE}/c++/v1")
+    else()
+      set(LIBCXX_LIBRARY_DIR ${CMAKE_BINARY_DIR}/lib${LIBCXX_LIBDIR_SUFFIX})
+      set(LIBCXX_GENERATED_INCLUDE_DIR "${CMAKE_BINARY_DIR}/include/c++/v1")
+    endif()
     add_lldb_test_dependency(cxx)
   endif()
 

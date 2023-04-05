@@ -12,8 +12,7 @@
 #include "Config.h"
 #include "InputFiles.h"
 #include "Target.h"
-#include "lld/Common/ErrorHandler.h"
-#include "lld/Common/Strings.h"
+
 #include "llvm/Object/Archive.h"
 #include "llvm/Support/MathExtras.h"
 
@@ -134,6 +133,10 @@ public:
 
   uint64_t getVA() const override;
 
+  // Returns the object file that this symbol was defined in. This value differs
+  // from `getFile()` if the symbol originated from a bitcode file.
+  ObjFile *getObjectFile() const;
+
   std::string getSourceLocation();
 
   // Ensure this symbol's pointers to InputSections point to their canonical
@@ -200,8 +203,10 @@ enum class RefState : uint8_t { Unreferenced = 0, Weak = 1, Strong = 2 };
 
 class Undefined : public Symbol {
 public:
-  Undefined(StringRefZ name, InputFile *file, RefState refState)
-      : Symbol(UndefinedKind, name, file), refState(refState) {
+  Undefined(StringRefZ name, InputFile *file, RefState refState,
+            bool wasBitcodeSymbol)
+      : Symbol(UndefinedKind, name, file), refState(refState),
+        wasBitcodeSymbol(wasBitcodeSymbol) {
     assert(refState != RefState::Unreferenced);
   }
 
@@ -210,6 +215,7 @@ public:
   static bool classof(const Symbol *s) { return s->kind() == UndefinedKind; }
 
   RefState refState : 2;
+  bool wasBitcodeSymbol;
 };
 
 // On Unix, it is traditionally allowed to write variable definitions without
@@ -248,8 +254,8 @@ class DylibSymbol : public Symbol {
 public:
   DylibSymbol(DylibFile *file, StringRefZ name, bool isWeakDef,
               RefState refState, bool isTlv)
-      : Symbol(DylibKind, name, file), refState(refState), weakDef(isWeakDef),
-        tlv(isTlv) {
+      : Symbol(DylibKind, name, file), shouldReexport(false),
+        refState(refState), weakDef(isWeakDef), tlv(isTlv) {
     if (file && refState > RefState::Unreferenced)
       file->numReferencedSymbols++;
   }
@@ -291,6 +297,7 @@ public:
     }
   }
 
+  bool shouldReexport : 1;
 private:
   RefState refState : 2;
   const bool weakDef : 1;
@@ -376,6 +383,12 @@ inline bool needsBinding(const Symbol *sym) {
   if (const auto *defined = dyn_cast<Defined>(sym))
     return defined->isExternalWeakDef() || defined->interposable;
   return false;
+}
+
+// Symbols with `l` or `L` as a prefix are linker-private and never appear in
+// the output.
+inline bool isPrivateLabel(StringRef name) {
+  return name.startswith("l") || name.startswith("L");
 }
 } // namespace macho
 

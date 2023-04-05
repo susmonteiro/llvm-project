@@ -8,7 +8,15 @@
 ! RUN:     -fdefault-real-8 \
 ! RUN:     -flarge-sizes \
 ! RUN:     -fconvert=little-endian \
-! RUN:     -mllvm -print-before-all\
+! RUN:     -ffp-contract=fast \
+! RUN:     -fno-honor-nans \
+! RUN:     -fapprox-func \
+! RUN:     -fno-signed-zeros \
+! RUN:     -fassociative-math \
+! RUN:     -freciprocal-math \
+! RUN:     -fpass-plugin=Bye%pluginext \
+! RUN:     -mllvm -print-before-all \
+! RUN:     -save-temps=obj \
 ! RUN:     -P \
 ! RUN:   | FileCheck %s
 
@@ -18,5 +26,13 @@
 ! CHECK: "-fdefault-integer-8"
 ! CHECK: "-fdefault-real-8"
 ! CHECK: "-flarge-sizes"
+! CHECK: "-ffp-contract=fast"
+! CHECK: "-menable-no-nans"
+! CHECK: "-fapprox-func"
+! CHECK: "-fno-signed-zeros"
+! CHECK: "-mreassociate"
+! CHECK: "-freciprocal-math"
 ! CHECK: "-fconvert=little-endian"
-! CHECK:  "-mllvm" "-print-before-all"
+! CHECK: "-fpass-plugin=Bye
+! CHECK: "-mllvm" "-print-before-all"
+! CHECK: "-save-temps=obj"

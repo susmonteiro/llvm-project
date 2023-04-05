@@ -60,14 +60,12 @@ def CompoundTokenSplit : DiagGroup<"compound-token-split",
                                     CompoundTokenSplitBySpace]>;
 def CoroutineMissingUnhandledException :
   DiagGroup<"coroutine-missing-unhandled-exception">;
-def DeprecatedExperimentalCoroutine :
-  DiagGroup<"deprecated-experimental-coroutine">;
 def DeprecatedCoroutine :
-  DiagGroup<"deprecated-coroutine", [DeprecatedExperimentalCoroutine]>;
+  DiagGroup<"deprecated-coroutine">;
 def AlwaysInlineCoroutine :
   DiagGroup<"always-inline-coroutine">;
 def CoroNonAlignedAllocationFunction :
-  DiagGroup<"coro-non-aligned-allocation-funciton">;
+  DiagGroup<"coro-non-aligned-allocation-function">;
 def Coroutine : DiagGroup<"coroutine", [CoroutineMissingUnhandledException, DeprecatedCoroutine,
                                         AlwaysInlineCoroutine, CoroNonAlignedAllocationFunction]>;
 def ObjCBoolConstantConversion : DiagGroup<"objc-bool-constant-conversion">;
@@ -173,6 +171,7 @@ def DeleteNonVirtualDtor : DiagGroup<"delete-non-virtual-dtor",
                                       DeleteAbstractNonVirtualDtor]>;
 def AbstractFinalClass : DiagGroup<"abstract-final-class">;
 def FinalDtorNonFinalClass : DiagGroup<"final-dtor-non-final-class">;
+def GNUOffsetofExtensions : DiagGroup<"gnu-offsetof-extensions">;
 
 def CXX11CompatDeprecatedWritableStr :
   DiagGroup<"c++11-compat-deprecated-writable-strings">;
@@ -257,7 +256,6 @@ def EmptyBody : DiagGroup<"empty-body">;
 def Exceptions : DiagGroup<"exceptions">;
 def DeclarationAfterStatement : DiagGroup<"declaration-after-statement">;
 
-def GNUEmptyInitializer : DiagGroup<"gnu-empty-initializer">;
 def GNUEmptyStruct : DiagGroup<"gnu-empty-struct">;
 def ExtraTokens : DiagGroup<"extra-tokens">;
 def CXX98CompatExtraSemi : DiagGroup<"c++98-compat-extra-semi">;
@@ -413,6 +411,8 @@ def DanglingField : DiagGroup<"dangling-field">;
 def DanglingInitializerList : DiagGroup<"dangling-initializer-list">;
 def DanglingGsl : DiagGroup<"dangling-gsl">;
 def ReturnStackAddress : DiagGroup<"return-stack-address">;
+// Name of this warning in GCC
+def : DiagGroup<"return-local-addr", [ReturnStackAddress]>;
 def Dangling : DiagGroup<"dangling", [DanglingField,
                                       DanglingInitializerList,
                                       DanglingGsl,
@@ -538,7 +538,8 @@ def PrivateExtern : DiagGroup<"private-extern">;
 def SelTypeCast : DiagGroup<"cast-of-sel-type">;
 def FunctionDefInObjCContainer : DiagGroup<"function-def-in-objc-container">;
 def BadFunctionCast : DiagGroup<"bad-function-cast">;
-def CastFunctionType : DiagGroup<"cast-function-type">;
+def CastFunctionTypeStrict : DiagGroup<"cast-function-type-strict">;
+def CastFunctionType : DiagGroup<"cast-function-type", [CastFunctionTypeStrict]>;
 def ObjCPropertyImpl : DiagGroup<"objc-property-implementation">;
 def ObjCPropertyNoAttribute : DiagGroup<"objc-property-no-attribute">;
 def ObjCPropertyAssignOnObjectType : DiagGroup<"objc-property-assign-on-object-type">;
@@ -561,7 +562,8 @@ def UnderalignedExceptionObject : DiagGroup<"underaligned-exception-object">;
 def DeprecatedObjCIsaUsage : DiagGroup<"deprecated-objc-isa-usage">;
 def ExplicitInitializeCall : DiagGroup<"explicit-initialize-call">;
 def OrderedCompareFunctionPointers : DiagGroup<"ordered-compare-function-pointers">;
-def Packed : DiagGroup<"packed">;
+def PackedNonPod : DiagGroup<"packed-non-pod">;
+def Packed : DiagGroup<"packed", [PackedNonPod]>;
 def Padded : DiagGroup<"padded">;
 def UnalignedAccess : DiagGroup<"unaligned-access">;
 
@@ -798,6 +800,7 @@ def AtomicAlignment : DiagGroup<"atomic-alignment">;
 def CustomAtomic : DiagGroup<"custom-atomic-properties">;
 def AtomicProperties : DiagGroup<"atomic-properties",
                                  [ImplicitAtomic, CustomAtomic]>;
+def SyncAlignment : DiagGroup<"sync-alignment">;
 def ARCUnsafeRetainedAssign : DiagGroup<"arc-unsafe-retained-assign">;
 def ARCRetainCycles : DiagGroup<"arc-retain-cycles">;
 def ARCNonPodMemAccess : DiagGroup<"arc-non-pod-memaccess">;
@@ -851,8 +854,9 @@ def LargeByValueCopy : DiagGroup<"large-by-value-copy">;
 def DuplicateArgDecl : DiagGroup<"duplicate-method-arg">;
 def SignedEnumBitfield : DiagGroup<"signed-enum-bitfield">;
 
+def ReservedModuleIdentifier : DiagGroup<"reserved-module-identifier">;
 def ReservedIdentifier : DiagGroup<"reserved-identifier",
-    [ReservedIdAsMacro]>;
+    [ReservedIdAsMacro, ReservedModuleIdentifier]>;
 
 // Unreachable code warning groups.
 //
@@ -1130,14 +1134,14 @@ def GNU : DiagGroup<"gnu", [GNUAlignofExpression, GNUAnonymousStruct,
                             GNUBinaryLiteral, GNUCaseRange,
                             GNUComplexInteger, GNUCompoundLiteralInitializer,
                             GNUConditionalOmittedOperand, GNUDesignator,
-                            GNUEmptyInitializer, GNUEmptyStruct,
+                            GNUEmptyStruct,
                             VLAExtension, GNUFlexibleArrayInitializer,
                             GNUFlexibleArrayUnionMember, GNUFoldingConstant,
                             GNUImaginaryConstant, GNUIncludeNext,
                             GNULabelsAsValue, GNULineMarker, GNUNullPointerArithmetic,
-                            GNUPointerArith, RedeclaredClassMember,
-                            GNURedeclaredEnum, GNUStatementExpression,
-                            GNUStaticFloatInit,
+                            GNUOffsetofExtensions, GNUPointerArith,
+                            RedeclaredClassMember, GNURedeclaredEnum,
+                            GNUStatementExpression, GNUStaticFloatInit,
                             GNUStringLiteralOperatorTemplate, GNUUnionCast,
                             GNUVariableSizedTypeNotAtEnd, ZeroLengthArray,
                             GNUZeroLineDirective,
@@ -1264,7 +1268,25 @@ def OpenMP : DiagGroup<"openmp", [
 // Backend warnings.
 def BackendInlineAsm : DiagGroup<"inline-asm">;
 def BackendSourceMgr : DiagGroup<"source-mgr">;
-def BackendFrameLargerThan : DiagGroup<"frame-larger-than">;
+def BackendFrameLargerThan : DiagGroup<"frame-larger-than">{
+ code Documentation = [{
+More fine grained information about the stack layout is available by adding the
+`-Rpass-analysis=stack-frame-layout` command-line flag to the compiler
+invocation.
+
+The diagnostic information can be saved to a file in a machine readable format,
+like YAML by adding the `-foptimization-record-file=<file>` command-line flag.
+
+Results can be filtered by function name by passing 
+`-mllvm -filter-print-funcs=foo`, where `foo` is the target function's name.
+
+   .. code-block: console
+      clang -c a.cpp -Rpass-analysis=stack-frame-layout -mllvm -filter-print-funcs=foo
+
+   .. code-block: console
+      clang -c a.cpp -Rpass-analysis=stack-frame-layout -foptimization-record-file=<file>
+}];
+}
 // Compatibility flag name from old versions of Clang.
 def : DiagGroup<"frame-larger-than=", [BackendFrameLargerThan]>;
 def BackendPlugin : DiagGroup<"backend-plugin">;
@@ -1297,6 +1319,9 @@ def CudaUnknownVersion: DiagGroup<"unknown-cuda-version">;
 // A warning group for warnings about features supported by HIP but
 // ignored by CUDA.
 def HIPOnly : DiagGroup<"hip-only">;
+
+// Warning about mixed HIP and OpenMP compilation / target offloading.
+def HIPOpenMPOffloading: DiagGroup<"hip-omp-target-directives">;
 
 // Warnings which cause linking of the runtime libraries like
 // libc and the CRT to be skipped.
@@ -1388,6 +1413,15 @@ def BranchProtection : DiagGroup<"branch-protection">;
 // HLSL diagnostic groups
 // Warnings for HLSL Clang extensions
 def HLSLExtension : DiagGroup<"hlsl-extensions">;
+
+// Warnings for DXIL validation
+def DXILValidation : DiagGroup<"dxil-validation">;
+
+// Warnings and notes related to const_var_decl_type attribute checks
+def ReadOnlyPlacementChecks : DiagGroup<"read-only-types">;
+
+// Warnings and fixes to support the "safe buffers" programming model.
+def UnsafeBufferUsage : DiagGroup<"unsafe-buffer-usage">;
 
 // TODO remove this
 def ComplexCondition : DiagGroup<
