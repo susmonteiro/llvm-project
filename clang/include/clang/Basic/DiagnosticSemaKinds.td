@@ -11723,5 +11723,9 @@ def warn_if_condition_too_complex : Warning<
   "condition of the 'if' statement is too complex">,
 	InGroup<ComplexCondition>, DefaultIgnore;
 
+def print_lifetime_annotations : Warning<
+  "lifetime annotations of current function">, 
+  InGroup<PrintLifetimes>, DefaultIgnore;
+
 
 } // end of sema component.

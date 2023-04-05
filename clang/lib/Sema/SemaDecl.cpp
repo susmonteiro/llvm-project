@@ -9564,6 +9564,13 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
                                               isVirtualOkay);
   if (!NewFD) return nullptr;
 
+  // TODO remove this
+  // if (!Diags.isIgnored(diag::print_lifetime_annotations,
+                      //  NewFD->getLocation())) {
+    // LifetimeAnnotationsChecker checker;
+    // checker.debug("Found function declaration");
+  // }
+
   if (OriginalLexicalContext && OriginalLexicalContext->isObjCContainer())
     NewFD->setTopLevelDeclInObjCContainer();
 

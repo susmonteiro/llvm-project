@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "LifetimeAnnotationsChecker.h"
 #include "UsedDeclVisitor.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTDiagnostic.h"
@@ -1099,10 +1098,6 @@ void Sema::ActOnEndOfTranslationUnitFragment(TUFragmentKind Kind) {
 void Sema::ActOnEndOfTranslationUnit() {
   assert(DelayedDiagnostics.getCurrentPool() == nullptr &&
          "reached end of translation unit with a pool attached?");
-
-  // TODO remove this
-  LifetimeAnnotationsChecker checker;
-  checker.debug("In ActOnEndOfTranslationUnit");
 
   // If code completion is enabled, don't perform any end-of-translation-unit
   // work.

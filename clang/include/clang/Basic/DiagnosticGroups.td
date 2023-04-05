@@ -1392,3 +1392,6 @@ def HLSLExtension : DiagGroup<"hlsl-extensions">;
 // TODO remove this
 def ComplexCondition : DiagGroup<
   "complex-condition">;
+
+def PrintLifetimes : DiagGroup<
+  "print-lifetimes">;
