@@ -4,7 +4,6 @@
 #include "clang/AST/ASTContext.h"
 
 using namespace clang;
-using namespace llvm;
 
 class LifetimeAnnotationsChecker {
  public:

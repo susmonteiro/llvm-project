@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "LifetimeAnnotationsChecker.h"
 #include "TypeLocBuilder.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
@@ -9643,6 +9644,13 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
   FunctionDecl *NewFD = CreateNewFunctionDecl(*this, D, DC, R, TInfo, SC,
                                               isVirtualOkay);
   if (!NewFD) return nullptr;
+
+  // TODO remove this
+  if (!Diags.isIgnored(diag::print_lifetime_annotations,
+                       NewFD->getLocation())) {
+    LifetimeAnnotationsChecker checker;
+    checker.debug("Found function declaration");
+  }
 
   // TODO remove this
   // if (!Diags.isIgnored(diag::print_lifetime_annotations,
