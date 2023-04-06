@@ -17,10 +17,12 @@ add_clang_library(clangSema
   CodeCompleteConsumer.cpp
   DeclSpec.cpp
   DelayedDiagnostic.cpp
+  FunctionLifetimes.cpp
   HLSLExternalSemaSource.cpp
   IdentifierResolver.cpp
   JumpDiagnostics.cpp
   LifetimeAnnotationsChecker.cpp
+  LifetimeTypes.cpp
   MultiplexExternalSemaSource.cpp
   ParsedAttr.cpp
   Scope.cpp

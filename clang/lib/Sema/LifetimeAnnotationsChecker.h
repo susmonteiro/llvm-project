@@ -3,7 +3,7 @@
 
 #include "clang/AST/ASTContext.h"
 
-using namespace clang;
+namespace clang {
 
 class LifetimeAnnotationsChecker {
  public:
@@ -12,3 +12,4 @@ class LifetimeAnnotationsChecker {
   // TODO probably not void
   void GetLifetimes(FunctionDecl* func);
 };
+}

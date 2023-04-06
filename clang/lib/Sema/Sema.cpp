@@ -126,6 +126,7 @@ PrintingPolicy Sema::getPrintingPolicy(const ASTContext &Context,
 void Sema::ActOnTranslationUnitScope(Scope *S) {
   TUScope = S;
   PushDeclContext(S, Context.getTranslationUnitDecl());
+  // TODO check if here tu
 }
 
 namespace clang {
