@@ -40,9 +40,12 @@ class FunctionLifetimeFactory {
   /* LifetimeSymbolTable& symbol_table; */
 };
 
+// Lifetimes for the signature of a function.
 class FunctionLifetimes {
  public:
-  static llvm::Expected<FunctionLifetimes> CreateForDecl(
+  // * Returns lifetimes for the `i`-th parameter.
+  // * These are the same number and order as FunctionDecl::parameters()
+  static void /* llvm::Expected<FunctionLifetimes> */ CreateForDecl(
       const clang::FunctionDecl *function,
       const FunctionLifetimeFactory &lifetime_factory);
 
@@ -50,6 +53,11 @@ class FunctionLifetimes {
   llvm::SmallVector<ValueLifetimes> param_lifetimes_;
   ValueLifetimes return_lifetimes_;
   // std::optional<ValueLifetimes> this_lifetimes_;
+
+  static void /* llvm::Expected<FunctionLifetimes> */ Create(
+      const clang::FunctionProtoType *type, clang::TypeLoc type_loc,
+      const clang::QualType this_type,
+      const FunctionLifetimeFactory &lifetime_factory);
 };
 
 }  // namespace clang
