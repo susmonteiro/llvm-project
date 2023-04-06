@@ -9,6 +9,8 @@ class ValueLifetimes {
   // Creates an invalid ValueLifetimes, which should not be used. This is
   // provided only for usage with functions with output parameters.
 
+  ValueLifetimes() : ValueLifetimes(clang::QualType()) {}
+
   ValueLifetimes(const ValueLifetimes& other);
 
 //   ValueLifetimes& operator=(const ValueLifetimes& other);

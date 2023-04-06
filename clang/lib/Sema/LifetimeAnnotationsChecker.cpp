@@ -33,6 +33,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
 
   if (!func->isDefined()) {
     debug("Function is not defined");
+    func->dump();
   }
 
   // TODO ellision
@@ -40,6 +41,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   // Following Case 2. Not part of a cycle.
   FunctionLifetimeFactory function_lifetime_factory(
       /* elision_enabled, */ func /* , symbol_table */);
+    FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
   // TODO keep track of analyzed functions
 }

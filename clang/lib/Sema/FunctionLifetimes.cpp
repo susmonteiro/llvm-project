@@ -1,6 +1,68 @@
 #include "FunctionLifetimes.h"
+// TODO remove this
+#include "Debug.h"
+#include <iostream>
 
 namespace clang {
+
+clang::TypeLoc StripAttributes(clang::TypeLoc type_loc,
+                               llvm::SmallVector<const clang::Attr*>& attrs) {
+  while (true) {
+    if (auto macro_qualified_type_loc =
+            type_loc.getAs<clang::MacroQualifiedTypeLoc>()) {
+      type_loc = macro_qualified_type_loc.getInnerLoc();
+    } else if (auto attr_type_loc =
+                   type_loc.getAs<clang::AttributedTypeLoc>()) {
+      attrs.push_back(attr_type_loc.getAttr());
+      type_loc = attr_type_loc.getModifiedLoc();
+    } else {
+      // The last attribute in a chain of attributes will appear as the
+      // outermost AttributedType, e.g. `int $a $b` will be represented as
+      // follows (in pseudocode):
+      //
+      // AttributedType(annotate_type("lifetime", "b"),
+      //   AttributedType(annotate_type("lifetime", "a"),
+      //     BuiltinType("int")
+      //   )
+      // )
+      //
+      // We reverse the attributes so that we obtain the more intuitive ordering
+      // "a, b".
+      std::reverse(attrs.begin(), attrs.end());
+      return type_loc;
+    }
+  }
+}
+
+// llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
+//     llvm::ArrayRef<const clang::Attr*> attrs) {
+//   llvm::SmallVector<const clang::Expr*> result;
+
+//   bool saw_annotate_type = false;
+
+//   for (const clang::Attr* attr : attrs) {
+//     auto annotate_type_attr = clang::dyn_cast<clang::AnnotateTypeAttr>(attr);
+//     if (!annotate_type_attr ||
+//         annotate_type_attr->getAnnotation() != "lifetime")
+//       continue;
+
+//     if (saw_annotate_type) {
+//       return llvm::createStringError(
+//           llvm::inconvertibleErrorCode(),
+//           "Only one `[[annotate_type(\"lifetime\", ...)]]` attribute may be "
+//           "placed on a type");
+//     }
+//     saw_annotate_type = true;
+
+//     for (const clang::Expr* arg : annotate_type_attr->args()) {
+//       result.push_back(arg);
+//     }
+//   }
+
+//   return result;
+// }
+
+
 void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::CreateForDecl(
     const clang::FunctionDecl* func,
     const FunctionLifetimeFactory& lifetime_factory) {
@@ -16,26 +78,30 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::CreateForDecl(
   if (func->getTypeSourceInfo()) {
     type_loc = func->getTypeSourceInfo()->getTypeLoc();
   }
-//   /* return  */Create(func->getType()->getAs<clang::FunctionProtoType>(), type_loc,
-//                 this_type, lifetime_factory);
+  /* return  */Create(func->getType()->getAs<clang::FunctionProtoType>(), type_loc,
+                this_type, lifetime_factory);
 }
 
 void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
     const clang::FunctionProtoType* type, clang::TypeLoc type_loc,
     const clang::QualType this_type,
     const FunctionLifetimeFactory& lifetime_factory) {
-//   FunctionLifetimes ret;
+  FunctionLifetimes ret;
 
   llvm::SmallVector<const clang::Attr*> attrs;
   if (type_loc) {
-    // StripAttributes(type_loc, attrs);
+    debug("type_loc is defined and the attributes are:");
+    StripAttributes(type_loc, attrs);
+    for (const auto &attr : attrs) {
+        std::cout << attr << '\n';
+    }
   }
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
-  //   if (llvm::Error err =
-  //   GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
-  //     return std::move(err);
-  //   }
+    // if (llvm::Error err =
+    // GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
+    //   return std::move(err);
+    // }
 
   /* if (this_type.isNull() && !lifetime_names.empty()) {
       return llvm::createStringError(
