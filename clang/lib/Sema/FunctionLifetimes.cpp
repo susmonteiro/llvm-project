@@ -1,67 +1,21 @@
 #include "FunctionLifetimes.h"
+#include <iostream>
+
 // TODO remove this
 #include "Debug.h"
-#include <iostream>
+#include "clang/AST/Attr.h"
+#include "llvm/Support/Error.h"
+#include "LifetimeTypes.h"
+#include "Lifetime.h"
 
 namespace clang {
 
-clang::TypeLoc StripAttributes(clang::TypeLoc type_loc,
-                               llvm::SmallVector<const clang::Attr*>& attrs) {
-  while (true) {
-    if (auto macro_qualified_type_loc =
-            type_loc.getAs<clang::MacroQualifiedTypeLoc>()) {
-      type_loc = macro_qualified_type_loc.getInnerLoc();
-    } else if (auto attr_type_loc =
-                   type_loc.getAs<clang::AttributedTypeLoc>()) {
-      attrs.push_back(attr_type_loc.getAttr());
-      type_loc = attr_type_loc.getModifiedLoc();
-    } else {
-      // The last attribute in a chain of attributes will appear as the
-      // outermost AttributedType, e.g. `int $a $b` will be represented as
-      // follows (in pseudocode):
-      //
-      // AttributedType(annotate_type("lifetime", "b"),
-      //   AttributedType(annotate_type("lifetime", "a"),
-      //     BuiltinType("int")
-      //   )
-      // )
-      //
-      // We reverse the attributes so that we obtain the more intuitive ordering
-      // "a, b".
-      std::reverse(attrs.begin(), attrs.end());
-      return type_loc;
-    }
-  }
-}
-
-// llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
-//     llvm::ArrayRef<const clang::Attr*> attrs) {
-//   llvm::SmallVector<const clang::Expr*> result;
-
-//   bool saw_annotate_type = false;
-
-//   for (const clang::Attr* attr : attrs) {
-//     auto annotate_type_attr = clang::dyn_cast<clang::AnnotateTypeAttr>(attr);
-//     if (!annotate_type_attr ||
-//         annotate_type_attr->getAnnotation() != "lifetime")
-//       continue;
-
-//     if (saw_annotate_type) {
-//       return llvm::createStringError(
-//           llvm::inconvertibleErrorCode(),
-//           "Only one `[[annotate_type(\"lifetime\", ...)]]` attribute may be "
-//           "placed on a type");
-//     }
-//     saw_annotate_type = true;
-
-//     for (const clang::Expr* arg : annotate_type_attr->args()) {
-//       result.push_back(arg);
-//     }
-//   }
-
-//   return result;
-// }
-
+void /* llvm::Expected<ValueLifetimes> */
+    FunctionLifetimeFactory::CreateParamLifetimes(clang::QualType param_type,
+                         clang::TypeLoc param_type_loc) const {
+/*       return ValueLifetimes::Create(param_type, param_type_loc,
+                                    ParamLifetimeFactory());
+ */    }
 
 void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::CreateForDecl(
     const clang::FunctionDecl* func,
@@ -78,8 +32,8 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::CreateForDecl(
   if (func->getTypeSourceInfo()) {
     type_loc = func->getTypeSourceInfo()->getTypeLoc();
   }
-  /* return  */Create(func->getType()->getAs<clang::FunctionProtoType>(), type_loc,
-                this_type, lifetime_factory);
+  /* return  */ Create(func->getType()->getAs<clang::FunctionProtoType>(),
+                       type_loc, this_type, lifetime_factory);
 }
 
 void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
@@ -90,18 +44,25 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
 
   llvm::SmallVector<const clang::Attr*> attrs;
   if (type_loc) {
-    debug("type_loc is defined and the attributes are:");
+    debug("type_loc is defined as: ", type_loc.getType().getAsString());
+    debug("and the attributes are:");
     StripAttributes(type_loc, attrs);
-    for (const auto &attr : attrs) {
-        std::cout << attr << '\n';
+    for (const auto& attr : attrs) {  // DEBUG
+      std::cout << attr << '\n';
     }
   }
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
-    // if (llvm::Error err =
-    // GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
-    //   return std::move(err);
-    // }
+  if (llvm::Error err =
+  GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
+    // TODO uncomment return
+    // return std::move(err);
+  }
+
+  debug("lifetime names");
+  for (const auto& name : lifetime_names) {  // DEBUG
+      name->dump();
+    }
 
   /* if (this_type.isNull() && !lifetime_names.empty()) {
       return llvm::createStringError(
@@ -135,7 +96,8 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
     func_type_loc = type_loc.getAsAdjusted<clang::FunctionTypeLoc>();
   }
 
-//   ret.param_lifetimes_.reserve(type->getNumParams());
+    ret.param_lifetimes_.reserve(type->getNumParams());
+    debug("Num of parameters", type->getNumParams());
 
   for (size_t i = 0; i < type->getNumParams(); i++) {
     clang::TypeLoc param_type_loc;
@@ -145,14 +107,15 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
     }
-    // ValueLifetimes tmp;
-    /* if (llvm::Error err =
-            lifetime_factory
-                .CreateParamLifetimes(type->getParamType(i), param_type_loc)
-                .moveInto(tmp)) {
-      return std::move(err);
-    } */
-    // ret.param_lifetimes_.push_back(std::move(tmp));
+    ValueLifetimes tmp;
+    // if (llvm::Error err =
+    //         lifetime_factory
+    //             .CreateParamLifetimes(type->getParamType(i), param_type_loc)
+    //             .moveInto(tmp)) {
+                  // TODO uncomment return value
+      // return std::move(err);
+    // }
+    ret.param_lifetimes_.push_back(std::move(tmp));
   }
   clang::TypeLoc return_type_loc;
   if (func_type_loc) {
@@ -167,7 +130,7 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
     return std::move(err);
   } */
 
-//   return ret;
+  //   return ret;
 }
 
 }  // namespace clang

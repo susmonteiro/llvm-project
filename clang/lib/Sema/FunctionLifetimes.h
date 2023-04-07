@@ -15,24 +15,24 @@ class FunctionLifetimeFactory {
         : /* elision_enabled(elision_enabled), */ func(func)/* ,
           symbol_table(symbol_table) */ {}
 
-  /* virtual ~FunctionLifetimeFactory() {}
+//   virtual ~FunctionLifetimeFactory() {}
 
-  virtual llvm::Expected<ValueLifetimes> CreateThisLifetimes(
-      clang::QualType type, const clang::Expr* lifetime_name) const = 0;
+//   virtual llvm::Expected<ValueLifetimes> CreateThisLifetimes(
+//       clang::QualType type, const clang::Expr* lifetime_name) const = 0;
 
-  // Note: The `type_loc` parameter passed into `CreateParamLifetimes` and
-  // `CreateReturnLifetimes` may be null if no type location is available.
+//   // Note: The `type_loc` parameter passed into `CreateParamLifetimes` and
+//   // `CreateReturnLifetimes` may be null if no type location is available.
 
-  virtual llvm::Expected<ValueLifetimes> CreateParamLifetimes(
-      clang::QualType type, clang::TypeLoc type_loc) const = 0;
+  void /* llvm::Expected<ValueLifetimes> */ CreateParamLifetimes(
+      clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
-  // * the method to create the return lifetime depends on the parameter
-  // lifetimes
+//   // * the method to create the return lifetime depends on the parameter
+//   // lifetimes
 
-  virtual llvm::Expected<ValueLifetimes> CreateReturnLifetimes(
-      clang::QualType type, clang::TypeLoc type_loc,
-      const llvm::SmallVector<ValueLifetimes>& param_lifetimes,
-      const std::optional<ValueLifetimes>& this_lifetimes) const = 0; */
+//   virtual llvm::Expected<ValueLifetimes> CreateReturnLifetimes(
+//       clang::QualType type, clang::TypeLoc type_loc,
+//       const llvm::SmallVector<ValueLifetimes>& param_lifetimes,
+//       const std::optional<ValueLifetimes>& this_lifetimes) const = 0;
 
  private:
   bool elision_enabled;
