@@ -1,15 +1,18 @@
 #ifndef LIFETIME_ANNOTATIONS_TYPE_LIFETIMES_H_
 #define LIFETIME_ANNOTATIONS_TYPE_LIFETIMES_H_
 
-#include "clang/AST/Type.h"
 #include "Lifetime.h"
+#include "LifetimeSymbolTable.h"
 #include "clang/AST/Type.h"
 #include "clang/AST/TypeLoc.h"
+#include "clang/AST/TypeOrdering.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 
 namespace clang {
-
-using LifetimeFactory =
-    std::function<llvm::Expected<Lifetime>(const clang::Expr*)>;
 
 // Strips any attributes off `type` and returns the result.
 clang::QualType StripAttributes(clang::QualType type);
@@ -29,6 +32,12 @@ llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
 // Extracts the lifetime parameters of the given type.
 llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type);
 
+llvm::Expected<llvm::StringRef> EvaluateAsStringLiteral(
+    const clang::Expr* expr, const clang::ASTContext& ast_context);
+
+using LifetimeFactory =
+    std::function<llvm::Expected<Lifetime>(const clang::Expr*)>;
+
 class ValueLifetimes {
  public:
   // Creates an invalid ValueLifetimes, which should not be used. This is
@@ -38,22 +47,26 @@ class ValueLifetimes {
 
   ValueLifetimes(const ValueLifetimes& other);
 
-//   ValueLifetimes& operator=(const ValueLifetimes& other);
+  //   ValueLifetimes& operator=(const ValueLifetimes& other);
 
   ~ValueLifetimes();
 
-  static void /* llvm::Expected<ValueLifetimes> */ Create(
+  static llvm::Expected<ValueLifetimes> Create(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
-  static void /* llvm::Expected<ValueLifetimes> */ Create(
+  static llvm::Expected<ValueLifetimes> Create(
       clang::QualType type, LifetimeFactory lifetime_factory) {
     return Create(type, clang::TypeLoc(), lifetime_factory);
   }
 
- private:
- explicit ValueLifetimes(clang::QualType type);
+  // Returns the type of the value.
+  clang::QualType Type() const { return type_; }
 
- clang::QualType type_;
+ private:
+  explicit ValueLifetimes(clang::QualType type);
+
+  clang::QualType type_;
+  friend class llvm::DenseMapInfo<clang::ValueLifetimes>;
 };
 }  // namespace clang
 

@@ -2,6 +2,7 @@
 
 #include "LifetimeTypes.h"
 #include "FunctionLifetimes.h"
+#include "LifetimeSymbolTable.h"
 
 namespace clang {
 
@@ -36,11 +37,14 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
     func->dump();
   }
 
+  // TODO correct?
+  LifetimeSymbolTable symbol_table;
+
   // TODO ellision
 
   // Following Case 2. Not part of a cycle.
   FunctionLifetimeFactory function_lifetime_factory(
-      /* elision_enabled, */ func /* , symbol_table */);
+      /* elision_enabled, */ func , symbol_table);
     FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
   // TODO keep track of analyzed functions

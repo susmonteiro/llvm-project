@@ -14,7 +14,7 @@ namespace clang {
 
 // A lifetime variable or constant lifetime.
 class Lifetime {
-public:
+ public:
   // Creates an invalid lifetime.
   //
   // This is provided because containers need default constructors. It is not
@@ -59,7 +59,7 @@ public:
 
   bool operator!=(Lifetime other) const { return !(*this == other); }
 
-private:
+ private:
   explicit Lifetime(int id);
 
   static Lifetime InvalidEmpty();
@@ -67,7 +67,7 @@ private:
 
   bool IsValid() const;
 
-  // TODO check what I need from here and implement my own lifetime class 
+  // TODO check what I need from here and implement my own lifetime class
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
   friend class std::less<Lifetime>;
@@ -79,7 +79,42 @@ private:
 
 std::ostream &operator<<(std::ostream &os, Lifetime lifetime);
 
-} // namespace lifetimes
+}  // namespace clang
 
+namespace llvm {
 
-#endif // LIFETIME_ANNOTATIONS_LIFETIME_H_
+template <>
+struct DenseMapInfo<clang::Lifetime, void> {
+  static clang::Lifetime getEmptyKey() {
+    return clang::Lifetime::InvalidEmpty();
+  }
+
+  static clang::Lifetime getTombstoneKey() {
+    return clang::Lifetime::InvalidTombstone();
+  }
+
+  static unsigned getHashValue(clang::Lifetime lifetime) {
+    return llvm::hash_value(lifetime.id_);
+  }
+
+  static bool isEqual(clang::Lifetime lhs,
+                      clang::Lifetime rhs) {
+    return lhs.id_ == rhs.id_;
+  }
+};
+
+}  // namespace llvm
+
+namespace std {
+
+template <>
+struct less<clang::Lifetime> {
+  bool operator()(const clang::Lifetime &l1,
+                  const clang::Lifetime &l2) const {
+    return l1.id_ < l2.id_;
+  }
+};
+
+}  // namespace std
+
+#endif  // LIFETIME_ANNOTATIONS_LIFETIME_H_

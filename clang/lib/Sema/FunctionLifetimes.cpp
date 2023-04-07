@@ -1,21 +1,65 @@
 #include "FunctionLifetimes.h"
+
 #include <iostream>
 
 // TODO remove this
 #include "Debug.h"
+#include "Lifetime.h"
+#include "LifetimeTypes.h"
 #include "clang/AST/Attr.h"
 #include "llvm/Support/Error.h"
-#include "LifetimeTypes.h"
-#include "Lifetime.h"
 
 namespace clang {
 
-void /* llvm::Expected<ValueLifetimes> */
-    FunctionLifetimeFactory::CreateParamLifetimes(clang::QualType param_type,
-                         clang::TypeLoc param_type_loc) const {
-/*       return ValueLifetimes::Create(param_type, param_type_loc,
-                                    ParamLifetimeFactory());
- */    }
+llvm::Expected<Lifetime> FunctionLifetimeFactory::LifetimeFromName(
+    const clang::Expr* name) const {
+  llvm::StringRef name_str;
+  if (llvm::Error err = EvaluateAsStringLiteral(name, func->getASTContext())
+                            .moveInto(name_str)) {
+    return std::move(err);
+  }
+  return symbol_table.LookupNameAndMaybeDeclare(name_str);
+}
+
+llvm::Expected<ValueLifetimes>
+FunctionLifetimeFactory::CreateParamLifetimes(
+    clang::QualType param_type, clang::TypeLoc param_type_loc) const {
+  // TODO pendurado
+  return ValueLifetimes::Create(param_type, param_type_loc,
+                                ParamLifetimeFactory());
+}
+
+LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
+  return [this](const clang::Expr* name) -> llvm::Expected<Lifetime> {
+    if (name) {
+      Lifetime lifetime;
+      if (llvm::Error err = LifetimeFromName(name).moveInto(lifetime)) {
+        return std::move(err);
+      }
+      return lifetime;
+    }
+
+    // As a special-case, lifetime is always inferred for the `this`
+    // parameter for destructors. The obvious lifetime is definitionally
+    // correct in this case: the object must be valid for the duration
+    // of the call, or else the behavior is undefined. So we can infer
+    // safely even if elision is disabled.
+    if (!elision_enabled && func->getDeclName().getNameKind() !=
+                                clang::DeclarationName::CXXDestructorName) {
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "Lifetime elision not enabled for function"
+          // TODO abseil
+          // absl::StrCat("Lifetime elision not enabled for '",
+          //              func->getNameAsString(), "'")
+          );
+    }
+
+    Lifetime lifetime = Lifetime::CreateVariable();
+    symbol_table.LookupLifetimeAndMaybeDeclare(lifetime);
+    return lifetime;
+  };
+}
 
 void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::CreateForDecl(
     const clang::FunctionDecl* func,
@@ -53,16 +97,15 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
   }
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
-  if (llvm::Error err =
-  GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
+  if (llvm::Error err = GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
     // TODO uncomment return
     // return std::move(err);
   }
 
   debug("lifetime names");
   for (const auto& name : lifetime_names) {  // DEBUG
-      name->dump();
-    }
+    name->dump();
+  }
 
   /* if (this_type.isNull() && !lifetime_names.empty()) {
       return llvm::createStringError(
@@ -96,8 +139,8 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
     func_type_loc = type_loc.getAsAdjusted<clang::FunctionTypeLoc>();
   }
 
-    ret.param_lifetimes_.reserve(type->getNumParams());
-    debug("Num of parameters", type->getNumParams());
+  ret.param_lifetimes_.reserve(type->getNumParams());
+  debug("Num of parameters", type->getNumParams());
 
   for (size_t i = 0; i < type->getNumParams(); i++) {
     clang::TypeLoc param_type_loc;
@@ -108,13 +151,13 @@ void /* llvm::Expected<FunctionLifetimes> */ FunctionLifetimes::Create(
       }
     }
     ValueLifetimes tmp;
-    // if (llvm::Error err =
-    //         lifetime_factory
-    //             .CreateParamLifetimes(type->getParamType(i), param_type_loc)
-    //             .moveInto(tmp)) {
-                  // TODO uncomment return value
+    if (llvm::Error err =
+            lifetime_factory
+                .CreateParamLifetimes(type->getParamType(i), param_type_loc)
+                .moveInto(tmp)) {
+      // TODO pendurado
       // return std::move(err);
-    // }
+    }
     ret.param_lifetimes_.push_back(std::move(tmp));
   }
   clang::TypeLoc return_type_loc;

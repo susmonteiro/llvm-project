@@ -183,7 +183,7 @@ ValueLifetimes::ValueLifetimes(clang::QualType type) : type_(type) {}
 ValueLifetimes::ValueLifetimes(const ValueLifetimes& other) { *this = other; }
 ValueLifetimes::~ValueLifetimes() = default;
 
-void /* llvm::Expected<ValueLifetimes> */ ValueLifetimes::Create(
+llvm::Expected<ValueLifetimes> ValueLifetimes::Create(
     clang::QualType type, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
   assert(!type.isNull());
@@ -201,8 +201,7 @@ void /* llvm::Expected<ValueLifetimes> */ ValueLifetimes::Create(
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
   if (llvm::Error err = GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
-    // TODO uncomment
-    // return std::move(err);
+    return std::move(err);
   }
 
   ValueLifetimes ret(type);
@@ -210,13 +209,13 @@ void /* llvm::Expected<ValueLifetimes> */ ValueLifetimes::Create(
   llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
   if (!lifetime_params.empty() && !lifetime_names.empty() &&
       lifetime_names.size() != lifetime_params.size()) {
-    // TODO abseil
-    // TODO uncomment
-    /* return llvm::createStringError(
+    return llvm::createStringError(
         llvm::inconvertibleErrorCode(),
-        absl::StrCat("Type has ", lifetime_params.size(),
+        "Number of types and lifetimes not the same"
+        // TODO abseil
+        /* absl::StrCat("Type has ", lifetime_params.size(),
                      " lifetime parameters but ", lifetime_names.size(),
-                     " lifetime arguments were given")); */
+                     " lifetime arguments were given") */);
   }
 }
 

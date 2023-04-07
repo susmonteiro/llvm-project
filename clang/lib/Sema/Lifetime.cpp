@@ -37,24 +37,28 @@ bool Lifetime::IsLocal() const {
   return id_ <= FIRST_LOCAL_LIFETIME_ID;
 }
 
-// std::string Lifetime::DebugString() const {
-//   assert(IsValid());
+std::string Lifetime::DebugString() const {
+  assert(IsValid());
 
-//   switch (id_) {
-//     case INVALID_LIFETIME_ID_EMPTY:
-//       return "INVALID_EMPTY";
-//     case INVALID_LIFETIME_ID_TOMBSTONE:
-//       return "INVALID_TOMBSTONE";
-//     case STATIC_LIFETIME_ID:
-//       return "'static";
-//     default:
-//       if (id_ <= FIRST_LOCAL_LIFETIME_ID) {
-//         return absl::StrCat("'local", -id_);
-//       } else {
-//         return absl::StrCat("'", id_);
-//       }
-//   }
-// }
+  switch (id_) {
+    case INVALID_LIFETIME_ID_EMPTY:
+      return "INVALID_EMPTY";
+    case INVALID_LIFETIME_ID_TOMBSTONE:
+      return "INVALID_TOMBSTONE";
+    case STATIC_LIFETIME_ID:
+      return "'static";
+    default:
+      if (id_ <= FIRST_LOCAL_LIFETIME_ID) {
+        // TODO abseil
+        // return absl::StrCat("'local", -id_);
+        return "'local";
+      } else {
+        // TODO abseil
+        // return absl::StrCat("'", id_);
+        return std::to_string(id_);
+      }
+  }
+}
 
 Lifetime::Lifetime(int id) : id_(id) {}
 

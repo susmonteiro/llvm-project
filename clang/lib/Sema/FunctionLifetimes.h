@@ -1,43 +1,52 @@
 #ifndef LIFETIME_ANNOTATIONS_FUNCTION_LIFETIMES_H_
 #define LIFETIME_ANNOTATIONS_FUNCTION_LIFETIMES_H_
 
+#include "LifetimeSymbolTable.h"
 #include "LifetimeTypes.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 
 namespace clang {
 
 class FunctionLifetimeFactory {
  public:
-  FunctionLifetimeFactory(/* bool elision_enabled, */ const clang::FunctionDecl *func/* ,
-            LifetimeSymbolTable &symbol_table */)
-        : /* elision_enabled(elision_enabled), */ func(func)/* ,
-          symbol_table(symbol_table) */ {}
+  FunctionLifetimeFactory(
+      /* bool elision_enabled, */ const clang::FunctionDecl *func,
+      LifetimeSymbolTable &symbol_table)
+      : /* elision_enabled(elision_enabled), */ func(func),
+        symbol_table(symbol_table) {}
 
-//   virtual ~FunctionLifetimeFactory() {}
+  //   virtual ~FunctionLifetimeFactory() {}
 
-//   virtual llvm::Expected<ValueLifetimes> CreateThisLifetimes(
-//       clang::QualType type, const clang::Expr* lifetime_name) const = 0;
+  //   virtual llvm::Expected<ValueLifetimes> CreateThisLifetimes(
+  //       clang::QualType type, const clang::Expr* lifetime_name) const = 0;
 
-//   // Note: The `type_loc` parameter passed into `CreateParamLifetimes` and
-//   // `CreateReturnLifetimes` may be null if no type location is available.
+  //   // Note: The `type_loc` parameter passed into `CreateParamLifetimes` and
+  //   // `CreateReturnLifetimes` may be null if no type location is available.
 
-  void /* llvm::Expected<ValueLifetimes> */ CreateParamLifetimes(
+  llvm::Expected<Lifetime> LifetimeFromName(const clang::Expr *name) const;
+
+  llvm::Expected<ValueLifetimes> CreateParamLifetimes(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
-//   // * the method to create the return lifetime depends on the parameter
-//   // lifetimes
+  //   // * the method to create the return lifetime depends on the parameter
+  //   // lifetimes
 
-//   virtual llvm::Expected<ValueLifetimes> CreateReturnLifetimes(
-//       clang::QualType type, clang::TypeLoc type_loc,
-//       const llvm::SmallVector<ValueLifetimes>& param_lifetimes,
-//       const std::optional<ValueLifetimes>& this_lifetimes) const = 0;
+  //   virtual llvm::Expected<ValueLifetimes> CreateReturnLifetimes(
+  //       clang::QualType type, clang::TypeLoc type_loc,
+  //       const llvm::SmallVector<ValueLifetimes>& param_lifetimes,
+  //       const std::optional<ValueLifetimes>& this_lifetimes) const = 0;
+
+  LifetimeFactory ParamLifetimeFactory() const;
 
  private:
   bool elision_enabled;
   const clang::FunctionDecl *func;
-  /* LifetimeSymbolTable& symbol_table; */
+  LifetimeSymbolTable &symbol_table;
 };
 
 // Lifetimes for the signature of a function.
