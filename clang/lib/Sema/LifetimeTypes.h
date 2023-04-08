@@ -12,7 +12,19 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
+// TODO remove this
+#include "DebugLifetimes.h"
+
 namespace clang {
+
+// Returns a lifetime in some human-readable format.
+using LifetimeFormatter = std::function<std::string(Lifetime)>;
+
+// Variance of a reference-like type with respect to the type it refers to.
+enum Variance {
+  kCovariant,
+  kInvariant,
+};
 
 // Strips any attributes off `type` and returns the result.
 clang::QualType StripAttributes(clang::QualType type);
@@ -47,7 +59,7 @@ class ValueLifetimes {
 
   ValueLifetimes(const ValueLifetimes& other);
 
-  //   ValueLifetimes& operator=(const ValueLifetimes& other);
+    // ValueLifetimes& operator=(const ValueLifetimes& other);
 
   ~ValueLifetimes();
 
@@ -61,6 +73,11 @@ class ValueLifetimes {
 
   // Returns the type of the value.
   clang::QualType Type() const { return type_; }
+
+//   void Traverse(std::function<void(Lifetime&, Variance)> visitor,
+//                 Variance variance = kCovariant);
+  void Traverse(std::function<void(const Lifetime&, Variance)> visitor,
+                Variance variance = kCovariant) const;
 
  private:
   explicit ValueLifetimes(clang::QualType type);

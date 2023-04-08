@@ -10,6 +10,9 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
+// TODO remove this
+#include "DebugLifetimes.h"
+
 namespace clang {
 
 class FunctionLifetimeFactory {
@@ -30,8 +33,17 @@ class FunctionLifetimeFactory {
 
   llvm::Expected<Lifetime> LifetimeFromName(const clang::Expr *name) const;
 
+  std::optional<Lifetime> GetSingleInputLifetime(
+      const llvm::SmallVector<ValueLifetimes> &param_lifetimes,
+      const std::optional<ValueLifetimes> &this_lifetimes) const;
+
   llvm::Expected<ValueLifetimes> CreateParamLifetimes(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
+
+  llvm::Expected<ValueLifetimes> CreateReturnLifetimes(
+      clang::QualType return_type, clang::TypeLoc return_type_loc,
+      const llvm::SmallVector<ValueLifetimes> &param_lifetimes,
+      const std::optional<ValueLifetimes> &this_lifetimes) const;
 
   //   // * the method to create the return lifetime depends on the parameter
   //   // lifetimes
@@ -54,16 +66,17 @@ class FunctionLifetimes {
  public:
   // * Returns lifetimes for the `i`-th parameter.
   // * These are the same number and order as FunctionDecl::parameters()
-  static void /* llvm::Expected<FunctionLifetimes> */ CreateForDecl(
+  static llvm::Expected<FunctionLifetimes> CreateForDecl(
       const clang::FunctionDecl *function,
       const FunctionLifetimeFactory &lifetime_factory);
 
  private:
   llvm::SmallVector<ValueLifetimes> param_lifetimes_;
   ValueLifetimes return_lifetimes_;
-  // std::optional<ValueLifetimes> this_lifetimes_;
+  // TODO this
+  //   std::optional<ValueLifetimes> this_lifetimes_;
 
-  static void /* llvm::Expected<FunctionLifetimes> */ Create(
+  static llvm::Expected<FunctionLifetimes> Create(
       const clang::FunctionProtoType *type, clang::TypeLoc type_loc,
       const clang::QualType this_type,
       const FunctionLifetimeFactory &lifetime_factory);

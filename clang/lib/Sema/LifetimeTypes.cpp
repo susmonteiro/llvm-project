@@ -179,6 +179,14 @@ bool SameType(clang::QualType type1, clang::QualType type2) {
   return Undecay(type1) == Undecay(type2);
 }
 
+// TODO return
+// void ValueLifetimes::Traverse(
+//     std::function<void(const Lifetime&, Variance)> visitor,
+//     Variance variance) const {
+//   const_cast<ValueLifetimes*>(this)->Traverse(
+//       [&visitor](Lifetime& l, Variance v) { visitor(l, v); }, variance);
+// }
+
 ValueLifetimes::ValueLifetimes(clang::QualType type) : type_(type) {}
 ValueLifetimes::ValueLifetimes(const ValueLifetimes& other) { *this = other; }
 ValueLifetimes::~ValueLifetimes() = default;
@@ -186,6 +194,7 @@ ValueLifetimes::~ValueLifetimes() = default;
 llvm::Expected<ValueLifetimes> ValueLifetimes::Create(
     clang::QualType type, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
+      debugLifetimes("Inside create value lifetimes");
   assert(!type.isNull());
   if (type_loc) {
     assert(SameType(type_loc.getType(), type));
@@ -199,14 +208,21 @@ llvm::Expected<ValueLifetimes> ValueLifetimes::Create(
     type_loc = StripAttributes(type_loc, attrs);
   }
 
+  debugLifetimes("Should have a type and type_loc");
+
   llvm::SmallVector<const clang::Expr*> lifetime_names;
   if (llvm::Error err = GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
     return std::move(err);
   }
 
+  debugLifetimes("Should have lifetime names");
+
   ValueLifetimes ret(type);
 
   llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
+
+  debugLifetimes("Should have lifetime params");
+
   if (!lifetime_params.empty() && !lifetime_names.empty() &&
       lifetime_names.size() != lifetime_params.size()) {
     return llvm::createStringError(
@@ -217,6 +233,45 @@ llvm::Expected<ValueLifetimes> ValueLifetimes::Create(
                      " lifetime parameters but ", lifetime_names.size(),
                      " lifetime arguments were given") */);
   }
+
+  for (size_t i = 0; i < lifetime_params.size(); ++i) {
+    Lifetime l;
+    const clang::Expr* lifetime_name = nullptr;
+    if (i < lifetime_names.size()) {
+      lifetime_name = lifetime_names[i];
+    }
+    if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(l)) {
+      return std::move(err);
+    }
+    // ret.lifetime_parameters_by_name_.Add(lifetime_params[i], l);
+  }
+
+  // TODO templates
+  // TODO pointee type loc
+  // clang::QualType pointee = PointeeType(type);
+  // if (pointee.isNull()) return ret;
+
+  // clang::TypeLoc pointee_type_loc;
+  // if (type_loc) {
+  //   pointee_type_loc = PointeeTypeLoc(type_loc);
+  //   // Note: We can't assert that `pointee_type_loc` is non-null here. If
+  //   // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
+  //   // the pointee type because the pointee type never got spelled out at the
+  //   // location of the original `TypeLoc`.
+  // }
+
+  // TODO pointee
+  // ValueLifetimes value_lifetimes;
+  // if (llvm::Error err =
+  //         ValueLifetimes::Create(pointee, pointee_type_loc, lifetime_factory)
+  //             .moveInto(value_lifetimes)) {
+  //   return std::move(err);
+  // }
+
+  // TODO object lifetimes
+
+  // TODO pendurado
+  return ret;
 }
 
 // ValueLifetimes& ValueLifetimes::operator=(const ValueLifetimes& other) {

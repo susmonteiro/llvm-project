@@ -1,14 +1,17 @@
 #include "LifetimeAnnotationsChecker.h"
 
-#include "LifetimeTypes.h"
+#include <iostream>
+
 #include "FunctionLifetimes.h"
 #include "LifetimeSymbolTable.h"
+#include "LifetimeTypes.h"
+#include "llvm/Support/Error.h"
 
 namespace clang {
 
 void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
-  debug("Found function");
-  debug(func->getNameAsString());
+  debugLifetimes("Found function");
+  debugLifetimes(func->getNameAsString());
 
   // BuildBaseToOverrides
   // AnalyzeTranslationUnitAndCollectTemplates -> templates
@@ -33,7 +36,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   // }
 
   if (!func->isDefined()) {
-    debug("Function is not defined");
+    debugLifetimes("Function is not defined");
     func->dump();
   }
 
@@ -44,8 +47,26 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
 
   // Following Case 2. Not part of a cycle.
   FunctionLifetimeFactory function_lifetime_factory(
-      /* elision_enabled, */ func , symbol_table);
-    FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
+      /* elision_enabled, */ func, symbol_table);
+  auto func_lifetimes = FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
+
+  if (!func_lifetimes) {
+    /* return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          llvm::toString(func_lifetimes.takeError())
+          // TODO abseil
+          // absl::StrCat("Lifetime elision not enabled for '",
+          //              func->getNameAsString(), "'")
+      ); */
+      // TODO error
+  }
+
+  // debugLifetimes("Name to lifetimes");
+  // const auto names_to_lifetimes = symbol_table.GetMapping();
+
+  // for (const auto &pair : names_to_lifetimes) {
+  //   std::cout << pair.getKey().str() << ": " << pair.getValue() << '\n';
+  // }
 
   // TODO keep track of analyzed functions
 }
