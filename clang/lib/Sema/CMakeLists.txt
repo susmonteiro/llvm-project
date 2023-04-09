@@ -23,6 +23,7 @@ add_clang_library(clangSema
   IdentifierResolver.cpp
   JumpDiagnostics.cpp
   Lifetime.cpp
+  LifetimeNew.cpp
   LifetimeAnnotationsChecker.cpp
   LifetimeSymbolTable.cpp
   LifetimeTypes.cpp

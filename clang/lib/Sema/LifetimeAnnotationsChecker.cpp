@@ -10,8 +10,7 @@
 namespace clang {
 
 void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
-  debugLifetimes("Found function");
-  debugLifetimes(func->getNameAsString());
+  debugLifetimes("Analyzing function", func->getNameAsString());
 
   // BuildBaseToOverrides
   // AnalyzeTranslationUnitAndCollectTemplates -> templates
@@ -48,7 +47,8 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   // Following Case 2. Not part of a cycle.
   FunctionLifetimeFactory function_lifetime_factory(
       /* elision_enabled, */ func, symbol_table);
-  auto func_lifetimes = FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
+  auto func_lifetimes =
+      FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
   if (!func_lifetimes) {
     /* return llvm::createStringError(
@@ -58,8 +58,12 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
           // absl::StrCat("Lifetime elision not enabled for '",
           //              func->getNameAsString(), "'")
       ); */
-      // TODO error
+    // TODO error
   }
+
+  debugLifetimes("Now should have all lifetimes");
+  func_lifetimes->DumpParameters();
+
 
   // debugLifetimes("Name to lifetimes");
   // const auto names_to_lifetimes = symbol_table.GetMapping();

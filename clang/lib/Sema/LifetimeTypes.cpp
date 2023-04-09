@@ -9,270 +9,274 @@
 
 namespace clang {
 
-llvm::Expected<llvm::StringRef> EvaluateAsStringLiteral(
-    const clang::Expr* expr, const clang::ASTContext& ast_context) {
-  auto error = []() {
-    return llvm::createStringError(
-        llvm::inconvertibleErrorCode(),
-        "cannot evaluate argument as a string literal");
-  };
+// llvm::Expected<llvm::StringRef> EvaluateAsStringLiteral(
+//     const clang::Expr* expr, const clang::ASTContext& ast_context) {
+//   auto error = []() {
+//     return llvm::createStringError(
+//         llvm::inconvertibleErrorCode(),
+//         "cannot evaluate argument as a string literal");
+//   };
 
-  clang::Expr::EvalResult eval_result;
-  if (!expr->EvaluateAsConstantExpr(eval_result, ast_context) ||
-      !eval_result.Val.isLValue()) {
-    return error();
-  }
+//   clang::Expr::EvalResult eval_result;
+//   if (!expr->EvaluateAsConstantExpr(eval_result, ast_context) ||
+//       !eval_result.Val.isLValue()) {
+//     return error();
+//   }
 
-  const auto* eval_result_expr =
-      eval_result.Val.getLValueBase().dyn_cast<const clang::Expr*>();
-  if (!eval_result_expr) {
-    return error();
-  }
+//   const auto* eval_result_expr =
+//       eval_result.Val.getLValueBase().dyn_cast<const clang::Expr*>();
+//   if (!eval_result_expr) {
+//     return error();
+//   }
 
-  const auto* strlit = clang::dyn_cast<clang::StringLiteral>(eval_result_expr);
-  if (!strlit) {
-    return error();
-  }
+//   const auto* strlit = clang::dyn_cast<clang::StringLiteral>(eval_result_expr);
+//   if (!strlit) {
+//     return error();
+//   }
 
-  return strlit->getString();
-}
-
-clang::QualType StripAttributes(clang::QualType type) {
-  while (true) {
-    if (auto macro_qualified_type = type->getAs<clang::MacroQualifiedType>()) {
-      type = macro_qualified_type->getUnderlyingType();
-    } else if (auto attr_type = type->getAs<clang::AttributedType>()) {
-      type = attr_type->getModifiedType();
-    } else {
-      return type;
-    }
-  }
-}
-
-clang::TypeLoc StripAttributes(clang::TypeLoc type_loc,
-                               llvm::SmallVector<const clang::Attr*>& attrs) {
-  while (true) {
-    if (auto macro_qualified_type_loc =
-            type_loc.getAs<clang::MacroQualifiedTypeLoc>()) {
-      type_loc = macro_qualified_type_loc.getInnerLoc();
-    } else if (auto attr_type_loc =
-                   type_loc.getAs<clang::AttributedTypeLoc>()) {
-      attrs.push_back(attr_type_loc.getAttr());
-      type_loc = attr_type_loc.getModifiedLoc();
-    } else {
-      // The last attribute in a chain of attributes will appear as the
-      // outermost AttributedType, e.g. `int $a $b` will be represented as
-      // follows (in pseudocode):
-      //
-      // AttributedType(annotate_type("lifetime", "b"),
-      //   AttributedType(annotate_type("lifetime", "a"),
-      //     BuiltinType("int")
-      //   )
-      // )
-      //
-      // We reverse the attributes so that we obtain the more intuitive ordering
-      // "a, b".
-      std::reverse(attrs.begin(), attrs.end());
-      return type_loc;
-    }
-  }
-}
-
-llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
-    llvm::ArrayRef<const clang::Attr*> attrs) {
-  llvm::SmallVector<const clang::Expr*> result;
-
-  bool saw_annotate_type = false;
-
-  for (const clang::Attr* attr : attrs) {
-    auto annotate_type_attr = clang::dyn_cast<clang::AnnotateTypeAttr>(attr);
-    if (!annotate_type_attr ||
-        annotate_type_attr->getAnnotation() != "lifetime")
-      continue;
-
-    if (saw_annotate_type) {
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "Only one `[[annotate_type(\"lifetime\", ...)]]` attribute may be "
-          "placed on a type");
-    }
-    saw_annotate_type = true;
-
-    for (const clang::Expr* arg : annotate_type_attr->args()) {
-      result.push_back(arg);
-    }
-  }
-
-  return result;
-}
-
-llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type) {
-  auto record = type->getAs<clang::RecordType>();
-  if (!record) {
-    return {};
-  }
-
-  auto cxx_record = record->getAsCXXRecordDecl();
-  if (!cxx_record) {
-    return {};
-  }
-
-  const clang::AnnotateAttr* lifetime_params_attr = nullptr;
-  for (auto annotate : cxx_record->specific_attrs<clang::AnnotateAttr>()) {
-    if (annotate->getAnnotation() == "lifetime_params") {
-      if (lifetime_params_attr) {
-        llvm::report_fatal_error("repeated lifetime annotation");
-      }
-      lifetime_params_attr = annotate;
-    }
-  }
-
-  llvm::SmallVector<std::string> ret;
-
-  if (cxx_record->hasDefinition()) {
-    for (const clang::CXXBaseSpecifier& base : cxx_record->bases()) {
-      if (lifetime_params_attr) {
-        llvm::report_fatal_error(
-            "derived classes may not add lifetime parameters");
-      }
-      if (!ret.empty()) {
-        llvm::report_fatal_error(
-            "only one base class may have lifetime parameters");
-      }
-      ret = GetLifetimeParameters(base.getType());
-    }
-  }
-
-  if (!lifetime_params_attr) {
-    return ret;
-  }
-
-  for (const auto& arg : lifetime_params_attr->args()) {
-    llvm::StringRef lifetime;
-    if (llvm::Error err =
-            EvaluateAsStringLiteral(arg, cxx_record->getASTContext())
-                .moveInto(lifetime)) {
-      llvm::report_fatal_error(llvm::StringRef(toString(std::move(err))));
-    }
-    ret.push_back(lifetime.str());
-  }
-
-  return ret;
-}
-
-QualType Undecay(clang::QualType type) {
-  if (auto decayed = type->getAs<clang::DecayedType>()) {
-    return decayed->getOriginalType();
-  }
-  return type;
-}
-
-bool SameType(clang::QualType type1, clang::QualType type2) {
-  // If both types are an AutoType, ignore the actual type and assume theyc're
-  // the same.
-  // An `AutoType` that came from a TypeLoc will have type `auto` (i.e. as
-  // written), whereas an `AutoType` that didn't come from a `TypeLoc` will be
-  // the actual deduced type. We still want these to compare equal though.
-  if (type1->getAs<clang::AutoType>() && type2->getAs<clang::AutoType>()) {
-    return true;
-  }
-  return Undecay(type1) == Undecay(type2);
-}
-
-// TODO return
-// void ValueLifetimes::Traverse(
-//     std::function<void(const Lifetime&, Variance)> visitor,
-//     Variance variance) const {
-//   const_cast<ValueLifetimes*>(this)->Traverse(
-//       [&visitor](Lifetime& l, Variance v) { visitor(l, v); }, variance);
+//   return strlit->getString();
 // }
 
-ValueLifetimes::ValueLifetimes(clang::QualType type) : type_(type) {}
-ValueLifetimes::ValueLifetimes(const ValueLifetimes& other) { *this = other; }
-ValueLifetimes::~ValueLifetimes() = default;
+// clang::QualType StripAttributes(clang::QualType type) {
+//   while (true) {
+//     if (auto macro_qualified_type = type->getAs<clang::MacroQualifiedType>()) {
+//       type = macro_qualified_type->getUnderlyingType();
+//     } else if (auto attr_type = type->getAs<clang::AttributedType>()) {
+//       type = attr_type->getModifiedType();
+//     } else {
+//       return type;
+//     }
+//   }
+// }
 
-llvm::Expected<ValueLifetimes> ValueLifetimes::Create(
-    clang::QualType type, clang::TypeLoc type_loc,
-    LifetimeFactory lifetime_factory) {
-      debugLifetimes("Inside create value lifetimes");
-  assert(!type.isNull());
-  if (type_loc) {
-    assert(SameType(type_loc.getType(), type));
-  }
+// clang::TypeLoc StripAttributes(clang::TypeLoc type_loc,
+//                                llvm::SmallVector<const clang::Attr*>& attrs) {
+//   while (true) {
+//     if (auto macro_qualified_type_loc =
+//             type_loc.getAs<clang::MacroQualifiedTypeLoc>()) {
+//       type_loc = macro_qualified_type_loc.getInnerLoc();
+//     } else if (auto attr_type_loc =
+//                    type_loc.getAs<clang::AttributedTypeLoc>()) {
+//       attrs.push_back(attr_type_loc.getAttr());
+//       type_loc = attr_type_loc.getModifiedLoc();
+//     } else {
+//       // The last attribute in a chain of attributes will appear as the
+//       // outermost AttributedType, e.g. `int $a $b` will be represented as
+//       // follows (in pseudocode):
+//       //
+//       // AttributedType(annotate_type("lifetime", "b"),
+//       //   AttributedType(annotate_type("lifetime", "a"),
+//       //     BuiltinType("int")
+//       //   )
+//       // )
+//       //
+//       // We reverse the attributes so that we obtain the more intuitive ordering
+//       // "a, b".
+//       std::reverse(attrs.begin(), attrs.end());
+//       return type_loc;
+//     }
+//   }
+// }
 
-  type = type.IgnoreParens();
+// llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
+//     llvm::ArrayRef<const clang::Attr*> attrs) {
+//   llvm::SmallVector<const clang::Expr*> result;
 
-  type = StripAttributes(type);
-  llvm::SmallVector<const clang::Attr*> attrs;
-  if (!type_loc.isNull()) {
-    type_loc = StripAttributes(type_loc, attrs);
-  }
+//   bool saw_annotate_type = false;
 
-  debugLifetimes("Should have a type and type_loc");
+//   for (const clang::Attr* attr : attrs) {
+//     auto annotate_type_attr = clang::dyn_cast<clang::AnnotateTypeAttr>(attr);
+//     if (!annotate_type_attr ||
+//         annotate_type_attr->getAnnotation() != "lifetime")
+//       continue;
 
-  llvm::SmallVector<const clang::Expr*> lifetime_names;
-  if (llvm::Error err = GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
-    return std::move(err);
-  }
+//     if (saw_annotate_type) {
+//       return llvm::createStringError(
+//           llvm::inconvertibleErrorCode(),
+//           "Only one `[[annotate_type(\"lifetime\", ...)]]` attribute may be "
+//           "placed on a type");
+//     }
+//     saw_annotate_type = true;
 
-  debugLifetimes("Should have lifetime names");
+//     for (const clang::Expr* arg : annotate_type_attr->args()) {
+//       result.push_back(arg);
+//     }
+//   }
 
-  ValueLifetimes ret(type);
+//   return result;
+// }
 
-  llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
+// llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type) {
+//   auto record = type->getAs<clang::RecordType>();
+//   if (!record) {
+//     return {};
+//   }
 
-  debugLifetimes("Should have lifetime params");
+//   auto cxx_record = record->getAsCXXRecordDecl();
+//   if (!cxx_record) {
+//     return {};
+//   }
 
-  if (!lifetime_params.empty() && !lifetime_names.empty() &&
-      lifetime_names.size() != lifetime_params.size()) {
-    return llvm::createStringError(
-        llvm::inconvertibleErrorCode(),
-        "Number of types and lifetimes not the same"
-        // TODO abseil
-        /* absl::StrCat("Type has ", lifetime_params.size(),
-                     " lifetime parameters but ", lifetime_names.size(),
-                     " lifetime arguments were given") */);
-  }
+//   const clang::AnnotateAttr* lifetime_params_attr = nullptr;
+//   for (auto annotate : cxx_record->specific_attrs<clang::AnnotateAttr>()) {
+//     if (annotate->getAnnotation() == "lifetime_params") {
+//       if (lifetime_params_attr) {
+//         llvm::report_fatal_error("repeated lifetime annotation");
+//       }
+//       lifetime_params_attr = annotate;
+//     }
+//   }
 
-  for (size_t i = 0; i < lifetime_params.size(); ++i) {
-    Lifetime l;
-    const clang::Expr* lifetime_name = nullptr;
-    if (i < lifetime_names.size()) {
-      lifetime_name = lifetime_names[i];
-    }
-    if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(l)) {
-      return std::move(err);
-    }
-    // ret.lifetime_parameters_by_name_.Add(lifetime_params[i], l);
-  }
+//   llvm::SmallVector<std::string> ret;
 
-  // TODO templates
-  // TODO pointee type loc
-  // clang::QualType pointee = PointeeType(type);
-  // if (pointee.isNull()) return ret;
+//   if (cxx_record->hasDefinition()) {
+//     for (const clang::CXXBaseSpecifier& base : cxx_record->bases()) {
+//       if (lifetime_params_attr) {
+//         llvm::report_fatal_error(
+//             "derived classes may not add lifetime parameters");
+//       }
+//       if (!ret.empty()) {
+//         llvm::report_fatal_error(
+//             "only one base class may have lifetime parameters");
+//       }
+//       ret = GetLifetimeParameters(base.getType());
+//     }
+//   }
 
-  // clang::TypeLoc pointee_type_loc;
-  // if (type_loc) {
-  //   pointee_type_loc = PointeeTypeLoc(type_loc);
-  //   // Note: We can't assert that `pointee_type_loc` is non-null here. If
-  //   // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
-  //   // the pointee type because the pointee type never got spelled out at the
-  //   // location of the original `TypeLoc`.
-  // }
+//   if (!lifetime_params_attr) {
+//     return ret;
+//   }
 
-  // TODO pointee
-  // ValueLifetimes value_lifetimes;
-  // if (llvm::Error err =
-  //         ValueLifetimes::Create(pointee, pointee_type_loc, lifetime_factory)
-  //             .moveInto(value_lifetimes)) {
-  //   return std::move(err);
-  // }
+//   for (const auto& arg : lifetime_params_attr->args()) {
+//     llvm::StringRef lifetime;
+//     if (llvm::Error err =
+//             EvaluateAsStringLiteral(arg, cxx_record->getASTContext())
+//                 .moveInto(lifetime)) {
+//       llvm::report_fatal_error(llvm::StringRef(toString(std::move(err))));
+//     }
+//     ret.push_back(lifetime.str());
+//   }
 
-  // TODO object lifetimes
+//   return ret;
+// }
 
-  // TODO pendurado
-  return ret;
-}
+// QualType Undecay(clang::QualType type) {
+//   if (auto decayed = type->getAs<clang::DecayedType>()) {
+//     return decayed->getOriginalType();
+//   }
+//   return type;
+// }
+
+// bool SameType(clang::QualType type1, clang::QualType type2) {
+//   // If both types are an AutoType, ignore the actual type and assume theyc're
+//   // the same.
+//   // An `AutoType` that came from a TypeLoc will have type `auto` (i.e. as
+//   // written), whereas an `AutoType` that didn't come from a `TypeLoc` will be
+//   // the actual deduced type. We still want these to compare equal though.
+//   if (type1->getAs<clang::AutoType>() && type2->getAs<clang::AutoType>()) {
+//     return true;
+//   }
+//   return Undecay(type1) == Undecay(type2);
+// }
+
+// // TODO return
+// // void ValueLifetimes::Traverse(
+// //     std::function<void(const Lifetime&, Variance)> visitor,
+// //     Variance variance) const {
+// //   const_cast<ValueLifetimes*>(this)->Traverse(
+// //       [&visitor](Lifetime& l, Variance v) { visitor(l, v); }, variance);
+// // }
+
+// ValueLifetimes::ValueLifetimes(clang::QualType type) : type_(type) {}
+// ValueLifetimes::ValueLifetimes(const ValueLifetimes& other) { *this = other; }
+// ValueLifetimes::~ValueLifetimes() = default;
+
+// llvm::Expected<ValueLifetimes> ValueLifetimes::Create(
+//     clang::QualType type, clang::TypeLoc type_loc,
+//     LifetimeFactory lifetime_factory) {
+//   assert(!type.isNull());
+//   if (type_loc) {
+//     assert(SameType(type_loc.getType(), type));
+//   }
+
+//   debugLifetimes("Type");
+//   type.dump();
+
+//   type = type.IgnoreParens();
+
+//   type = StripAttributes(type);
+//   llvm::SmallVector<const clang::Attr*> attrs;
+//   if (!type_loc.isNull()) {
+//     type_loc = StripAttributes(type_loc, attrs);
+//     debugLifetimes("Attributes");
+//     debugLifetimes(attrs);
+//   }
+
+//   llvm::SmallVector<const clang::Expr*> lifetime_names;
+//   if (llvm::Error err = GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
+//     return std::move(err);
+//   }
+
+//   debugLifetimes("Lifetime names");
+//   debugLifetimes(lifetime_names);
+
+//   ValueLifetimes ret(type);
+
+//   llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
+
+//   debugLifetimes("Lifetime parameters");
+//   debugLifetimes(lifetime_params);
+
+//   if (!lifetime_params.empty() && !lifetime_names.empty() &&
+//       lifetime_names.size() != lifetime_params.size()) {
+//     return llvm::createStringError(
+//         llvm::inconvertibleErrorCode(),
+//         "Number of types and lifetimes not the same"
+//         // TODO abseil
+//         /* absl::StrCat("Type has ", lifetime_params.size(),
+//                      " lifetime parameters but ", lifetime_names.size(),
+//                      " lifetime arguments were given") */);
+//   }
+
+//   for (size_t i = 0; i < lifetime_params.size(); ++i) {
+//     Lifetime l;
+//     const clang::Expr* lifetime_name = nullptr;
+//     if (i < lifetime_names.size()) {
+//       lifetime_name = lifetime_names[i];
+//     }
+//     if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(l)) {
+//       return std::move(err);
+//     }
+//     // ret.lifetime_parameters_by_name_.Add(lifetime_params[i], l);
+//   }
+
+//   // TODO templates
+//   // TODO pointee type loc
+//   // clang::QualType pointee = PointeeType(type);
+//   // if (pointee.isNull()) return ret;
+
+//   // clang::TypeLoc pointee_type_loc;
+//   // if (type_loc) {
+//   //   pointee_type_loc = PointeeTypeLoc(type_loc);
+//   //   // Note: We can't assert that `pointee_type_loc` is non-null here. If
+//   //   // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
+//   //   // the pointee type because the pointee type never got spelled out at the
+//   //   // location of the original `TypeLoc`.
+//   // }
+
+//   // TODO pointee
+//   // ValueLifetimes value_lifetimes;
+//   // if (llvm::Error err =
+//   //         ValueLifetimes::Create(pointee, pointee_type_loc, lifetime_factory)
+//   //             .moveInto(value_lifetimes)) {
+//   //   return std::move(err);
+//   // }
+
+//   // TODO object lifetimes
+
+//   // TODO pendurado
+//   return ret;
+// }
 
 // ValueLifetimes& ValueLifetimes::operator=(const ValueLifetimes& other) {
 //   type_ = other.type_;

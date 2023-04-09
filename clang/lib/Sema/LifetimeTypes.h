@@ -1,6 +1,7 @@
 #ifndef LIFETIME_ANNOTATIONS_TYPE_LIFETIMES_H_
 #define LIFETIME_ANNOTATIONS_TYPE_LIFETIMES_H_
 
+#include "LifetimeNew.h"
 #include "Lifetime.h"
 #include "LifetimeSymbolTable.h"
 #include "clang/AST/Type.h"
@@ -44,11 +45,12 @@ llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
 // Extracts the lifetime parameters of the given type.
 llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type);
 
+// TODO remove this
+/* using LifetimeFactory =
+    std::function<llvm::Expected<Lifetime>(const clang::Expr*)>; */
+
 llvm::Expected<llvm::StringRef> EvaluateAsStringLiteral(
     const clang::Expr* expr, const clang::ASTContext& ast_context);
-
-using LifetimeFactory =
-    std::function<llvm::Expected<Lifetime>(const clang::Expr*)>;
 
 class ValueLifetimes {
  public:
@@ -63,13 +65,13 @@ class ValueLifetimes {
 
   ~ValueLifetimes();
 
-  static llvm::Expected<ValueLifetimes> Create(
-      clang::QualType type, clang::TypeLoc type_loc,
-      LifetimeFactory lifetime_factory);
-  static llvm::Expected<ValueLifetimes> Create(
-      clang::QualType type, LifetimeFactory lifetime_factory) {
-    return Create(type, clang::TypeLoc(), lifetime_factory);
-  }
+  // static llvm::Expected<ValueLifetimes> Create(
+  //     clang::QualType type, clang::TypeLoc type_loc,
+  //     LifetimeFactory lifetime_factory);
+  // static llvm::Expected<ValueLifetimes> Create(
+  //     clang::QualType type, LifetimeFactory lifetime_factory) {
+  //   return Create(type, clang::TypeLoc(), lifetime_factory);
+  // }
 
   // Returns the type of the value.
   clang::QualType Type() const { return type_; }
@@ -83,6 +85,7 @@ class ValueLifetimes {
   explicit ValueLifetimes(clang::QualType type);
 
   clang::QualType type_;
+  LifetimeSymbolTable lifetime_parameters_by_name_;
   friend class llvm::DenseMapInfo<clang::ValueLifetimes>;
 };
 }  // namespace clang
