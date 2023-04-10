@@ -7,8 +7,6 @@
 #include "clang/AST/TypeLoc.h"
 
 namespace clang {
-namespace tidy {
-namespace lifetimes {
 
 clang::QualType PointeeType(clang::QualType type) {
   if (auto ptr_type = type->getAs<clang::PointerType>()) {
@@ -44,6 +42,4 @@ clang::TypeLoc PointeeTypeLoc(clang::TypeLoc type_loc) {
   return clang::TypeLoc();
 }
 
-}  // namespace lifetimes
-}  // namespace tidy
 }  // namespace clang

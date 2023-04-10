@@ -200,12 +200,12 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::LifetimeFromName(
   return Lifetime(name_str);
 }
 
-llvm::Optional<Lifetime> FunctionLifetimeFactory::CreateParamLifetimesNew(
+llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateParamLifetimesNew(
     clang::QualType param_type, clang::TypeLoc param_type_loc) const {
   return CreateLifetime(param_type, param_type_loc, ParamLifetimeFactory());
 }
 
-llvm::Optional<Lifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
+llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
     clang::QualType return_type, clang::TypeLoc return_type_loc,
     llvm::DenseMap<const clang::Decl*, Lifetime>) const {
   // TODO is this needed?
@@ -214,7 +214,7 @@ llvm::Optional<Lifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
   return CreateLifetime(return_type, return_type_loc, ReturnLifetimeFactory());
 }
 
-llvm::Optional<Lifetime> FunctionLifetimeFactory::CreateLifetime(
+llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
     clang::QualType type, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
   assert(!type.isNull());
@@ -281,17 +281,7 @@ llvm::Optional<Lifetime> FunctionLifetimeFactory::CreateLifetime(
 
   debugLifetimes("After for");
 
-  clang::QualType pointee = PointeeType(type);
-  if (pointee.isNull()) return {};
-
-  clang::TypeLoc pointee_type_loc;
-  if (type_loc) {
-    pointee_type_loc = PointeeTypeLoc(type_loc);
-    // Note: We can't assert that `pointee_type_loc` is non-null here. If
-    // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
-    // the pointee type because the pointee type never got spelled out at the
-    // location of the original `TypeLoc`.
-  }
+  
 
 
   // TODO change to optional maybe
@@ -483,6 +473,21 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
       if (param && param->getTypeSourceInfo()) {
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
+
+      clang::QualType param_type = type->getParamType(i);
+      clang::QualType pointee = PointeeType(param_type);
+      // TODO check if this covers everything that should have a lifetime
+      if (pointee.isNull()) continue;
+
+      clang::TypeLoc pointee_type_loc;
+      if (param_type_loc) {
+        pointee_type_loc = PointeeTypeLoc(type_loc);
+        // Note: We can't assert that `pointee_type_loc` is non-null here. If
+        // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
+        // the pointee type because the pointee type never got spelled out at the
+        // location of the original `TypeLoc`.
+      }
+
       Lifetime tmp;
       // TODO take care of optional
       if (llvm::Error err = lifetime_factory

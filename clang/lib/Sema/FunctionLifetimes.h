@@ -3,10 +3,11 @@
 
 #include <iostream>
 
-#include "PointeeType.h"
 #include "Lifetime.h"
+#include "PointeeType.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
@@ -27,14 +28,14 @@ class FunctionLifetimeFactory {
 
   //   virtual ~FunctionLifetimeFactory() {}
 
-  llvm::Optional<Lifetime> CreateParamLifetimesNew(
+  llvm::Expected<Lifetime> CreateParamLifetimesNew(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
-  llvm::Optional<Lifetime> CreateReturnLifetimes(
+  llvm::Expected<Lifetime> CreateReturnLifetimes(
       clang::QualType return_type, clang::TypeLoc return_type_loc,
       llvm::DenseMap<const clang::Decl *, Lifetime>) const;
 
-  static llvm::Optional<Lifetime> CreateLifetime(
+  static llvm::Expected<Lifetime> CreateLifetime(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
 
@@ -54,7 +55,6 @@ class FunctionLifetimeFactory {
 // Lifetimes for the signature of a function.
 class FunctionLifetimes {
  public:
-
   // TODO 2 options: remove or different structures for params and other vars
   // * Returns lifetimes for the `i`-th parameter.
   // * These are the same number and order as FunctionDecl::parameters()
@@ -85,7 +85,7 @@ class FunctionLifetimes {
       const FunctionLifetimeFactory &lifetime_factory);
 
  private:
-   // TODO 2 options: remove or different structures for params and other vars
+  // TODO 2 options: remove or different structures for params and other vars
   // llvm::SmallVector<ValueLifetimes> param_lifetimes_;
   // TODO is it enough to store the id?
   // TODO separate parameters from all variables?
