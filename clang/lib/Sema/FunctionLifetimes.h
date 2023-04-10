@@ -32,8 +32,7 @@ class FunctionLifetimeFactory {
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
   llvm::Expected<Lifetime> CreateReturnLifetimes(
-      clang::QualType return_type, clang::TypeLoc return_type_loc,
-      llvm::DenseMap<const clang::Decl *, Lifetime>) const;
+      clang::QualType return_type, clang::TypeLoc return_type_loc) const;
 
   static llvm::Expected<Lifetime> CreateLifetime(
       clang::QualType type, clang::TypeLoc type_loc,
@@ -71,13 +70,17 @@ class FunctionLifetimes {
       const clang::Decl *key = pair.first;
       Lifetime value = pair.second;
       key->dump();
-      debugLifetimes("Lifetime", value.Id());
+      debugLifetimes("Lifetime", value.getLifetimeName());
     }
   }
 
   void DumpReturn() const {
     std::cout << "[FunctionLifetimes]: Return lifetimes\n";
-    debugLifetimes("Lifetime", return_lifetime_.Id());
+    if (return_lifetime_.IsInvalid()) {
+      debugLifetimes("Return value has no lifetime");
+    } else {
+      debugLifetimes("Lifetime", return_lifetime_.getLifetimeName());
+    }
   }
 
   static llvm::Expected<FunctionLifetimes> CreateForDecl(

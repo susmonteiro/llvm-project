@@ -7,12 +7,24 @@
 
 namespace clang {
 
+constexpr char UNSET = -1;
+constexpr char STATIC = -2;
+constexpr char LOCAL = -3;
+constexpr char INVALID_ID_TOMBSTONE = -4;
+constexpr char TODO = 100;
+
+constexpr llvm::StringRef STATIC_NAME = "static";
+constexpr llvm::StringRef LOCAL_NAME = "local";
+
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
  public:
   Lifetime();
 
-  Lifetime(llvm::StringRef);
+  Lifetime(llvm::StringRef name);
+
+  // Returns whether this lifetime is valid
+  bool IsInvalid() const { return id_ == UNSET; }
 
   // Returns whether this lifetime is a static lifetime.
   bool IsStatic() const { return isStatic; }
@@ -21,10 +33,13 @@ class Lifetime {
   bool IsLocal() const { return isLocal; }
 
   // Returns a unique numeric ID for the lifetime.
-  int Id() const { return id_; }
+  char Id() const { return id_; }
+
+  // Returns the name of the lifetime
+  std::string getLifetimeName() const;
 
  private:
-  explicit Lifetime(int id);
+  explicit Lifetime(char id);
 
   static Lifetime InvalidEmpty();
   static Lifetime InvalidTombstone();
@@ -35,7 +50,7 @@ class Lifetime {
   llvm::DenseSet<const clang::Decl*> parents;
   llvm::DenseSet<const clang::Decl*> children;
   llvm::DenseSet<int> shortest_lifetimes;
-  int id_;
+  char id_;
   bool isStatic = false;
   bool isLocal = false;
 };

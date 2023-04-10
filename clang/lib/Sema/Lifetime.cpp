@@ -8,34 +8,39 @@
 #include "llvm/Support/ErrorHandling.h"
 
 namespace clang {
-constexpr int UNSET = 0;
-constexpr int STATIC = -1;
-constexpr int LOCAL = -2;
-constexpr int INVALID_ID_TOMBSTONE = -3;
-constexpr int TODO = 100;
-
-constexpr llvm::StringRef STATIC_NAME = "static";
-constexpr llvm::StringRef LOCAL_NAME = "local";
 
 Lifetime::Lifetime() : id_(UNSET) {}
 
-Lifetime::Lifetime(int id) : id_(id) {}
+Lifetime::Lifetime(char id) : id_(id) {
+  debugLifetimes("In constructor, value of id", id);
+  debugLifetimes("In constructor, value of id_", id_);
+}
 
 Lifetime::Lifetime(llvm::StringRef name) {
-  debugLifetimes("=== Lifetime Name ===", name.str());
+  debugLifetimes("=== Lifetime Name ===", name.str());  
   if ((isStatic = name.equals(STATIC_NAME))) {
-    // TODO is this correct?
-    Lifetime STATIC;
+    *this = Lifetime(STATIC);
   } else if ((isLocal = name.equals(LOCAL_NAME))) {
-    Lifetime LOCAL;
+    *this = Lifetime(LOCAL);
   // TODO is this check ok?
   } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
-    Lifetime(name.front() - 'a' + 1);
+    char res = name.front() - 'a';
+    debugLifetimes("Lifetime value", res);
+    *this = Lifetime(res);
   } else {
     // TODO error
     // TODO change this
     Lifetime TODO;
   }
+}
+
+// TODO
+// what is wrong here?
+std::string Lifetime::getLifetimeName() const { 
+  debugLifetimes("Letter 'a' has value", 'a');
+  debugLifetimes("Variable 'id_' has value", id_);
+  debugLifetimes("Get lifetime name", id_ + 'a');
+  return std::string(1, id_ + 'a'); 
 }
 
 Lifetime Lifetime::InvalidEmpty() { return Lifetime(UNSET); }

@@ -2,8 +2,8 @@
 
 #include <iostream>
 
-#include "llvm/ADT/Optional.h"
 #include "clang/AST/Attr.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/Support/Error.h"
 
 namespace clang {
@@ -106,18 +106,20 @@ llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
 }
 
 llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type) {
-  debugLifetimes("Get lifetime parameters", type.getAsString());
+  // DEBUG
+  // debugLifetimes("Get lifetime parameters", type.getAsString());
 
   auto record = type->getAs<clang::RecordType>();
   if (!record) {
-    debugInfo("Not a record");
-
+    // DEBUG
+    // debugInfo("Not a record");
     return {};
   }
 
   auto cxx_record = record->getAsCXXRecordDecl();
   if (!cxx_record) {
-    debugInfo("Not a cxxrecord");
+    // DEBUG
+    // debugInfo("Not a cxxrecord");
 
     return {};
   }
@@ -149,7 +151,6 @@ llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type) {
   }
 
   if (!lifetime_params_attr) {
-    debugWarn("No lifetime param attrs");
     return ret;
   }
 
@@ -161,11 +162,6 @@ llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type) {
       llvm::report_fatal_error(llvm::StringRef(toString(std::move(err))));
     }
     ret.push_back(lifetime.str());
-  }
-
-  debugInfo("Ret has anything?");
-  for (const auto& el : ret) {
-    debugLifetimes(el);
   }
 
   return ret;
@@ -206,8 +202,7 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateParamLifetimesNew(
 }
 
 llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
-    clang::QualType return_type, clang::TypeLoc return_type_loc,
-    llvm::DenseMap<const clang::Decl*, Lifetime>) const {
+    clang::QualType return_type, clang::TypeLoc return_type_loc) const {
   // TODO is this needed?
   // std::optional<Lifetime> input_lifetime =
   // GetSingleInputLifetime(param_lifetimes, this_lifetimes);
@@ -223,8 +218,8 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
   }
 
   // DEBUG
-  debugLifetimes("Type");
-  type.dump();
+  // debugLifetimes("Type");
+  // type.dump();
 
   type = type.IgnoreParens();
   type = StripAttributes(type);
@@ -233,8 +228,8 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
   if (!type_loc.isNull()) {
     type_loc = StripAttributes(type_loc, attrs);
     // DEBUG
-    debugLifetimes("Attributes");
-    debugLifetimes(attrs);
+    // debugLifetimes("Attributes");
+    // debugLifetimes(attrs);
   }
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
@@ -243,16 +238,16 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
   }
 
   // DEBUG
-  debugLifetimes("Lifetime names");
-  debugLifetimes(lifetime_names);
+  // debugLifetimes("Lifetime names");
+  // debugLifetimes(lifetime_names);
 
-  Lifetime ret();
+  Lifetime ret;
 
   llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
 
   // DEBUG
-  debugLifetimes("Lifetime parameters");
-  debugLifetimes(lifetime_params);
+  // debugLifetimes("Lifetime parameters");
+  // debugLifetimes(lifetime_params);
 
   if (!lifetime_params.empty() && !lifetime_names.empty() &&
       lifetime_names.size() != lifetime_params.size()) {
@@ -265,10 +260,10 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
                      " lifetime arguments were given") */);
   }
 
-  debugLifetimes("Size of lifetime_params", lifetime_params.size());
+  // debugLifetimes("Size of lifetime_params", lifetime_params.size());
 
   for (size_t i = 0; i < lifetime_params.size(); ++i) {
-    debugLifetimes("Inside loop of parameters");
+    // debugLifetimes("Inside loop of parameters");
     Lifetime l;
     const clang::Expr* lifetime_name = nullptr;
     if (i < lifetime_names.size()) {
@@ -279,21 +274,62 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
     }
   }
 
-  debugLifetimes("After for");
+  // TODO this is already done in the previous function
+  clang::QualType pointee = PointeeType(type);
+  // TODO change this
+  if (pointee.isNull()) return Lifetime();
 
-  
+  clang::TypeLoc pointee_type_loc;
+  if (type_loc) {
+    pointee_type_loc = PointeeTypeLoc(type_loc);
+    // Note: We can't assert that `pointee_type_loc` is non-null here. If
+    // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
+    // the pointee type because the pointee type never got spelled out at the
+    // location of the original `TypeLoc`.
+  }
 
+  // TODO is this ok?
+  // recursive call
+  Lifetime lifetime;
+  if (llvm::Error err =
+          CreateLifetime(pointee, pointee_type_loc, lifetime_factory)
+              .moveInto(lifetime)) {
+    return std::move(err);
+  }
+
+  const clang::Expr* lifetime_name = nullptr;
+  // debugLifetimes("Let's see if lifetime names is empty...");
+  if (!lifetime_names.empty()) {
+    // debugLifetimes("Lifetime names is not emptyyyyyyy");
+    if (lifetime_names.size() != 1) {
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          // TODO abseil
+          "Expected a single lifetime but multiple were given"
+          /* absl::StrCat("Expected a single lifetime but ", lifetime_names.size(),
+                       " were given") */);
+    }
+    lifetime_name = lifetime_names.front();
+  }
+  // DEBUG
+  // else {
+  //   debugLifetimes("Yep lifetime names is empty...");
+  // }
+
+  if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(ret)) {
+    return std::move(err);
+  }
 
   // TODO change to optional maybe
-  return Lifetime();
+  return ret;
 }
 
 LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
   return [this](const clang::Expr* name) -> llvm::Expected<Lifetime> {
-    debugLifetimes(">> Expression name:");
+    // debugLifetimes(">> Expression name:");
     name->dump();
     if (name) {
-      debugLifetimes(">>> The lifetime has a name");
+      // debugLifetimes(">>> The lifetime has a name");
       Lifetime lifetime;
       if (llvm::Error err = LifetimeFromName(name).moveInto(lifetime)) {
         return std::move(err);
@@ -475,17 +511,17 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
       }
 
       clang::QualType param_type = type->getParamType(i);
-      clang::QualType pointee = PointeeType(param_type);
+      clang::QualType param_pointee = PointeeType(param_type);
       // TODO check if this covers everything that should have a lifetime
-      if (pointee.isNull()) continue;
+      if (param_pointee.isNull()) continue;
 
       clang::TypeLoc pointee_type_loc;
       if (param_type_loc) {
         pointee_type_loc = PointeeTypeLoc(type_loc);
         // Note: We can't assert that `pointee_type_loc` is non-null here. If
         // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
-        // the pointee type because the pointee type never got spelled out at the
-        // location of the original `TypeLoc`.
+        // the pointee type because the pointee type never got spelled out at
+        // the location of the original `TypeLoc`.
       }
 
       Lifetime tmp;
@@ -500,18 +536,23 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
     }
   }
 
-  clang::TypeLoc return_type_loc;
-  if (func_type_loc) {
-    return_type_loc = func_type_loc.getReturnLoc();
-  }
+  clang::QualType return_type = type->getReturnType();
+  clang::QualType return_pointee = PointeeType(return_type);
+  // TODO check if this covers everything that should have a lifetime
+  if (!return_pointee.isNull()) {
+    clang::TypeLoc return_type_loc;
+    if (func_type_loc) {
+      return_type_loc = func_type_loc.getReturnLoc();
+    }
 
-  if (llvm::Error err =
-          lifetime_factory
-              .CreateReturnLifetimes(
-                  type->getReturnType(), return_type_loc, ret.variable_lifetimes
-                  /*, ret.this_lifetimes_ */)
-              .moveInto(ret.return_lifetime_)) {
-    return std::move(err);
+    if (llvm::Error err =
+            lifetime_factory
+                .CreateReturnLifetimes(return_type, return_type_loc/* ,
+                                       ret.variable_lifetimes
+                                       , ret.this_lifetimes_ */)
+                .moveInto(ret.return_lifetime_)) {
+      return std::move(err);
+    }
   }
 
   return ret;
