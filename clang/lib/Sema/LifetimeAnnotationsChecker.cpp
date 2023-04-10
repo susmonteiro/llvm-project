@@ -17,6 +17,39 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
   // With all the lifetime information acquired, check that the return statements and the attributions are correct 
 }
 
+
+
+// TODO list
+//   TODO add this function header to .h
+//   TODO define the class TransferStmtVisitor in this file
+//   TODO define LifetimeLattice class
+//   TODO make this function be called from the GetLifetimes
+//   TODO implement some functions of the StmtVisitor
+
+
+// void LifetimeAnnotationsChecker::transfer(
+//     const clang::CFGElement &elt, LifetimeLattice &state,
+//     clang::dataflow::Environment & /*environment*/) {
+//   if (state.IsError())
+//     return;
+
+//   auto cfg_stmt = elt.getAs<clang::CFGStmt>();
+//   if (!cfg_stmt)
+//     return;
+//   auto stmt = cfg_stmt->getStmt();
+
+//   TransferStmtVisitor visitor(object_repository_, state.PointsTo(),
+//                               state.Constraints(), state.SingleValuedObjects(),
+//                               func_, callee_lifetimes_, diag_reporter_);
+
+//   // * visitor pattern -> visit the specific function and handle different
+//   // * elements in each specific way
+//   if (std::optional<std::string> err =
+//           visitor.Visit(const_cast<clang::Stmt *>(stmt))) {
+//     state = LifetimeLattice(*err);
+//   }
+// }
+
 void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   debugLifetimes("Analyzing function", func->getNameAsString());
 
