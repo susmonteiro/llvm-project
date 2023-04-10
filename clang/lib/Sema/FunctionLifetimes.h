@@ -3,6 +3,7 @@
 
 #include <iostream>
 
+#include "PointeeType.h"
 #include "Lifetime.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
@@ -26,14 +27,14 @@ class FunctionLifetimeFactory {
 
   //   virtual ~FunctionLifetimeFactory() {}
 
-  llvm::Expected<Lifetime> CreateParamLifetimesNew(
+  llvm::Optional<Lifetime> CreateParamLifetimesNew(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
-  llvm::Expected<Lifetime> CreateReturnLifetimes(
+  llvm::Optional<Lifetime> CreateReturnLifetimes(
       clang::QualType return_type, clang::TypeLoc return_type_loc,
       llvm::DenseMap<const clang::Decl *, Lifetime>) const;
 
-  static llvm::Expected<Lifetime> CreateLifetime(
+  static llvm::Optional<Lifetime> CreateLifetime(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
 

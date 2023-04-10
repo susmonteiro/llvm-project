@@ -26,6 +26,7 @@ add_clang_library(clangSema
   LifetimeAnnotationsChecker.cpp
   MultiplexExternalSemaSource.cpp
   ParsedAttr.cpp
+  PointeeType.cpp
   Scope.cpp
   ScopeInfo.cpp
   Sema.cpp
