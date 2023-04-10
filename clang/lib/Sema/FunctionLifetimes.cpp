@@ -326,8 +326,9 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
 
 LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
   return [this](const clang::Expr* name) -> llvm::Expected<Lifetime> {
+    // DEBUG
     // debugLifetimes(">> Expression name:");
-    name->dump();
+    // name->dump();
     if (name) {
       // debugLifetimes(">>> The lifetime has a name");
       Lifetime lifetime;
