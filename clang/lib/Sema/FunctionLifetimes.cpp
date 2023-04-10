@@ -262,61 +262,12 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
     }
   }
 
+  debugLifetimes("After for");
+
   // TODO what?
   return Lifetime();
 }
 
-// TODO return
-// llvm::Expected<ValueLifetimes>
-// FunctionLifetimeFactory::CreateReturnLifetimes(
-//         clang::QualType return_type, clang::TypeLoc return_type_loc,
-//         const llvm::SmallVector<ValueLifetimes> &param_lifetimes,
-//         const std::optional<ValueLifetimes> &this_lifetimes) const {
-
-//       // std::optional<Lifetime> input_lifetime =
-//       //     GetSingleInputLifetime(param_lifetimes, this_lifetimes);
-
-//       return ValueLifetimes::Create(
-//           return_type, return_type_loc,
-//           [&input_lifetime,
-//            this](const clang::Expr *name) -> llvm::Expected<Lifetime> {
-//             if (name) {
-//               Lifetime lifetime;
-//               if (llvm::Error err =
-//               LifetimeFromName(name).moveInto(lifetime)) {
-//                 return std::move(err);
-//               }
-//               return lifetime;
-//             }
-
-//             if (!elision_enabled) {
-//               return llvm::createStringError(
-//                   llvm::inconvertibleErrorCode(),
-//                   // TODO abseil
-//                   /* absl::StrCat("Lifetime elision not enabled for '",
-//                                func->getNameAsString(), "'") */
-//                   "Lifetime elision not enabled for function");
-//             }
-
-//             // If we have a single input lifetime, its lifetime is assigned
-//             to
-//             // all output lifetimes.
-//             if (input_lifetime.has_value()) {
-//               return *input_lifetime;
-//             } else {
-//               // Otherwise, we don't know how to elide the output lifetime.
-//               return llvm::createStringError(
-//                   llvm::inconvertibleErrorCode(),
-//                   // TODO abseil
-//                   /* absl::StrCat("Cannot elide output lifetimes for '",
-//                                func->getNameAsString(),
-//                                "' because it is a non-member function that "
-//                                "does not have "
-//                                "exactly one input lifetime") */
-//                   "Cannot elide output lifetimes for function...");
-//             }
-//           });
-//     }
 
 LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
   return [this](const clang::Expr* name) -> llvm::Expected<Lifetime> {
@@ -420,7 +371,7 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
 
   // llvm::SmallVector<const clang::Attr*> attrs;
   if (type_loc) {
-    debugWarn("Has type_loc");
+    // debugInfo("Has type_loc");
     // debugLifetimes("type_loc is defined as: ",
     //                type_loc.getType().getAsString());
     // debugLifetimes("and the attributes are:");
@@ -503,24 +454,22 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
       if (param && param->getTypeSourceInfo()) {
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
-      Lifetime tmp_lifetime;
+      Lifetime tmp;
       if (llvm::Error err = lifetime_factory
                                 .CreateParamLifetimesNew(type->getParamType(i),
                                                          param_type_loc)
-                                .moveInto(tmp_lifetime)) {
+                                .moveInto(tmp)) {
         return std::move(err);
       }
-      ret.variable_lifetimes[param] = tmp_lifetime;
+      ret.variable_lifetimes[param] = tmp;
     }
   }
 
-  // TODO return
   clang::TypeLoc return_type_loc;
   if (func_type_loc) {
     return_type_loc = func_type_loc.getReturnLoc();
   }
 
-  // TODO return
   if (llvm::Error err =
           lifetime_factory
               .CreateReturnLifetimes(

@@ -43,8 +43,9 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   // }
 
   if (!func->isDefined()) {
-    debugLifetimes("Function is not defined");
-    func->dump();
+    // DEBUG
+    // debugLifetimes("Function is not defined");
+    // func->dump();
   }
 
   // TODO ellision
@@ -66,7 +67,6 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
     // TODO error
   }
 
-  debugLifetimes("Now should have all lifetimes");
   func_lifetimes->DumpParameters();
   func_lifetimes->DumpReturn();
 
