@@ -18,6 +18,7 @@ void debugLifetimes(llvm::SmallVector<const clang::Expr*> vec);
 void debugLifetimes(llvm::SmallVector<const clang::Attr*> vec);
 void debugLifetimes(llvm::SmallVector<std::string> vec);
 
+void debugInfo(std::string txt);
 void debugWarn(std::string txt);
 
 #endif  // LIFETIME_ANNOTATIONS_DEBUG_H_

@@ -3,11 +3,19 @@
 #include <iostream>
 
 #include "FunctionLifetimes.h"
-#include "LifetimeSymbolTable.h"
-#include "LifetimeTypes.h"
 #include "llvm/Support/Error.h"
 
 namespace clang {
+
+void LifetimeAnnotationsChecker::PropagateLifetimes() {
+  // TODO
+  // After capturing lifetimes from the function, apply the fixed point algorithm
+}
+
+void LifetimeAnnotationsChecker::CheckLifetimes() {
+  // TODO
+  // With all the lifetime information acquired, check that the return statements and the attributions are correct 
+}
 
 void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   debugLifetimes("Analyzing function", func->getNameAsString());
@@ -39,14 +47,11 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
     func->dump();
   }
 
-  // TODO correct?
-  LifetimeSymbolTable symbol_table;
-
   // TODO ellision
 
   // Following Case 2. Not part of a cycle.
   FunctionLifetimeFactory function_lifetime_factory(
-      /* elision_enabled, */ func, symbol_table);
+      /* elision_enabled, */ func);
   auto func_lifetimes =
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
@@ -63,15 +68,15 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
 
   debugLifetimes("Now should have all lifetimes");
   func_lifetimes->DumpParameters();
+  func_lifetimes->DumpReturn();
 
-
-  // debugLifetimes("Name to lifetimes");
-  // const auto names_to_lifetimes = symbol_table.GetMapping();
-
-  // for (const auto &pair : names_to_lifetimes) {
-  //   std::cout << pair.getKey().str() << ": " << pair.getValue() << '\n';
-  // }
 
   // TODO keep track of analyzed functions
+
+  // step 2
+  LifetimeAnnotationsChecker::PropagateLifetimes();
+
+  // step 3
+  LifetimeAnnotationsChecker::CheckLifetimes();
 }
 }  // namespace clang

@@ -3,72 +3,58 @@
 
 #include <iostream>
 
-#include "LifetimeNew.h"
-#include "LifetimeSymbolTable.h"
-#include "LifetimeTypes.h"
+#include "Lifetime.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
-// TODO remove this
+// DEBUG
 #include "DebugLifetimes.h"
 
 namespace clang {
 
 using LifetimeFactory =
-    std::function<llvm::Expected<LifetimeNew>(const clang::Expr *)>;
+    std::function<llvm::Expected<Lifetime>(const clang::Expr *)>;
 
 class FunctionLifetimeFactory {
  public:
   FunctionLifetimeFactory(
-      /* bool elision_enabled, */ const clang::FunctionDecl *func,
-      LifetimeSymbolTable &symbol_table)
-      : /* elision_enabled(elision_enabled), */ func(func),
-        symbol_table(symbol_table) {}
+      /* bool elision_enabled, */ const clang::FunctionDecl *func)
+      : /* elision_enabled(elision_enabled), */ func(func) {}
 
   //   virtual ~FunctionLifetimeFactory() {}
 
-  // llvm::Expected<ValueLifetimes> CreateParamLifetimes(
-  //     clang::QualType param_type, clang::TypeLoc param_type_loc) const;
-
-  llvm::Expected<LifetimeNew> CreateParamLifetimesNew(
+  llvm::Expected<Lifetime> CreateParamLifetimesNew(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
-    static llvm::Expected<LifetimeNew> CreateLifetime(
+  llvm::Expected<Lifetime> CreateReturnLifetimes(
+      clang::QualType return_type, clang::TypeLoc return_type_loc,
+      llvm::DenseMap<const clang::Decl *, Lifetime>) const;
+
+  static llvm::Expected<Lifetime> CreateLifetime(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
-
-  //   virtual llvm::Expected<ValueLifetimes> CreateThisLifetimes(
-  //       clang::QualType type, const clang::Expr* lifetime_name) const = 0;
 
   //   // Note: The `type_loc` parameter passed into `CreateParamLifetimes` and
   //   // `CreateReturnLifetimes` may be null if no type location is available.
 
-  LifetimeSymbolTable &getLifetimeSymbolTable() const { return symbol_table; }
-
-  llvm::Expected<LifetimeNew> LifetimeFromName(const clang::Expr *name) const;
-
-  //   // * the method to create the return lifetime depends on the parameter
-  //   // lifetimes
-
-  //   virtual llvm::Expected<ValueLifetimes> CreateReturnLifetimes(
-  //       clang::QualType type, clang::TypeLoc type_loc,
-  //       const llvm::SmallVector<ValueLifetimes>& param_lifetimes,
-  //       const std::optional<ValueLifetimes>& this_lifetimes) const = 0;
+  llvm::Expected<Lifetime> LifetimeFromName(const clang::Expr *name) const;
 
   LifetimeFactory ParamLifetimeFactory() const;
+  LifetimeFactory ReturnLifetimeFactory() const;
 
  private:
   bool elision_enabled;
   const clang::FunctionDecl *func;
-  LifetimeSymbolTable &symbol_table;
 };
 
 // Lifetimes for the signature of a function.
 class FunctionLifetimes {
  public:
+
+  // TODO 2 options: remove or different structures for params and other vars
   // * Returns lifetimes for the `i`-th parameter.
   // * These are the same number and order as FunctionDecl::parameters()
   // const ValueLifetimes &GetParamLifetimes(size_t i) const {
@@ -80,12 +66,17 @@ class FunctionLifetimes {
 
   void DumpParameters() const {
     std::cout << "[FunctionLifetimes]: Parameters Lifetimes\n";
-    for (const auto &pair : params_lifetimes_new) {
-      const clang::Decl* key = pair.first;
-      LifetimeNew value = pair.second;
+    for (const auto &pair : variable_lifetimes) {
+      const clang::Decl *key = pair.first;
+      Lifetime value = pair.second;
       key->dump();
       debugLifetimes("Lifetime", value.Id());
     }
+  }
+
+  void DumpReturn() const {
+    std::cout << "[FunctionLifetimes]: Return lifetimes\n";
+    debugLifetimes("Lifetime", return_lifetime_.Id());
   }
 
   static llvm::Expected<FunctionLifetimes> CreateForDecl(
@@ -93,11 +84,12 @@ class FunctionLifetimes {
       const FunctionLifetimeFactory &lifetime_factory);
 
  private:
+   // TODO 2 options: remove or different structures for params and other vars
   // llvm::SmallVector<ValueLifetimes> param_lifetimes_;
   // TODO is it enough to store the id?
-  llvm::DenseMap<const clang::Decl *, LifetimeNew> params_lifetimes_new;
-  // ValueLifetimes return_lifetimes_;
-  // llvm::DenseMap<clang::Decl, LifetimeNew> initial_object_lifetimes_;
+  // TODO separate parameters from all variables?
+  llvm::DenseMap<const clang::Decl *, Lifetime> variable_lifetimes;
+  Lifetime return_lifetime_;
 
   // TODO this
   // std::optional<ValueLifetimes> this_lifetimes_;

@@ -14,8 +14,12 @@ namespace clang {
 class LifetimeAnnotationsChecker {
  public:
 
+
   // TODO probably not void
   void GetLifetimes(FunctionDecl* func);
+
+  void PropagateLifetimes();
+  void CheckLifetimes();
 };
 }
 
