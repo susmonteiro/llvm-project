@@ -1,8 +1,8 @@
-#include "LifetimeAnnotationsChecker.h"
+#include "clang/Sema/LifetimeAnnotationsChecker.h"
 
 #include <iostream>
 
-#include "FunctionLifetimes.h"
+#include "clang/Sema/IdentifierResolver.h"
 #include "clang/AST/ASTDiagnostic.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtVisitor.h"

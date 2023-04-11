@@ -4,9 +4,11 @@
 #include <iostream>
 #include <string>
 #include "clang/Sema/Sema.h"
+#include "clang/Sema/FunctionLifetimes.h"
+#include "clang/Sema/Lifetime.h"
 
-// TODO remove this
-#include "DebugLifetimes.h"
+// DEBUG
+#include "clang/Sema/DebugLifetimes.h"
 
 #include "clang/AST/ASTContext.h"
 
@@ -14,7 +16,6 @@ namespace clang {
 
 class LifetimeAnnotationsChecker {
  public:
-
 
   // TODO probably not void
   void GetLifetimes(const FunctionDecl* func, Sema &S);

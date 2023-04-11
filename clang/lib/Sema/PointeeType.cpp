@@ -2,7 +2,7 @@
 // Exceptions. See /LICENSE for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "PointeeType.h"
+#include "clang/Sema/PointeeType.h"
 
 #include "clang/AST/TypeLoc.h"
 

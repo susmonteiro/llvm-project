@@ -1,7 +1,7 @@
 #ifndef LIFETIME_ANNOTATIONS_LIFETIME_H_
 #define LIFETIME_ANNOTATIONS_LIFETIME_H_
 
-#include "DebugLifetimes.h"
+#include "clang/Sema/DebugLifetimes.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
 
@@ -47,10 +47,15 @@ class Lifetime {
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
   // ? store this here or in the structure "above"
+  // TODO remove this
+  // TODO denseset of Lifetimes
+  // TODO maybe store clang::Decl here
   llvm::DenseSet<const clang::Decl*> parents;
+  // TODO FunctionLifetimes
   llvm::DenseSet<const clang::Decl*> children;
   llvm::DenseSet<int> shortest_lifetimes;
   char id_;
+  // TODO remove this
   bool isStatic = false;
   bool isLocal = false;
 };

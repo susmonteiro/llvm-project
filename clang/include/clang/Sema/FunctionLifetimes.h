@@ -3,17 +3,17 @@
 
 #include <iostream>
 
-#include "Lifetime.h"
-#include "PointeeType.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/Sema/Lifetime.h"
+#include "clang/Sema/PointeeType.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Error.h"
 
 // DEBUG
-#include "DebugLifetimes.h"
+#include "clang/Sema/DebugLifetimes.h"
 
 namespace clang {
 
@@ -64,27 +64,22 @@ class FunctionLifetimes {
   // Returns the number of function parameters (excluding the implicit `this).
   // size_t GetNumParams() const { return param_lifetimes_.size(); }
 
-  llvm::DenseMap<const clang::Decl*, Lifetime> GetVariableLifetimes() {
+  llvm::DenseMap<const clang::Decl *, Lifetime> GetVariableLifetimes() {
     return variable_lifetimes_;
   }
 
-  llvm::DenseSet<char> GetDefinedLifetimes() {
-    return lifetimes_id_set_;
-  }
+  llvm::DenseSet<char> GetDefinedLifetimes() { return lifetimes_id_set_; }
 
-  Lifetime GetReturnLifetimes() {
-    return return_lifetime_;
-  }
+  Lifetime GetReturnLifetimes() { return return_lifetime_; }
 
   bool CheckIfLifetimeIsDefined(Lifetime l) {
     return lifetimes_id_set_.find(l.Id()) != lifetimes_id_set_.end();
   }
 
-
-  void InsertVariableLifetime(const clang::Decl* decl, Lifetime l) {
+  void InsertVariableLifetime(const clang::Decl *decl, Lifetime l) {
     variable_lifetimes_[decl] = l;
     lifetimes_id_set_.insert(l.Id());
-  } 
+  }
 
   void DumpParameters() const {
     std::cout << "[FunctionLifetimes]: Parameters Lifetimes\n";

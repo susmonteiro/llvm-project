@@ -1,4 +1,4 @@
-#include "Lifetime.h"
+#include "clang/Sema/Lifetime.h"
 
 #include "clang/AST/Attr.h"
 #include "clang/AST/Attrs.inc"
