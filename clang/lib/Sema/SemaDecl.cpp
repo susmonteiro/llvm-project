@@ -9645,6 +9645,14 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
                                               isVirtualOkay);
   if (!NewFD) return nullptr;
 
+      if (!Diags.isIgnored(diag::print_lifetime_annotations,
+                             NewFD->getLocation())) {
+      debugInfo("Analyzing from function ActOnFunctionDeclarator");
+      LifetimeAnnotationsChecker checker;
+      checker.GetLifetimes(NewFD, *this);
+    }
+
+
   if (OriginalLexicalContext && OriginalLexicalContext->isObjCContainer())
     NewFD->setTopLevelDeclInObjCContainer();
 
@@ -15164,12 +15172,6 @@ Decl *Sema::ActOnStartOfFunctionDef(Scope *FnBodyScope, Decl *D,
     FD = FunTmpl->getTemplatedDecl();
   else
     FD = cast<FunctionDecl>(D);
-    if (!Diags.isIgnored(diag::print_lifetime_annotations,
-                             FD->getLocation())) {
-      debugInfo("Analyzing from function ActOnStartOfFunctionDecl");
-      LifetimeAnnotationsChecker checker;
-      checker.GetLifetimes(FD, *this);
-    }
 
   // Do not push if it is a lambda because one is already pushed when building
   // the lambda in ActOnStartOfLambdaDefinition().

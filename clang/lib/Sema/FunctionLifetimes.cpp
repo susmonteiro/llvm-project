@@ -533,7 +533,7 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
                                 .moveInto(tmp)) {
         return std::move(err);
       }
-      ret.variable_lifetimes[param] = tmp;
+      ret.InsertVariableLifetime(param, tmp);
     }
   }
 

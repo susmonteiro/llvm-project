@@ -32,7 +32,7 @@ class Lifetime {
   // Returns whether this lifetime is a local lifetime.
   bool IsLocal() const { return isLocal; }
 
-  // Returns a unique numeric ID for the lifetime.
+  // Returns the numeric ID for the lifetime.
   char Id() const { return id_; }
 
   // Returns the name of the lifetime

@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <string>
+#include "clang/Sema/Sema.h"
 
 // TODO remove this
 #include "DebugLifetimes.h"
@@ -16,7 +17,7 @@ class LifetimeAnnotationsChecker {
 
 
   // TODO probably not void
-  void GetLifetimes(const FunctionDecl* func);
+  void GetLifetimes(const FunctionDecl* func, Sema &S);
 
   llvm::Error AnalyzeFunctionBody(const clang::FunctionDecl *func, clang::ASTContext &ast_context);
 

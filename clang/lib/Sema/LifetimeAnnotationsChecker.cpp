@@ -3,8 +3,16 @@
 #include <iostream>
 
 #include "FunctionLifetimes.h"
+#include "clang/AST/ASTDiagnostic.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtVisitor.h"
+#include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/DiagnosticIDs.h"
+#include "clang/Basic/DiagnosticOptions.h"
+#include "clang/Basic/DiagnosticSema.h"
+#include "clang/Basic/PartialDiagnostic.h"
+#include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Sema.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Error.h"
 
@@ -73,11 +81,21 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
 //   }
 // }
 
-void CheckReturnLifetime(const clang::ReturnStmt *return_stmt, Sema &S) {
+void CheckReturnLifetime(const clang::FunctionDecl *func,
+                         FunctionLifetimes &function_lifetimes, Sema &S) {
+  clang::QualType return_type = func->getReturnType();
+  clang::QualType return_pointee = PointeeType(return_type);
+  if (return_pointee.isNull()) return;
 
+  Lifetime l = function_lifetimes.GetReturnLifetimes();
+
+  if (!function_lifetimes.CheckIfLifetimeIsDefined(l))
+    S.Diag(func->getLocation(), diag::warn_return_undefined_lifetime)
+        << func->getSourceRange();
 }
 
-void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func, Sema &S) {
+void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
+                                              Sema &S) {
   debugLifetimes("Analyzing function", func->getNameAsString());
 
   // BuildBaseToOverrides
@@ -104,8 +122,8 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func, Sema &S)
 
   if (!func->isDefined()) {
     // DEBUG
-    debugLifetimes("Function is not defined");
-    func->dump();
+    // debugLifetimes("Function is not defined");
+    // func->dump();
   }
 
   // TODO ellision
@@ -114,10 +132,10 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func, Sema &S)
   // AnalyzeSingleFunction()
   FunctionLifetimeFactory function_lifetime_factory(
       /* elision_enabled, */ func);
-  auto func_lifetimes =
+  auto expected_func_lifetimes =
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
-  if (!func_lifetimes) {
+  if (!expected_func_lifetimes) {
     /* return llvm::createStringError(
           llvm::inconvertibleErrorCode(),
           llvm::toString(func_lifetimes.takeError())
@@ -126,10 +144,16 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func, Sema &S)
           //              func->getNameAsString(), "'")
       ); */
     // TODO error
+    return;
   }
 
-  func_lifetimes->DumpParameters();
-  func_lifetimes->DumpReturn();
+  FunctionLifetimes &func_lifetimes = *expected_func_lifetimes;
+
+  // TODO this should be validated in the check step
+  CheckReturnLifetime(func, func_lifetimes, S);
+
+  func_lifetimes.DumpParameters();
+  func_lifetimes.DumpReturn();
 
   // TODO keep track of analyzed functions
 
@@ -138,14 +162,14 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func, Sema &S)
   clang::SourceRange func_source_range = func->getSourceRange();
 
   if (func->getBody()) {
-    debugLifetimes("Function has body");
+    // debugLifetimes("Function has body");
     if (llvm::Error err = AnalyzeFunctionBody(func, ast_context)) {
       // TODO error
       // return std::move(err);
       return;
     }
   } else {
-    debugLifetimes("Function does not have body");
+    // debugLifetimes("Function does not have body");
   }
 
   // step 2

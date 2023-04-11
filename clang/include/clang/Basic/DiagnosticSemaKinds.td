@@ -11809,6 +11809,7 @@ def err_wasm_ca_reference : Error<
 def err_wasm_funcref_not_wasm : Error<
   "invalid use of '__funcref' keyword outside the WebAssembly triple">;
 
+// Lifetime annotations
 // TODO remove this
 def warn_if_condition_too_complex : Warning<
   "condition of the 'if' statement is too complex">,
@@ -11816,6 +11817,10 @@ def warn_if_condition_too_complex : Warning<
 
 def print_lifetime_annotations : Warning<
   "lifetime annotations of current function">, 
+  InGroup<PrintLifetimes>, DefaultIgnore;
+
+def warn_return_undefined_lifetime : Warning<
+  "cannot return an undefined lifetime">, 
   InGroup<PrintLifetimes>, DefaultIgnore;
 
 } // end of sema component.

@@ -64,9 +64,31 @@ class FunctionLifetimes {
   // Returns the number of function parameters (excluding the implicit `this).
   // size_t GetNumParams() const { return param_lifetimes_.size(); }
 
+  llvm::DenseMap<const clang::Decl*, Lifetime> GetVariableLifetimes() {
+    return variable_lifetimes_;
+  }
+
+  llvm::DenseSet<char> GetDefinedLifetimes() {
+    return lifetimes_id_set_;
+  }
+
+  Lifetime GetReturnLifetimes() {
+    return return_lifetime_;
+  }
+
+  bool CheckIfLifetimeIsDefined(Lifetime l) {
+    return lifetimes_id_set_.find(l.Id()) != lifetimes_id_set_.end();
+  }
+
+
+  void InsertVariableLifetime(const clang::Decl* decl, Lifetime l) {
+    variable_lifetimes_[decl] = l;
+    lifetimes_id_set_.insert(l.Id());
+  } 
+
   void DumpParameters() const {
     std::cout << "[FunctionLifetimes]: Parameters Lifetimes\n";
-    for (const auto &pair : variable_lifetimes) {
+    for (const auto &pair : variable_lifetimes_) {
       const clang::Decl *key = pair.first;
       Lifetime value = pair.second;
       key->dump();
@@ -92,7 +114,8 @@ class FunctionLifetimes {
   // llvm::SmallVector<ValueLifetimes> param_lifetimes_;
   // TODO is it enough to store the id?
   // TODO separate parameters from all variables?
-  llvm::DenseMap<const clang::Decl *, Lifetime> variable_lifetimes;
+  llvm::DenseMap<const clang::Decl *, Lifetime> variable_lifetimes_;
+  llvm::DenseSet<char> lifetimes_id_set_;
   Lifetime return_lifetime_;
 
   // TODO this
