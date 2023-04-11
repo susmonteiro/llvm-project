@@ -16,7 +16,9 @@ class LifetimeAnnotationsChecker {
 
 
   // TODO probably not void
-  void GetLifetimes(FunctionDecl* func);
+  void GetLifetimes(const FunctionDecl* func);
+
+  llvm::Error AnalyzeFunctionBody(const clang::FunctionDecl *func, clang::ASTContext &ast_context);
 
   void PropagateLifetimes();
   void CheckLifetimes();

@@ -3,21 +3,44 @@
 #include <iostream>
 
 #include "FunctionLifetimes.h"
+#include "clang/AST/Stmt.h"
+#include "clang/AST/StmtVisitor.h"
+#include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Error.h"
 
 namespace clang {
 
+namespace {
+class TransferStmtVisitor
+    : public clang::StmtVisitor<TransferStmtVisitor,
+                                std::optional<std::string>> {
+ public:
+  TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
+
+  std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
+
+ private:
+  const clang::FunctionDecl *func_;
+};
+}  // namespace
+
+llvm::Error LifetimeAnnotationsChecker::AnalyzeFunctionBody(
+    const clang::FunctionDecl *func, clang::ASTContext &ast_context) {
+  // TODO implement
+  return llvm::Error::success();
+}
+
 void LifetimeAnnotationsChecker::PropagateLifetimes() {
   // TODO
-  // After capturing lifetimes from the function, apply the fixed point algorithm
+  // After capturing lifetimes from the function, apply the fixed point
+  // algorithm
 }
 
 void LifetimeAnnotationsChecker::CheckLifetimes() {
   // TODO
-  // With all the lifetime information acquired, check that the return statements and the attributions are correct 
+  // With all the lifetime information acquired, check that the return
+  // statements and the attributions are correct
 }
-
-
 
 // TODO list
 //   TODO add this function header to .h
@@ -25,7 +48,6 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
 //   TODO define LifetimeLattice class
 //   TODO make this function be called from the GetLifetimes
 //   TODO implement some functions of the StmtVisitor
-
 
 // void LifetimeAnnotationsChecker::transfer(
 //     const clang::CFGElement &elt, LifetimeLattice &state,
@@ -39,8 +61,9 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
 //   auto stmt = cfg_stmt->getStmt();
 
 //   TransferStmtVisitor visitor(object_repository_, state.PointsTo(),
-//                               state.Constraints(), state.SingleValuedObjects(),
-//                               func_, callee_lifetimes_, diag_reporter_);
+//                               state.Constraints(),
+//                               state.SingleValuedObjects(), func_,
+//                               callee_lifetimes_, diag_reporter_);
 
 //   // * visitor pattern -> visit the specific function and handle different
 //   // * elements in each specific way
@@ -50,7 +73,11 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
 //   }
 // }
 
-void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
+void CheckReturnLifetime(const clang::ReturnStmt *return_stmt, Sema &S) {
+
+}
+
+void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func, Sema &S) {
   debugLifetimes("Analyzing function", func->getNameAsString());
 
   // BuildBaseToOverrides
@@ -77,13 +104,14 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
 
   if (!func->isDefined()) {
     // DEBUG
-    // debugLifetimes("Function is not defined");
-    // func->dump();
+    debugLifetimes("Function is not defined");
+    func->dump();
   }
 
   // TODO ellision
 
   // Following Case 2. Not part of a cycle.
+  // AnalyzeSingleFunction()
   FunctionLifetimeFactory function_lifetime_factory(
       /* elision_enabled, */ func);
   auto func_lifetimes =
@@ -103,8 +131,22 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   func_lifetimes->DumpParameters();
   func_lifetimes->DumpReturn();
 
-
   // TODO keep track of analyzed functions
+
+  clang::ASTContext &ast_context = func->getASTContext();
+  clang::SourceManager &source_manager = ast_context.getSourceManager();
+  clang::SourceRange func_source_range = func->getSourceRange();
+
+  if (func->getBody()) {
+    debugLifetimes("Function has body");
+    if (llvm::Error err = AnalyzeFunctionBody(func, ast_context)) {
+      // TODO error
+      // return std::move(err);
+      return;
+    }
+  } else {
+    debugLifetimes("Function does not have body");
+  }
 
   // step 2
   LifetimeAnnotationsChecker::PropagateLifetimes();
@@ -112,4 +154,13 @@ void LifetimeAnnotationsChecker::GetLifetimes(FunctionDecl* func) {
   // step 3
   LifetimeAnnotationsChecker::CheckLifetimes();
 }
+
+namespace {
+// Below is the implementation of all visit functions
+std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
+    const clang::DeclStmt *decl_stmt) {
+  // TODO implement
+}
+}  // namespace
+
 }  // namespace clang
