@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-#include "clang/Sema/IdentifierResolver.h"
 #include "clang/AST/ASTDiagnostic.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtVisitor.h"
@@ -12,6 +11,7 @@
 #include "clang/Basic/DiagnosticSema.h"
 #include "clang/Basic/PartialDiagnostic.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/IdentifierResolver.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Error.h"
@@ -32,10 +32,14 @@ class TransferStmtVisitor
 };
 }  // namespace
 
-llvm::Error LifetimeAnnotationsChecker::AnalyzeFunctionBody(
-    const clang::FunctionDecl *func, clang::ASTContext &ast_context) {
+void LifetimeAnnotationsChecker::AnalyzeFunctionBody(
+    const FunctionDecl *func, Sema &S) {
   // TODO implement
-  return llvm::Error::success();
+  if (func->getBody()) {
+    debugLifetimes("Function has body");
+  } else {
+    debugLifetimes("Function does not have body");
+  }
 }
 
 void LifetimeAnnotationsChecker::PropagateLifetimes() {
@@ -160,17 +164,6 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
   clang::ASTContext &ast_context = func->getASTContext();
   clang::SourceManager &source_manager = ast_context.getSourceManager();
   clang::SourceRange func_source_range = func->getSourceRange();
-
-  if (func->getBody()) {
-    // debugLifetimes("Function has body");
-    if (llvm::Error err = AnalyzeFunctionBody(func, ast_context)) {
-      // TODO error
-      // return std::move(err);
-      return;
-    }
-  } else {
-    // debugLifetimes("Function does not have body");
-  }
 
   // step 2
   LifetimeAnnotationsChecker::PropagateLifetimes();

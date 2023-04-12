@@ -51,6 +51,7 @@
 #include "clang/Sema/DeclSpec.h"
 #include "clang/Sema/ExternalSemaSource.h"
 #include "clang/Sema/IdentifierResolver.h"
+#include "clang/Sema/LifetimeAnnotationsChecker.h"
 #include "clang/Sema/ObjCMethodList.h"
 #include "clang/Sema/Ownership.h"
 #include "clang/Sema/Scope.h"
@@ -143,6 +144,7 @@ namespace clang {
   class LabelStmt;
   class LambdaExpr;
   class LangOptions;
+  class LifetimeAnnotationsChecker;
   class LocalInstantiationScope;
   class LookupResult;
   class MacroInfo;
@@ -378,6 +380,7 @@ class Sema final {
     }
     return false;
   }
+
   bool shouldLinkPossiblyHiddenDecl(LookupResult &Old, const NamedDecl *New);
 
   void setupImplicitSpecialMemberType(CXXMethodDecl *SpecialMem,
@@ -1206,6 +1209,8 @@ public:
 
   /// will hold 'respondsToSelector:'
   Selector RespondsToSelectorSel;
+
+  LifetimeAnnotationsChecker *LAChecker;
 
   /// A flag to remember whether the implicit forms of operator new and delete
   /// have been declared.

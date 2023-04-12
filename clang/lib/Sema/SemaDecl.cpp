@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "LifetimeAnnotationsChecker.h"
 #include "TypeLocBuilder.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
@@ -9645,13 +9644,11 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
                                               isVirtualOkay);
   if (!NewFD) return nullptr;
 
-      if (!Diags.isIgnored(diag::print_lifetime_annotations,
+    if (!Diags.isIgnored(diag::print_lifetime_annotations,
                              NewFD->getLocation())) {
       debugInfo("Analyzing from function ActOnFunctionDeclarator");
-      LifetimeAnnotationsChecker checker;
-      checker.GetLifetimes(NewFD, *this);
+      LAChecker->GetLifetimes(NewFD, *this);
     }
-
 
   if (OriginalLexicalContext && OriginalLexicalContext->isObjCContainer())
     NewFD->setTopLevelDeclInObjCContainer();
@@ -15496,6 +15493,13 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
     if (FD) {
       FD->setBody(Body);
       FD->setWillHaveBody(false);
+
+      if (!Diags.isIgnored(diag::print_lifetime_annotations,
+                             FD->getLocation())) {
+        debugInfo("Analyzing function body from function ActOnFinishFunctionBody");
+        LAChecker->AnalyzeFunctionBody(FD, *this);
+      }
+
 
       if (getLangOpts().CPlusPlus14) {
         if (!FD->isInvalidDecl() && Body && !FD->isDependentContext() &&

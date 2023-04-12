@@ -20,6 +20,7 @@ namespace clang {
 using LifetimeFactory =
     std::function<llvm::Expected<Lifetime>(const clang::Expr *)>;
 
+
 class FunctionLifetimeFactory {
  public:
   FunctionLifetimeFactory(
@@ -51,7 +52,7 @@ class FunctionLifetimeFactory {
   const clang::FunctionDecl *func;
 };
 
-// Lifetimes for the signature of a function.
+// Holds the state during the analysis of a function
 class FunctionLifetimes {
  public:
   // TODO 2 options: remove or different structures for params and other vars
@@ -105,10 +106,6 @@ class FunctionLifetimes {
       const FunctionLifetimeFactory &lifetime_factory);
 
  private:
-  // TODO 2 options: remove or different structures for params and other vars
-  // llvm::SmallVector<ValueLifetimes> param_lifetimes_;
-  // TODO is it enough to store the id?
-  // TODO separate parameters from all variables?
   llvm::DenseMap<const clang::Decl *, Lifetime> variable_lifetimes_;
   llvm::DenseSet<char> lifetimes_id_set_;
   Lifetime return_lifetime_;
