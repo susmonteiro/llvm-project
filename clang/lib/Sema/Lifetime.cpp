@@ -9,14 +9,23 @@
 
 namespace clang {
 
+constexpr char UNSET = -1;
+constexpr char STATIC = -2;
+constexpr char LOCAL = -3;
+constexpr char INVALID_ID_TOMBSTONE = -4;
+constexpr char TODO = 100;
+
+constexpr llvm::StringRef STATIC_NAME = "static";
+constexpr llvm::StringRef LOCAL_NAME = "local";
+
 Lifetime::Lifetime() : id_(UNSET) {}
 
 Lifetime::Lifetime(char id) : id_(id) {}
 
 Lifetime::Lifetime(llvm::StringRef name) {
-  if ((isStatic = name.equals(STATIC_NAME))) {
+  if (name.equals(STATIC_NAME)) {
     *this = Lifetime(STATIC);
-  } else if ((isLocal = name.equals(LOCAL_NAME))) {
+  } else if (name.equals(LOCAL_NAME)) {
     *this = Lifetime(LOCAL);
     // TODO is this check ok?
   } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
@@ -31,6 +40,12 @@ Lifetime::Lifetime(llvm::StringRef name) {
 std::string Lifetime::getLifetimeName() const {
   return std::string(1, id_ + 'a');
 }
+
+bool Lifetime::IsInvalid() const { return id_ == UNSET; }
+bool Lifetime::IsStatic() const { return id_ == STATIC; }
+bool Lifetime::IsLocal() const { return id_ == LOCAL; }
+void Lifetime::SetStatic() { id_ = STATIC; }
+void Lifetime::SetLocal() { id_ = LOCAL; }
 
 Lifetime Lifetime::InvalidEmpty() { return Lifetime(UNSET); }
 

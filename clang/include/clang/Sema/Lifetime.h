@@ -7,15 +7,6 @@
 
 namespace clang {
 
-constexpr char UNSET = -1;
-constexpr char STATIC = -2;
-constexpr char LOCAL = -3;
-constexpr char INVALID_ID_TOMBSTONE = -4;
-constexpr char TODO = 100;
-
-constexpr llvm::StringRef STATIC_NAME = "static";
-constexpr llvm::StringRef LOCAL_NAME = "local";
-
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
  public:
@@ -24,13 +15,19 @@ class Lifetime {
   Lifetime(llvm::StringRef name);
 
   // Returns whether this lifetime is valid
-  bool IsInvalid() const { return id_ == UNSET; }
+  bool IsInvalid() const;
 
   // Returns whether this lifetime is a static lifetime.
-  bool IsStatic() const { return isStatic; }
+  bool IsStatic() const;
 
   // Returns whether this lifetime is a local lifetime.
-  bool IsLocal() const { return isLocal; }
+  bool IsLocal() const;
+
+  // Sets the id_ to $static
+  void SetStatic();
+
+  // Sets the id_ to $local
+  void SetLocal();
 
   // Returns the numeric ID for the lifetime.
   char Id() const { return id_; }
@@ -49,15 +46,12 @@ class Lifetime {
   // ? store this here or in the structure "above"
   // TODO remove this
   // TODO denseset of Lifetimes
-  // TODO maybe store clang::Decl here
+  // TODO maybe store clang::Decl in this class
   llvm::DenseSet<const clang::Decl*> parents;
   // TODO FunctionLifetimes
   llvm::DenseSet<const clang::Decl*> children;
   llvm::DenseSet<int> shortest_lifetimes;
   char id_;
-  // TODO remove this
-  bool isStatic = false;
-  bool isLocal = false;
 };
 }  // namespace clang
 
