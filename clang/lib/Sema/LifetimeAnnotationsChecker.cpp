@@ -30,21 +30,43 @@ class TransferStmtVisitor
  public:
   TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
 
+  std::optional<std::string> VisitExpr(const clang::Expr *expr);
+  std::optional<std::string> VisitDeclRefExpr(
+      const clang::DeclRefExpr *decl_ref);
+  std::optional<std::string> VisitStringLiteral(
+      const clang::StringLiteral *strlit);
+  std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
+  std::optional<std::string> VisitReturnStmt(
+      const clang::ReturnStmt *return_stmt);
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
-  void /* std::optional<std::string> */ VisitVarDecl(const clang::VarDecl *var_decl);
+  std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
+  std::optional<std::string> VisitArraySubscriptExpr(
+      const clang::ArraySubscriptExpr *subscript);
+  std::optional<std::string> VisitBinaryOperator(
+      const clang::BinaryOperator *op);
+  std::optional<std::string> VisitConditionalOperator(
+      const clang::ConditionalOperator *op);
+  std::optional<std::string> VisitInitListExpr(
+      const clang::InitListExpr *init_list);
+  std::optional<std::string> VisitMaterializeTemporaryExpr(
+      const clang::MaterializeTemporaryExpr *temporary_expr);
+  std::optional<std::string> VisitMemberExpr(const clang::MemberExpr *member);
+  std::optional<std::string> VisitCXXThisExpr(
+      const clang::CXXThisExpr *this_expr);
+  std::optional<std::string> VisitCallExpr(const clang::CallExpr *call);
+  std::optional<std::string> VisitCXXConstructExpr(
+      const clang::CXXConstructExpr *construct_expr);
+  std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
 
  private:
   const clang::FunctionDecl *func_;
 };
+
 }  // namespace
 
-void TransferStmtVisitor::VisitVarDecl(const clang::VarDecl *var_decl) {
-  debugLifetimes("[VisitVarDecl]");
-}
-
-
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
-    const clang::Stmt *functionBody, clang::ASTContext &Context, const clang::FunctionDecl* func) {
+    const clang::Stmt *functionBody, clang::ASTContext &Context,
+    const clang::FunctionDecl *func) {
   auto matcher = compoundStmt(hasDescendant(varDecl().bind("vardecl")));
   // auto matcher = stmt();
 
@@ -66,16 +88,19 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
   debugLifetimes("Matched expressions");
 
   // for (const auto &node : Nodes) {
-  const auto *vardecl = Nodes.getNodeAs<clang::VarDecl>("vardecl");
+  const auto *stmt = Nodes.getNodeAs<clang::Stmt>("vardecl");
   debugLifetimes("Visiting stmt");
-  visitor.VisitVarDecl(vardecl);
+  auto *after_cast = const_cast<clang::Stmt *>(stmt);
+  // visitor.VisitVarDecl(vardecl);
+  debugLifetimes("After cast");
+  std::optional<std::string> err = visitor.Visit(after_cast);
+  debugLifetimes("Error?");
   // stmt->dump();
   // }
 }
 
 void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
-
   auto functionBody = func->getBody();
   clang::ASTContext &Context = func->getASTContext();
 
@@ -253,5 +278,124 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 //   // TODO implement
 // }
 // }  // namespace
+
+namespace {
+
+std::optional<std::string> TransferStmtVisitor::VisitExpr(
+    const clang::Expr *expr) {
+  debugLifetimes("[VisitExpr]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitDeclRefExpr(
+    const clang::DeclRefExpr *decl_ref) {
+  debugLifetimes("[VisitDeclRefExpr]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitStringLiteral(
+    const clang::StringLiteral *strlit) {
+  debugLifetimes("[VisitStringLiteral]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitCastExpr(
+    const clang::CastExpr *cast) {
+  debugLifetimes("[VisitCastExpr]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitReturnStmt(
+    const clang::ReturnStmt *return_stmt) {
+  debugLifetimes("[VisitReturnStmt]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
+    const clang::DeclStmt *decl_stmt) {
+  debugLifetimes("[VisitVarDecl]");
+  decl_stmt->dump();
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitUnaryOperator(
+    const clang::UnaryOperator *op) {
+  debugLifetimes("[VisitUnaryOperator]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitArraySubscriptExpr(
+    const clang::ArraySubscriptExpr *subscript) {
+  debugLifetimes("[VisitArraySubscriptExpr]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitBinaryOperator(
+    const clang::BinaryOperator *op) {
+  debugLifetimes("[VisitBinaryOperator]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitConditionalOperator(
+    const clang::ConditionalOperator *op) {
+  debugLifetimes("[VisitConditionalOperator]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitInitListExpr(
+    const clang::InitListExpr *init_list) {
+  debugLifetimes("[VisitInitListExpr]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitMaterializeTemporaryExpr(
+    const clang::MaterializeTemporaryExpr *temporary_expr) {
+debugLifetimes("[VisitMaterializeTemporaryExpr]");
+  // TODO
+  return std::nullopt;}
+
+std::optional<std::string> TransferStmtVisitor::VisitMemberExpr(
+    const clang::MemberExpr *member) {
+debugLifetimes("[VisitMembersExpr]");
+  // TODO
+  return std::nullopt;}
+
+std::optional<std::string> TransferStmtVisitor::VisitCXXThisExpr(
+    const clang::CXXThisExpr *this_expr) {
+debugLifetimes("[VisitCXXThisExpr]");
+  // TODO
+  return std::nullopt;}
+
+std::optional<std::string> TransferStmtVisitor::VisitCallExpr(
+    const clang::CallExpr *call) {
+debugLifetimes("[VisitCallExpr]");
+  // TODO
+  return std::nullopt;}
+
+std::optional<std::string> TransferStmtVisitor::VisitCXXConstructExpr(
+    const clang::CXXConstructExpr *construct_expr) {
+  debugLifetimes("[VisitCXXConstructExpr]");
+  // TODO
+  return std::nullopt;
+}
+
+  std::optional<std::string> TransferStmtVisitor::VisitStmt(const clang::Stmt *stmt) {
+    debugLifetimes("[VisitStmt] - default?");
+    // TODO 
+    return std::nullopt;
+  }
+
+
+}  // namespace
 
 }  // namespace clang
