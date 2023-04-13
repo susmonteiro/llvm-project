@@ -64,6 +64,10 @@ class TransferStmtVisitor
 
 }  // namespace
 
+void VisitVarDecl(const clang::VarDecl *var_decl) {
+
+}
+
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::Stmt *functionBody, clang::ASTContext &Context,
     const clang::FunctionDecl *func) {
@@ -88,13 +92,14 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
   debugLifetimes("Matched expressions");
 
   // for (const auto &node : Nodes) {
-  const auto *stmt = Nodes.getNodeAs<clang::Stmt>("vardecl");
+  const auto *var_decl = Nodes.getNodeAs<clang::VarDecl>("vardecl");
+  VisitVarDecl(var_decl);
   debugLifetimes("Visiting stmt");
-  auto *after_cast = const_cast<clang::Stmt *>(stmt);
+  // auto *after_cast = const_cast<clang::Stmt *>(stmt);
   // visitor.VisitVarDecl(vardecl);
-  debugLifetimes("After cast");
-  std::optional<std::string> err = visitor.Visit(after_cast);
-  debugLifetimes("Error?");
+  // debugLifetimes("After cast");
+  // std::optional<std::string> err = visitor.Visit(after_cast);
+  // debugLifetimes("Error?");
   // stmt->dump();
   // }
 }
