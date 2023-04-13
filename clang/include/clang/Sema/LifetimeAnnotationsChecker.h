@@ -8,6 +8,9 @@
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/ADT/DenseMap.h"
+// TODO uncomment
+// #include "clang/Sema/LifetimeAnnotationsAnalysis.h"
 
 // DEBUG
 #include "clang/AST/ASTContext.h"
@@ -15,26 +18,30 @@
 
 namespace clang {
 
-struct FunctionInfo {
-  std::vector<Lifetime> param_lifetimes;
-  std::optional<Lifetime> return_lifetime;
-  const clang::FunctionDecl *func;
-};
-
 class LifetimeAnnotationsChecker {
  public:
-  // TODO probably not void
+ // TODO remove this
+  // void InsertInMap(const FunctionDecl *func, int i) {
+  //     debug_map_[func] = 1;
+  // }
+
   void GetLifetimes(const FunctionDecl *func, Sema &S);
-
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
-
   void PropagateLifetimes();
   void CheckLifetimes();
 
-  // TODO this should hold the lifetimes of the parameters and return values for
-  // all functions
-  std::vector<FunctionInfo> function_info_;
+  private:
+
+  // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimesOrError> function_info_;
+  // FIXME 
+  llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimes> function_info_;
+  // llvm::DenseMap<const clang::FunctionDecl*, int> debug_map_;
+  // llvm::DenseMap<int, int> whatever_tmp_;
+  // llvm::DenseSet<FunctionLifetimes> function_info_;
+  // TODO
+  // LifetimeAnnotationsAnalysis state_;
 };
+
 }  // namespace clang
 
 #endif

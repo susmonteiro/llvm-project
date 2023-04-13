@@ -18,28 +18,38 @@
 
 namespace clang {
 
-namespace {
-class TransferStmtVisitor
-    : public clang::StmtVisitor<TransferStmtVisitor,
-                                std::optional<std::string>> {
- public:
-  TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
+// namespace {
+// class TransferStmtVisitor
+//     : public clang::StmtVisitor<TransferStmtVisitor,
+//                                 std::optional<std::string>> {
+//  public:
+//   TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
 
-  std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
+//   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
 
- private:
-  const clang::FunctionDecl *func_;
-};
-}  // namespace
+//  private:
+//   const clang::FunctionDecl *func_;
+// };
+// }  // namespace
 
-void LifetimeAnnotationsChecker::AnalyzeFunctionBody(
-    const FunctionDecl *func, Sema &S) {
+void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
+                                                     Sema &S) {
   // TODO implement
   if (func->getBody()) {
     debugLifetimes("Function has body");
   } else {
     debugLifetimes("Function does not have body");
   }
+
+  clang::ASTContext &ast_context = func->getASTContext();
+  clang::SourceManager &source_manager = ast_context.getSourceManager();
+  clang::SourceRange func_source_range = func->getSourceRange();
+
+  // step 2
+  LifetimeAnnotationsChecker::PropagateLifetimes();
+
+  // step 3
+  LifetimeAnnotationsChecker::CheckLifetimes();
 }
 
 void LifetimeAnnotationsChecker::PropagateLifetimes() {
@@ -85,22 +95,23 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
 //   }
 // }
 
-void CheckReturnLifetime(const clang::FunctionDecl *func,
-                         FunctionLifetimes &function_lifetimes, Sema &S) {
-  clang::QualType return_type = func->getReturnType();
-  clang::QualType return_pointee = PointeeType(return_type);
-  if (return_pointee.isNull()) return;
+// TODO this is just an experience - delete or change this
+// void CheckReturnLifetime(const clang::FunctionDecl *func,
+//                          FunctionLifetimes &function_lifetimes, Sema &S) {
+//   clang::QualType return_type = func->getReturnType();
+//   clang::QualType return_pointee = PointeeType(return_type);
+//   if (return_pointee.isNull()) return;
 
-  Lifetime l = function_lifetimes.GetReturnLifetimes();
+//   Lifetime l = function_lifetimes.GetReturnLifetimes();
 
-  if (!function_lifetimes.CheckIfLifetimeIsDefined(l))
-    S.Diag(func->getLocation(), diag::warn_return_undefined_lifetime)
-        << func->getSourceRange();
-}
+//   if (!function_lifetimes.CheckIfLifetimeIsDefined(l))
+//     S.Diag(func->getLocation(), diag::warn_return_undefined_lifetime)
+//         << func->getSourceRange();
+// }
 
 void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
                                               Sema &S) {
-  debugLifetimes("Analyzing function", func->getNameAsString());
+  debugLifetimes("GetLifetimes of function", func->getNameAsString());
 
   // BuildBaseToOverrides
   // AnalyzeTranslationUnitAndCollectTemplates -> templates
@@ -136,10 +147,54 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
   // AnalyzeSingleFunction()
   FunctionLifetimeFactory function_lifetime_factory(
       /* elision_enabled, */ func);
-  auto expected_func_lifetimes =
+
+  // if (function_info_[func]) {
+  //   debugLifetimes("Before setting of map");
+
+  //   func_lifetimes.DumpParameters();
+  //   func_lifetimes.DumpReturn();
+
+  //   function_info_[func] = std::move(func_lifetimes);
+
+  //   // TODO this should be validated in the check step
+  //   // CheckReturnLifetime(func, func_lifetimes, S);
+
+  //   debugLifetimes("After setting of map");
+
+  //   // TODO maybe keep track of analyzed functions
+
+  // } else {
+  //   // TODO error
+  //   /* return llvm::createStringError(
+  //         llvm::inconvertibleErrorCode(),
+  //         llvm::toString(func_lifetimes.takeError())
+  //         // TODO abseil
+  //         // absl::StrCat("Lifetime elision not enabled for '",
+  //         //              func->getNameAsString(), "'")
+  //     ); */
+  //   return;
+  // }
+
+
+  llvm::Expected<FunctionLifetimes> expected_func_lifetimes =
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
-  if (!expected_func_lifetimes) {
+
+  if (expected_func_lifetimes) {
+    FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
+
+    func_lifetimes.DumpParameters();
+    func_lifetimes.DumpReturn();
+
+    // TODO insert on map
+
+    // TODO this should be validated in the check step
+    // CheckReturnLifetime(func, func_lifetimes, S);
+
+    // TODO maybe keep track of analyzed functions
+
+  } else {
+    // TODO error
     /* return llvm::createStringError(
           llvm::inconvertibleErrorCode(),
           llvm::toString(func_lifetimes.takeError())
@@ -147,37 +202,16 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
           // absl::StrCat("Lifetime elision not enabled for '",
           //              func->getNameAsString(), "'")
       ); */
-    // TODO error
     return;
   }
-
-  FunctionLifetimes &func_lifetimes = *expected_func_lifetimes;
-
-  // TODO this should be validated in the check step
-  CheckReturnLifetime(func, func_lifetimes, S);
-
-  func_lifetimes.DumpParameters();
-  func_lifetimes.DumpReturn();
-
-  // TODO keep track of analyzed functions
-
-  clang::ASTContext &ast_context = func->getASTContext();
-  clang::SourceManager &source_manager = ast_context.getSourceManager();
-  clang::SourceRange func_source_range = func->getSourceRange();
-
-  // step 2
-  LifetimeAnnotationsChecker::PropagateLifetimes();
-
-  // step 3
-  LifetimeAnnotationsChecker::CheckLifetimes();
 }
 
-namespace {
-// Below is the implementation of all visit functions
-std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
-    const clang::DeclStmt *decl_stmt) {
-  // TODO implement
-}
-}  // namespace
+// namespace {
+// // Below is the implementation of all visit functions
+// std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
+//     const clang::DeclStmt *decl_stmt) {
+//   // TODO implement
+// }
+// }  // namespace
 
 }  // namespace clang

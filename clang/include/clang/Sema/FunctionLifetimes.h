@@ -7,6 +7,7 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/PointeeType.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -20,6 +21,8 @@ namespace clang {
 using LifetimeFactory =
     std::function<llvm::Expected<Lifetime>(const clang::Expr *)>;
 
+// TODO remove this
+using MaybeLifetime = std::optional<Lifetime>;
 
 class FunctionLifetimeFactory {
  public:
@@ -29,7 +32,7 @@ class FunctionLifetimeFactory {
 
   //   virtual ~FunctionLifetimeFactory() {}
 
-  llvm::Expected<Lifetime> CreateParamLifetimesNew(
+  llvm::Expected<Lifetime> CreateParamLifetimes(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
   llvm::Expected<Lifetime> CreateReturnLifetimes(
@@ -52,53 +55,49 @@ class FunctionLifetimeFactory {
   const clang::FunctionDecl *func;
 };
 
-// Holds the state during the analysis of a function
+// Holds information about each function
 class FunctionLifetimes {
  public:
-  // TODO 2 options: remove or different structures for params and other vars
+  FunctionLifetimes();
+  FunctionLifetimes(int func_id) : func_id_(func_id) {}
   // * Returns lifetimes for the `i`-th parameter.
   // * These are the same number and order as FunctionDecl::parameters()
-  // const ValueLifetimes &GetParamLifetimes(size_t i) const {
-  //   return param_lifetimes_[i];
-  // }
+  const Lifetime &GetParamLifetime(size_t i) const {
+    return params_lifetimes_[i];
+  }
+
+  int Id() { return func_id_; }
 
   // Returns the number of function parameters (excluding the implicit `this).
-  // size_t GetNumParams() const { return param_lifetimes_.size(); }
+  size_t GetNumParams() const { return params_lifetimes_.size(); }
 
-  llvm::DenseMap<const clang::Decl *, Lifetime> GetVariableLifetimes() {
-    return variable_lifetimes_;
-  }
+  std::vector<Lifetime> GetParamsLifetimes() { return params_lifetimes_; }
 
-  llvm::DenseSet<char> GetDefinedLifetimes() { return lifetimes_id_set_; }
+  Lifetime GetReturnLifetime() { return return_lifetime_; }
+  void SetReturnLifetime(Lifetime l) { return_lifetime_ = l; }
 
-  Lifetime GetReturnLifetimes() { return return_lifetime_; }
+  // FIXME
+  // bool CheckIfLifetimeIsDefined(Lifetime l) {
+  //   return lifetimes_id_set_.find(l.Id()) != lifetimes_id_set_.end();
+  // }
 
-  bool CheckIfLifetimeIsDefined(Lifetime l) {
-    return lifetimes_id_set_.find(l.Id()) != lifetimes_id_set_.end();
-  }
-
-  void InsertVariableLifetime(const clang::Decl *decl, Lifetime l) {
-    variable_lifetimes_[decl] = l;
-    lifetimes_id_set_.insert(l.Id());
-  }
+  void InsertParamLifetime(Lifetime l) { params_lifetimes_.emplace_back(l); }
 
   void DumpParameters() const {
     std::cout << "[FunctionLifetimes]: Parameters Lifetimes\n";
-    for (const auto &pair : variable_lifetimes_) {
-      const clang::Decl *key = pair.first;
-      Lifetime value = pair.second;
-      key->dump();
-      debugLifetimes("Lifetime", value.getLifetimeName());
+    int i = 0;
+    for (const auto &param : params_lifetimes_) {
+      debugLifetimes("Parameter ", i++);
+      debugLifetimes("Lifetime",
+                     param.IsInvalid() ? "none" : param.getLifetimeName());
     }
   }
 
   void DumpReturn() const {
     std::cout << "[FunctionLifetimes]: Return lifetimes\n";
-    if (return_lifetime_.IsInvalid()) {
-      debugLifetimes("Return value has no lifetime");
-    } else {
-      debugLifetimes("Lifetime", return_lifetime_.getLifetimeName());
-    }
+    debugLifetimes("Lifetime", return_lifetime_.IsInvalid()
+                                   ? "none"
+                                   : return_lifetime_.getLifetimeName());
   }
 
   static llvm::Expected<FunctionLifetimes> CreateForDecl(
@@ -106,19 +105,54 @@ class FunctionLifetimes {
       const FunctionLifetimeFactory &lifetime_factory);
 
  private:
-  llvm::DenseMap<const clang::Decl *, Lifetime> variable_lifetimes_;
-  llvm::DenseSet<char> lifetimes_id_set_;
+  // ? is it better to have optionals or a Lifetime that basically means no
+  // lifetime
+  // stores param lifetimes in order
+  // TODO choose
+  // std::vector<MaybeLifetime> params_lifetimes_;
+  std::vector<Lifetime> params_lifetimes_;
   Lifetime return_lifetime_;
+  int func_id_;
 
   // TODO this
   // std::optional<ValueLifetimes> this_lifetimes_;
 
+  // TODO need DenseMapInfo?
+  // static FunctionLifetimes InvalidEmpty();
+  // static FunctionLifetimes InvalidTombstone();
+  // friend class llvm::DenseMapInfo<FunctionLifetimes, void>;
+
   static llvm::Expected<FunctionLifetimes> Create(
-      const clang::FunctionProtoType *type, clang::TypeLoc type_loc,
+      const clang::FunctionDecl *func, clang::TypeLoc type_loc,
       const clang::QualType this_type,
       const FunctionLifetimeFactory &lifetime_factory);
 };
 
 }  // namespace clang
+
+// TODO need DenseMapInfo?
+// namespace llvm {
+
+// template <>
+// struct DenseMapInfo<clang::FunctionLifetimes, void> {
+//   static clang::FunctionLifetimes getEmptyKey() {
+//     return clang::FunctionLifetimes::InvalidEmpty();
+//   }
+
+//   static clang::FunctionLifetimes getTombstoneKey() {
+//     return clang::FunctionLifetimes::InvalidTombstone();
+//   }
+
+//   static unsigned getHashValue(clang::FunctionLifetimes functionLifetimes) {
+//     return llvm::hash_value(functionLifetimes.Id());
+//   }
+
+//   static bool isEqual(clang::FunctionLifetimes lhs,
+//                       clang::FunctionLifetimes rhs) {
+//     return lhs.Id() == rhs.Id();
+//   }
+// };
+
+// }  // namespace llvm
 
 #endif  // LIFETIME_ANNOTATIONS_FUNCTION_LIFETIMES_H_

@@ -8,6 +8,9 @@
 
 namespace clang {
 
+constexpr int INVALID = -1;
+constexpr int INVALID_ID_TOMBSTONE = -2;
+
 llvm::Expected<llvm::StringRef> EvaluateAsStringLiteral(
     const clang::Expr* expr, const clang::ASTContext& ast_context) {
   auto error = []() {
@@ -196,7 +199,7 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::LifetimeFromName(
   return Lifetime(name_str);
 }
 
-llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateParamLifetimesNew(
+llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateParamLifetimes(
     clang::QualType param_type, clang::TypeLoc param_type_loc) const {
   return CreateLifetime(param_type, param_type_loc, ParamLifetimeFactory());
 }
@@ -400,6 +403,16 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
   };
 }
 
+FunctionLifetimes::FunctionLifetimes() : func_id_(INVALID) {}
+
+// FunctionLifetimes FunctionLifetimes::InvalidEmpty() {
+//   return FunctionLifetimes(INVALID);
+// }
+
+// FunctionLifetimes FunctionLifetimes::InvalidTombstone() {
+//   return FunctionLifetimes(INVALID_ID_TOMBSTONE);
+// }
+
 llvm::Expected<FunctionLifetimes> FunctionLifetimes::CreateForDecl(
     const clang::FunctionDecl* func,
     const FunctionLifetimeFactory& lifetime_factory) {
@@ -415,15 +428,16 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::CreateForDecl(
   if (func->getTypeSourceInfo()) {
     type_loc = func->getTypeSourceInfo()->getTypeLoc();
   }
-  return Create(func->getType()->getAs<clang::FunctionProtoType>(), type_loc,
-                this_type, lifetime_factory);
+  return Create(func, type_loc, this_type, lifetime_factory);
 }
 
 llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
-    const clang::FunctionProtoType* type, clang::TypeLoc type_loc,
+    const clang::FunctionDecl* func, clang::TypeLoc type_loc,
     const clang::QualType this_type,
     const FunctionLifetimeFactory& lifetime_factory) {
-  FunctionLifetimes ret;
+  const clang::FunctionProtoType* type =
+      func->getType()->getAs<clang::FunctionProtoType>();
+  FunctionLifetimes ret(func->getID());
 
   // llvm::SmallVector<const clang::Attr*> attrs;
   if (type_loc) {
@@ -513,8 +527,9 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
 
       clang::QualType param_type = type->getParamType(i);
       clang::QualType param_pointee = PointeeType(param_type);
+      Lifetime tmp;
+
       // TODO check if this covers everything that should have a lifetime
-      if (param_pointee.isNull()) continue;
 
       clang::TypeLoc pointee_type_loc;
       if (param_type_loc) {
@@ -524,16 +539,14 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
         // the pointee type because the pointee type never got spelled out at
         // the location of the original `TypeLoc`.
       }
-
-      Lifetime tmp;
       // TODO take care of optional
-      if (llvm::Error err = lifetime_factory
-                                .CreateParamLifetimesNew(type->getParamType(i),
-                                                         param_type_loc)
-                                .moveInto(tmp)) {
+      if (llvm::Error err =
+              lifetime_factory
+                  .CreateParamLifetimes(type->getParamType(i), param_type_loc)
+                  .moveInto(tmp)) {
         return std::move(err);
       }
-      ret.InsertVariableLifetime(param, tmp);
+      ret.InsertParamLifetime(tmp);
     }
   }
 
