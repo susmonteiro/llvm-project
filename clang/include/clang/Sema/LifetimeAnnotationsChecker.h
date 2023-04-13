@@ -9,6 +9,7 @@
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/DenseMap.h"
+#include "clang/AST/Decl.h"
 // TODO uncomment
 // #include "clang/Sema/LifetimeAnnotationsAnalysis.h"
 
@@ -30,13 +31,18 @@ class LifetimeAnnotationsChecker {
   void PropagateLifetimes();
   void CheckLifetimes();
 
+  // void experiment() {
+  //   whatever_tmp_[0] = 1;
+  // }
+
+
   private:
 
   // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimesOrError> function_info_;
   // FIXME 
-  llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimes> function_info_;
+  // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimes> function_info_;
   // llvm::DenseMap<const clang::FunctionDecl*, int> debug_map_;
-  // llvm::DenseMap<int, int> whatever_tmp_;
+  llvm::DenseMap<int, int> whatever_tmp_;
   // llvm::DenseSet<FunctionLifetimes> function_info_;
   // TODO
   // LifetimeAnnotationsAnalysis state_;

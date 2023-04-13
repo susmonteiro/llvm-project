@@ -3,6 +3,9 @@
 #include <iostream>
 
 #include "clang/AST/ASTDiagnostic.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/ASTMatchers/ASTMatchFinder.h"
+#include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/Basic/Diagnostic.h"
@@ -17,6 +20,8 @@
 #include "llvm/Support/Error.h"
 
 namespace clang {
+
+  using namespace ast_matchers;
 
 // namespace {
 // class TransferStmtVisitor
@@ -112,6 +117,8 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
 void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
                                               Sema &S) {
   debugLifetimes("GetLifetimes of function", func->getNameAsString());
+
+  // experiment();
 
   // BuildBaseToOverrides
   // AnalyzeTranslationUnitAndCollectTemplates -> templates
