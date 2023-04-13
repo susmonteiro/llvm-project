@@ -28,6 +28,7 @@ class LifetimeAnnotationsChecker {
 
   void GetLifetimes(const FunctionDecl *func, Sema &S);
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
+  void GetLifetimeDependencies(const clang::Stmt *functionBody, clang::ASTContext &Context, const clang::FunctionDecl* func);
   void PropagateLifetimes();
   void CheckLifetimes();
 
@@ -42,7 +43,8 @@ class LifetimeAnnotationsChecker {
   // FIXME 
   // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimes> function_info_;
   // llvm::DenseMap<const clang::FunctionDecl*, int> debug_map_;
-  llvm::DenseMap<int, int> whatever_tmp_;
+  // TODO try this at home computer
+  // llvm::DenseMap<int, int> whatever_tmp_;
   // llvm::DenseSet<FunctionLifetimes> function_info_;
   // TODO
   // LifetimeAnnotationsAnalysis state_;

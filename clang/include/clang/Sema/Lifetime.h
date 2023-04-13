@@ -43,13 +43,8 @@ class Lifetime {
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
-  // ? store this here or in the structure "above"
-  // TODO remove this
-  // TODO denseset of Lifetimes
   // TODO maybe store clang::Decl in this class
-  llvm::DenseSet<const clang::Decl*> parents;
-  // TODO FunctionLifetimes
-  llvm::DenseSet<const clang::Decl*> children;
+  // TODO do we want this?
   llvm::DenseSet<int> shortest_lifetimes;
   char id_;
 };

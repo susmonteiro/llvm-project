@@ -2,12 +2,12 @@
 
 #include <iostream>
 
-#include "clang/AST/ASTDiagnostic.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/ASTMatchers/ASTMatchFinder.h"
-#include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/AST/ASTDiagnostic.h"
 #include "clang/AST/Stmt.h"
 #include "clang/AST/StmtVisitor.h"
+#include "clang/ASTMatchers/ASTMatchFinder.h"
+#include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticIDs.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -21,34 +21,69 @@
 
 namespace clang {
 
-  using namespace ast_matchers;
+using namespace ast_matchers;
 
-// namespace {
-// class TransferStmtVisitor
-//     : public clang::StmtVisitor<TransferStmtVisitor,
-//                                 std::optional<std::string>> {
-//  public:
-//   TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
+namespace {
+class TransferStmtVisitor
+    : public clang::StmtVisitor<TransferStmtVisitor,
+                                std::optional<std::string>> {
+ public:
+  TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
 
-//   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
+  std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
+  void /* std::optional<std::string> */ VisitVarDecl(const clang::VarDecl *var_decl);
 
-//  private:
-//   const clang::FunctionDecl *func_;
-// };
-// }  // namespace
+ private:
+  const clang::FunctionDecl *func_;
+};
+}  // namespace
+
+void TransferStmtVisitor::VisitVarDecl(const clang::VarDecl *var_decl) {
+  debugLifetimes("[VisitVarDecl]");
+}
+
+
+void LifetimeAnnotationsChecker::GetLifetimeDependencies(
+    const clang::Stmt *functionBody, clang::ASTContext &Context, const clang::FunctionDecl* func) {
+  auto matcher = compoundStmt(hasDescendant(varDecl().bind("vardecl")));
+  // auto matcher = stmt();
+
+  TransferStmtVisitor visitor(func);
+
+  auto Results = match(matcher, *functionBody, Context);
+
+  // DEBUG
+  // functionBody->dump();
+
+  if (Results.empty()) {
+    // FIXME
+    debugWarn("Results is empty");
+    return;
+  }
+
+  const BoundNodes &Nodes = Results[0];
+
+  debugLifetimes("Matched expressions");
+
+  // for (const auto &node : Nodes) {
+  const auto *vardecl = Nodes.getNodeAs<clang::VarDecl>("vardecl");
+  debugLifetimes("Visiting stmt");
+  visitor.VisitVarDecl(vardecl);
+  // stmt->dump();
+  // }
+}
 
 void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
-  // TODO implement
-  if (func->getBody()) {
-    debugLifetimes("Function has body");
-  } else {
-    debugLifetimes("Function does not have body");
-  }
 
-  clang::ASTContext &ast_context = func->getASTContext();
-  clang::SourceManager &source_manager = ast_context.getSourceManager();
-  clang::SourceRange func_source_range = func->getSourceRange();
+  auto functionBody = func->getBody();
+  clang::ASTContext &Context = func->getASTContext();
+
+  // step 1
+  GetLifetimeDependencies(functionBody, Context, func);
+
+  // clang::SourceManager &source_manager = ast_context.getSourceManager();
+  // clang::SourceRange func_source_range = func->getSourceRange();
 
   // step 2
   LifetimeAnnotationsChecker::PropagateLifetimes();
@@ -182,10 +217,8 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
   //   return;
   // }
 
-
   llvm::Expected<FunctionLifetimes> expected_func_lifetimes =
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
-
 
   if (expected_func_lifetimes) {
     FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
