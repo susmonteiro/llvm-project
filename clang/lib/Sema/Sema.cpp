@@ -126,7 +126,6 @@ PrintingPolicy Sema::getPrintingPolicy(const ASTContext &Context,
 void Sema::ActOnTranslationUnitScope(Scope *S) {
   TUScope = S;
   PushDeclContext(S, Context.getTranslationUnitDecl());
-  // TODO check if here tu
 }
 
 namespace clang {
@@ -210,7 +209,7 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
       StringWithUTF8StringMethod(nullptr),
       ValueWithBytesObjCTypeMethod(nullptr), NSArrayDecl(nullptr),
       ArrayWithObjectsMethod(nullptr), NSDictionaryDecl(nullptr),
-      DictionaryWithObjectsMethod(nullptr), LAChecker(), GlobalNewDeleteDeclared(false),
+      DictionaryWithObjectsMethod(nullptr), GlobalNewDeleteDeclared(false),
       TUKind(TUKind), NumSFINAEErrors(0),
       FullyCheckedComparisonCategories(
           static_cast<unsigned>(ComparisonCategoryType::Last) + 1),
@@ -246,6 +245,7 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
 
   // Initialization of data sharing attributes stack for OpenMP
   InitDataSharingAttributesStack();
+  InitLifetimeAnnotationsChecker();
 
   std::unique_ptr<sema::SemaPPCallbacks> Callbacks =
       std::make_unique<sema::SemaPPCallbacks>();
@@ -494,6 +494,9 @@ Sema::~Sema() {
 
   // Destroys data sharing attributes stack for OpenMP
   DestroyDataSharingAttributesStack();
+
+  // Destroys lifetime annotations checker
+  DestroyLifetimeAnnotationsChecker();
 
   // Detach from the PP callback handler which outlives Sema since it's owned
   // by the preprocessor.

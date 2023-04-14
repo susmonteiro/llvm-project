@@ -21,10 +21,6 @@ namespace clang {
 
 class LifetimeAnnotationsChecker {
  public:
- // TODO remove this
-  // void InsertInMap(const FunctionDecl *func, int i) {
-  //     debug_map_[func] = 1;
-  // }
 
   void GetLifetimes(const FunctionDecl *func, Sema &S);
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
@@ -32,20 +28,21 @@ class LifetimeAnnotationsChecker {
   void PropagateLifetimes();
   void CheckLifetimes();
 
-  // void experiment() {
-  //   whatever_tmp_[0] = 1;
-  // }
-
+  void DumpFunctionInfo() const {
+    debugLifetimes("[LifetimeAnnotationsChecker]: Functions Information");
+    for (const auto &pair : function_info_) {
+      debugLifetimes("Function", pair.first->getNameAsString());
+      pair.second.DumpParameters();
+      pair.second.DumpReturn();
+      debugLifetimes("============");
+    }
+  }
 
   private:
 
+  // TODO maybe need to store the case where there are errors?
   // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimesOrError> function_info_;
-  // FIXME 
-  // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimes> function_info_;
-  // llvm::DenseMap<const clang::FunctionDecl*, int> debug_map_;
-  // TODO try this at home computer
-  // llvm::DenseMap<int, int> whatever_tmp_;
-  // llvm::DenseSet<FunctionLifetimes> function_info_;
+  llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimes> function_info_;
   // TODO
   // LifetimeAnnotationsAnalysis state_;
 };

@@ -11008,6 +11008,10 @@ private:
   /// Initialization of data-sharing attributes stack.
   void InitDataSharingAttributesStack();
   void DestroyDataSharingAttributesStack();
+
+  void InitLifetimeAnnotationsChecker();
+  void DestroyLifetimeAnnotationsChecker();
+  
   ExprResult
   VerifyPositiveIntegerConstantInClause(Expr *Op, OpenMPClauseKind CKind,
                                         bool StrictlyPositive = true,

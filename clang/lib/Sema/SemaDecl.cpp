@@ -9646,7 +9646,10 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
 
     if (!Diags.isIgnored(diag::print_lifetime_annotations,
                              NewFD->getLocation())) {
-      debugInfo("Analyzing from function ActOnFunctionDeclarator");
+      // TODO remove this
+      if (!LAChecker) {
+        debugWarn("No LAChecker...");
+      }
       LAChecker->GetLifetimes(NewFD, *this);
     }
 
@@ -20014,4 +20017,13 @@ bool Sema::shouldIgnoreInHostDeviceCheck(FunctionDecl *Callee) {
   // known-emitted.
   return LangOpts.CUDA && !LangOpts.CUDAIsDevice &&
          IdentifyCUDATarget(Callee) == CFT_Global;
+}
+
+void Sema::InitLifetimeAnnotationsChecker() {
+  LAChecker = new LifetimeAnnotationsChecker();
+}
+
+
+void Sema::DestroyLifetimeAnnotationsChecker() {
+  delete LAChecker;
 }
