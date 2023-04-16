@@ -17,9 +17,9 @@
 
 namespace clang {
 
-using VariableLifetimes = llvm::DenseMap<const clang::Decl *, Lifetime>;
+using VariableLifetimes = llvm::DenseMap<const clang::VarDecl *, Lifetime>;
 using Dependencies =
-    llvm::DenseMap<const clang::Decl *, std::vector<const clang::Decl *>>;
+    llvm::DenseMap<const clang::VarDecl *, std::vector<const clang::VarDecl *>>;
 
 // TODO refactor this (copy from FunctionLifetimes)
 
@@ -36,9 +36,25 @@ class LifetimeAnnotationsAnalysis {
   // Returns the number of function parameters (excluding the implicit `this).
   // size_t GetNumParams() const { return param_lifetimes_.size(); }
 
-  llvm::DenseMap<const clang::Decl *, Lifetime> GetVariableLifetimes() {
+  VariableLifetimes GetVariableLifetimes() {
     return variable_lifetimes_;
   }
+
+  Lifetime& GetLifetime(const clang::VarDecl *var_decl) {
+    VariableLifetimes::iterator it = variable_lifetimes_.find(var_decl);
+    if (it == variable_lifetimes_.end()) {
+      // TODO error
+      CreateVariable(var_decl);
+    }
+    Lifetime &l = variable_lifetimes_[var_decl];
+    return l;
+  }
+
+  void CreateVariable(const clang::VarDecl *var_decl) {
+    variable_lifetimes_[var_decl] = Lifetime();
+  }
+
+  void CreateDependency(const clang::VarDecl *var_decl);
 
   // llvm::DenseSet<char> GetDefinedLifetimes() { return lifetimes_id_set_; }
 
@@ -76,6 +92,16 @@ class LifetimeAnnotationsAnalysis {
   //     const clang::FunctionDecl *function,
   //     const FunctionLifetimeFactory &lifetime_factory);
 
+  std::string DebugString() {
+    std::string str = "[LifetimeAnnotationsAnalysis]\n";
+    str += ">> variable_lifetimes_\n";
+    for (const auto &pair : variable_lifetimes_) {
+      str += pair.first->getNameAsString() + ": " + pair.second.getLifetimeName() + '\n';
+    }
+    // TODO dependencies
+    return str;
+  }
+
  private:
   VariableLifetimes variable_lifetimes_;
   // llvm::DenseSet<char> lifetimes_id_set_;
@@ -91,6 +117,11 @@ class LifetimeAnnotationsAnalysis {
   //       const clang::QualType this_type,
   //       const FunctionLifetimeFactory &lifetime_factory);
 };
+
+  // friend std::ostream& operator<<(std::ostream& os, LifetimeAnnotationsAnalysis analysis) {
+  //   os << "[LifetimeAnnotationsAnalysis]\n";
+  //   os << ""
+  // }
 
 }  // namespace clang
 

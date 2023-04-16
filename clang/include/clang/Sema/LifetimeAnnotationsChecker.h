@@ -5,13 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "clang/AST/Decl.h"
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/DenseMap.h"
-#include "clang/AST/Decl.h"
-// TODO uncomment
-// #include "clang/Sema/LifetimeAnnotationsAnalysis.h"
+#include "clang/Sema/LifetimeAnnotationsAnalysis.h"
 
 // DEBUG
 #include "clang/AST/ASTContext.h"
@@ -21,10 +20,13 @@ namespace clang {
 
 class LifetimeAnnotationsChecker {
  public:
+  void VisitVarDecl(const clang::VarDecl *var_decl);
 
   void GetLifetimes(const FunctionDecl *func, Sema &S);
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
-  void GetLifetimeDependencies(const clang::Stmt *functionBody, clang::ASTContext &Context, const clang::FunctionDecl* func);
+  void GetLifetimeDependencies(const clang::Stmt *functionBody,
+                               clang::ASTContext &Context,
+                               const clang::FunctionDecl *func);
   void PropagateLifetimes();
   void CheckLifetimes();
 
@@ -38,13 +40,13 @@ class LifetimeAnnotationsChecker {
     }
   }
 
-  private:
-
+ private:
   // TODO maybe need to store the case where there are errors?
-  // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimesOrError> function_info_;
-  llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimes> function_info_;
+  // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimesOrError>
+  // function_info_;
+  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> function_info_;
   // TODO
-  // LifetimeAnnotationsAnalysis state_;
+  LifetimeAnnotationsAnalysis state_;
 };
 
 }  // namespace clang

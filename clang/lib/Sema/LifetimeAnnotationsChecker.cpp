@@ -23,97 +23,75 @@ namespace clang {
 
 using namespace ast_matchers;
 
-// namespace {
-// class TransferStmtVisitor
-//     : public clang::StmtVisitor<TransferStmtVisitor,
-//                                 std::optional<std::string>> {
-//  public:
-//   TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
+namespace {
+class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
+ public:
+  LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state)
+      : state_(state) {}
 
-//   std::optional<std::string> VisitExpr(const clang::Expr *expr);
-//   std::optional<std::string> VisitDeclRefExpr(
-//       const clang::DeclRefExpr *decl_ref);
-//   std::optional<std::string> VisitStringLiteral(
-//       const clang::StringLiteral *strlit);
-//   std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
-//   std::optional<std::string> VisitReturnStmt(
-//       const clang::ReturnStmt *return_stmt);
-//   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
-//   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
-//   std::optional<std::string> VisitArraySubscriptExpr(
-//       const clang::ArraySubscriptExpr *subscript);
-//   std::optional<std::string> VisitBinaryOperator(
-//       const clang::BinaryOperator *op);
-//   std::optional<std::string> VisitConditionalOperator(
-//       const clang::ConditionalOperator *op);
-//   std::optional<std::string> VisitInitListExpr(
-//       const clang::InitListExpr *init_list);
-//   std::optional<std::string> VisitMaterializeTemporaryExpr(
-//       const clang::MaterializeTemporaryExpr *temporary_expr);
-//   std::optional<std::string> VisitMemberExpr(const clang::MemberExpr *member);
-//   std::optional<std::string> VisitCXXThisExpr(
-//       const clang::CXXThisExpr *this_expr);
-//   std::optional<std::string> VisitCallExpr(const clang::CallExpr *call);
-//   std::optional<std::string> VisitCXXConstructExpr(
-//       const clang::CXXConstructExpr *construct_expr);
-//   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
+ private:
+  void VisitVarDecl(const clang::VarDecl *var_decl);
 
-//  private:
-//   const clang::FunctionDecl *func_;
-// };
+  void run(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
-// }  // namespace
+  LifetimeAnnotationsAnalysis *state_;
+};
 
-void VisitVarDecl(const clang::VarDecl *var_decl) {
+void LifetimeAnnotationsProcessor::VisitVarDecl(
+    const clang::VarDecl *var_decl) {
+  debugLifetimes("[VisitVarDecl]", var_decl->getNameAsString());
+  if (isa<clang::ParmVarDecl>(var_decl)) return;
+  // TODO check if pointer?
+  state_->CreateVariable(var_decl);
+  // TODO if annotations, store annotation
 
+  // Don't need to record initializers because initialization has already
+  // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
+  // VisitCallExpr().
+  if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
+    debugLifetimes("VarDecl has initializer!");
+    state_->CreateDependency(var_decl);
+    // TODO implement
+  }
+  // return std::nullopt;
 }
+
+void LifetimeAnnotationsProcessor::run(
+    const ast_matchers::MatchFinder::MatchResult &Result) {
+  if (const auto *var_decl =
+          Result.Nodes.getNodeAs<clang::VarDecl>("vardecl")) {
+    VisitVarDecl(var_decl);
+  }
+}
+}  // namespace
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::Stmt *functionBody, clang::ASTContext &Context,
     const clang::FunctionDecl *func) {
-  auto matcher = compoundStmt(hasDescendant(varDecl().bind("vardecl")));
-  // auto matcher = stmt();
+  debugLifetimes("[GetLifetimeDependencies]");
+  LifetimeAnnotationsProcessor Callback(&state_);
+  auto anotherMatcher = findAll(varDecl().bind("vardecl"));
+  MatchFinder Finder;
+  Finder.addMatcher(anotherMatcher, &Callback);
 
-  // TransferStmtVisitor visitor(func);
-
-  auto Results = match(matcher, *functionBody, Context);
+  Finder.match(*func, Context);
 
   // DEBUG
   // functionBody->dump();
-
-  if (Results.empty()) {
-    debugWarn("Results is empty");
-    return;
-  }
-
-  const BoundNodes &Nodes = Results[0];
-
-  debugLifetimes("Matched expressions");
-
-  // for (const auto &node : Nodes) {
-  const auto *var_decl = Nodes.getNodeAs<clang::VarDecl>("vardecl");
-  VisitVarDecl(var_decl);
-  debugLifetimes("Visiting stmt");
-  // auto *after_cast = const_cast<clang::Stmt *>(stmt);
-  // visitor.VisitVarDecl(vardecl);
-  // debugLifetimes("After cast");
-  // std::optional<std::string> err = visitor.Visit(after_cast);
-  // debugLifetimes("Error?");
-  // stmt->dump();
-  // }
 }
 
 void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
-
   // DEBUG
-  DumpFunctionInfo();
+  // DumpFunctionInfo();
 
   auto functionBody = func->getBody();
   clang::ASTContext &Context = func->getASTContext();
 
   // step 1
   GetLifetimeDependencies(functionBody, Context, func);
+
+  debugLifetimes(state_.DebugString());
 
   // clang::SourceManager &source_manager = ast_context.getSourceManager();
   // clang::SourceRange func_source_range = func->getSourceRange();
@@ -136,13 +114,6 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
   // With all the lifetime information acquired, check that the return
   // statements and the attributions are correct
 }
-
-// TODO list
-//   TODO add this function header to .h
-//   TODO define the class TransferStmtVisitor in this file
-//   TODO define LifetimeLattice class
-//   TODO make this function be called from the GetLifetimes
-//   TODO implement some functions of the StmtVisitor
 
 // void LifetimeAnnotationsChecker::transfer(
 //     const clang::CFGElement &elt, LifetimeLattice &state,
@@ -281,14 +252,6 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 }
 
 // namespace {
-// // Below is the implementation of all visit functions
-// std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
-//     const clang::DeclStmt *decl_stmt) {
-//   // TODO implement
-// }
-// }  // namespace
-
-// namespace {
 
 // std::optional<std::string> TransferStmtVisitor::VisitExpr(
 //     const clang::Expr *expr) {
@@ -367,7 +330,8 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 //   return std::nullopt;
 // }
 
-// std::optional<std::string> TransferStmtVisitor::VisitMaterializeTemporaryExpr(
+// std::optional<std::string>
+// TransferStmtVisitor::VisitMaterializeTemporaryExpr(
 //     const clang::MaterializeTemporaryExpr *temporary_expr) {
 // debugLifetimes("[VisitMaterializeTemporaryExpr]");
 //   // TODO
@@ -398,12 +362,12 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 //   return std::nullopt;
 // }
 
-//   std::optional<std::string> TransferStmtVisitor::VisitStmt(const clang::Stmt *stmt) {
-//     debugLifetimes("[VisitStmt] - default?");
-//     // TODO 
-//     return std::nullopt;
-//   }
-
+//   // std::optional<std::string> TransferStmtVisitor::VisitStmt(const
+//   clang::Stmt *stmt) {
+//   //   debugLifetimes("[VisitStmt] - default?");
+//   //   // TODO
+//   //   return std::nullopt;
+//   // }
 
 // }  // namespace
 

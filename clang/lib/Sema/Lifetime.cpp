@@ -38,7 +38,23 @@ Lifetime::Lifetime(llvm::StringRef name) {
 }
 
 std::string Lifetime::getLifetimeName() const {
-  return std::string(1, id_ + 'a');
+  switch(id_) {
+    case UNSET:
+    case INVALID_ID_TOMBSTONE:
+    case TODO:
+      return "unset";
+      break;
+    case STATIC:
+      return "static";
+      break;
+    case LOCAL:
+      return "local";
+      break;
+    default:
+      if (id_ > 0) return std::string(1, id_ + 'a'); 
+      // TODO error
+      else return "error";
+  }
 }
 
 bool Lifetime::IsInvalid() const { return id_ == UNSET; }
