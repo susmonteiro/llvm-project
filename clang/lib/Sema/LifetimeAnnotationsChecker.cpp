@@ -31,6 +31,7 @@ class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
 
  private:
   void VisitVarDecl(const clang::VarDecl *var_decl);
+  void VisitAssignment(const clang::BinaryOperator *bin_op);
 
   void run(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
@@ -40,7 +41,6 @@ class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
 void LifetimeAnnotationsProcessor::VisitVarDecl(
     const clang::VarDecl *var_decl) {
   debugLifetimes("[VisitVarDecl]", var_decl->getNameAsString());
-  if (isa<clang::ParmVarDecl>(var_decl)) return;
   // TODO check if pointer?
   state_->CreateVariable(var_decl);
   // TODO if annotations, store annotation
@@ -56,28 +56,53 @@ void LifetimeAnnotationsProcessor::VisitVarDecl(
   // return std::nullopt;
 }
 
+void LifetimeAnnotationsProcessor::VisitAssignment(
+    const clang::BinaryOperator *bin_op) {
+  debugLifetimes("[VisitAssignment]");
+  bin_op->dump();
+}
+
 void LifetimeAnnotationsProcessor::run(
     const ast_matchers::MatchFinder::MatchResult &Result) {
+  // DEBUG
+  // debugInfo("On run...");
   if (const auto *var_decl =
           Result.Nodes.getNodeAs<clang::VarDecl>("vardecl")) {
     VisitVarDecl(var_decl);
+    return;
+  }
+
+  if (const auto *assignment =
+          Result.Nodes.getNodeAs<clang::BinaryOperator>("assignment")) {
+    VisitAssignment(assignment);
+    return;
   }
 }
+
 }  // namespace
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::Stmt *functionBody, clang::ASTContext &Context,
     const clang::FunctionDecl *func) {
   debugLifetimes("[GetLifetimeDependencies]");
-  LifetimeAnnotationsProcessor Callback(&state_);
-  auto anotherMatcher = findAll(varDecl().bind("vardecl"));
+  auto var_decl_matcher =
+      findAll(varDecl(unless(parmVarDecl())).bind("vardecl"));
+  // FIXME
+  auto assign_matcher = findAll(
+      binaryOperator(hasOperatorName("="),
+                     hasLHS(declRefExpr(to(varDecl().bind("rhs_vardecl")))))
+          .bind("assignment"));
+
   MatchFinder Finder;
-  Finder.addMatcher(anotherMatcher, &Callback);
+  LifetimeAnnotationsProcessor Callback(&state_);
+  Finder.addMatcher(var_decl_matcher, &Callback);
+  Finder.addMatcher(assign_matcher, &Callback);
 
   Finder.match(*func, Context);
 
   // DEBUG
   // functionBody->dump();
+  // func->dump();
 }
 
 void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
