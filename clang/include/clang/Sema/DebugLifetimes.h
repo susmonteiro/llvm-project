@@ -8,6 +8,7 @@
 #include "clang/AST/Attrs.inc"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/DenseSet.h"
 
 // TODO delete this file
 
@@ -17,6 +18,9 @@ void debugLifetimes(std::string txt, int i);
 void debugLifetimes(llvm::SmallVector<const clang::Expr*> vec);
 void debugLifetimes(llvm::SmallVector<const clang::Attr*> vec);
 void debugLifetimes(llvm::SmallVector<std::string> vec);
+void debugLifetimes(std::vector<const clang::NamedDecl*> vec);
+void debugLifetimes(llvm::DenseSet<const clang::NamedDecl*> vec);
+void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::NamedDecl *>> m);
 
 void debugInfo(std::string txt);
 void debugWarn(std::string txt);

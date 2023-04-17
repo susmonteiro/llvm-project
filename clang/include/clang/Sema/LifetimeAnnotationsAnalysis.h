@@ -17,16 +17,16 @@
 
 namespace clang {
 
-using VariableLifetimes = llvm::DenseMap<const clang::VarDecl *, Lifetime>;
+using VariableLifetimes = llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
 using Dependencies =
-    llvm::DenseMap<const clang::VarDecl *, std::vector<const clang::VarDecl *>>;
+    llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::NamedDecl *>>;
 
 // TODO refactor this (copy from FunctionLifetimes)
 
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
  public:
-  LifetimeAnnotationsAnalysis();
+  LifetimeAnnotationsAnalysis() {}
   LifetimeAnnotationsAnalysis(
       llvm::DenseMap<const clang::ParmVarDecl *, Lifetime> params_lifetimes) {
     for (auto &pair : params_lifetimes) {
@@ -46,6 +46,8 @@ class LifetimeAnnotationsAnalysis {
 
   VariableLifetimes GetVariableLifetimes() { return variable_lifetimes_; }
 
+  Dependencies& GetDependencies() { return dependencies_; }
+
   Lifetime &GetLifetime(const clang::VarDecl *var_decl) {
     VariableLifetimes::iterator it = variable_lifetimes_.find(var_decl);
     if (it == variable_lifetimes_.end()) {
@@ -64,8 +66,12 @@ class LifetimeAnnotationsAnalysis {
     variable_lifetimes_[var_decl] = Lifetime(lifetime);
   }
 
-  void CreateDependency(const clang::VarDecl *var_decl);
+  void CreateDependency(const clang::VarDecl *from, const clang::DeclRefExpr *to);
 
+  Dependencies TransposeDependencies() const;
+  std::vector<const clang::NamedDecl*> InitializeWorklist() const;
+
+  
   // llvm::DenseSet<char> GetDefinedLifetimes() { return lifetimes_id_set_; }
 
   // Lifetime GetReturnLifetimes() { return return_lifetime_; }
@@ -108,6 +114,14 @@ class LifetimeAnnotationsAnalysis {
     for (const auto &pair : variable_lifetimes_) {
       str += pair.first->getNameAsString() + ": " +
              pair.second.getLifetimeName() + '\n';
+    }
+    str += ">> dependencies_\n";
+    for (const auto &pair : dependencies_) {
+      str += pair.first->getNameAsString() + ": ";
+      for (const auto &var : pair.second) {
+        str += var->getNameAsString() + ' ';
+      }
+      str += '\n';
     }
     // TODO dependencies
     return str;

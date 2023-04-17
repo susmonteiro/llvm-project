@@ -51,7 +51,7 @@ std::string Lifetime::getLifetimeName() const {
       return "local";
       break;
     default:
-      if (id_ > 0) return std::string(1, id_ + 'a'); 
+      if (id_ >= 0) return std::string(1, id_ + 'a'); 
       // TODO error
       else return "error";
   }

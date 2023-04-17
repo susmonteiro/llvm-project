@@ -32,6 +32,32 @@ void debugLifetimes(llvm::SmallVector<std::string> vec) {
   }
 }
 
+void debugLifetimes(std::vector<const clang::NamedDecl*> vec) {
+  for (const auto &el : vec) {
+    debugLifetimes(el->getNameAsString());
+  }
+}
+
+void debugLifetimes(llvm::DenseSet<const clang::NamedDecl*> vec) {
+  for (const auto &el : vec) {
+    debugLifetimes(el->getNameAsString());
+  }
+}
+
+
+void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::NamedDecl*>> m) {
+  std::string res;
+  for (const auto &pair : m) {
+    res += "Dependencies of " + pair.first->getNameAsString() + ": ";
+    for (const auto &var : pair.second) {
+      res += var->getNameAsString() + ' ';
+    }
+    res += '\n';
+  }
+  debugLifetimes(res);
+}
+
+
 void debugInfo(std::string txt) { std::cout << "\033[1;34m" << txt << "\033[0m\n"; }
 void debugWarn(std::string txt) { std::cout << "\033[1;31m" << txt << "\033[0m\n"; }
 

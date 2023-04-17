@@ -26,11 +26,13 @@ using namespace ast_matchers;
 namespace {
 class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
  public:
-  LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state, FunctionLifetimes *func_info)
+  LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state,
+                               FunctionLifetimes *func_info)
       : state_(state), func_info_(func_info) {}
 
  private:
   void VisitVarDecl(const clang::VarDecl *var_decl);
+  void VisitCallExpr(const clang::CallExpr *call_expr);
   void VisitAssignment(const clang::BinaryOperator *bin_op);
 
   void run(const ast_matchers::MatchFinder::MatchResult &Result) override;
@@ -39,10 +41,11 @@ class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
   FunctionLifetimes *func_info_;
 };
 
-}
+}  // namespace
 
 // TODO change to not void
-void GetExprObjectSet(const clang::Expr *expr, LifetimeAnnotationsAnalysis *state) {
+void GetExprObjectSet(const clang::Expr *expr,
+                      LifetimeAnnotationsAnalysis *state) {
   // We can't handle `ParenExpr`s like other `Expr`s because the CFG doesn't
   // contain `CFGStmt`s for them. Instead, if we encounter a `ParenExpr` here,
   // we simply return the object set for its subexpression.
@@ -55,7 +58,7 @@ void GetExprObjectSet(const clang::Expr *expr, LifetimeAnnotationsAnalysis *stat
          expr->getType()->isBuiltinType());
 
   // TODO implement this better
-  
+
   // const auto &variable_lifetimes = state->GetVariableLifetimes();
   // auto iter = variable_lifetimes.find(expr);
   // if (iter == variable_lifetimes.end()) {
@@ -77,18 +80,25 @@ void LifetimeAnnotationsProcessor::VisitVarDecl(
   // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
   // VisitCallExpr().
   // If the variable of the LHS has a lifetime annotation, don't process RHS
-  if (var_decl->hasInit() && !var_decl->getType()->isRecordType() && state_->GetLifetime(var_decl).IsUnset()) {
+  if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
+      state_->GetLifetime(var_decl).IsUnset()) {
     debugLifetimes("VarDecl has initializer!");
     const clang::Expr *init_expr = var_decl->getInit();
 
-    state_->CreateDependency(var_decl);
     GetExprObjectSet(init_expr, state_);
-    if (const clang::DeclRefExpr *rhs = dyn_cast<clang::DeclRefExpr>(init_expr)) {
+    if (const clang::DeclRefExpr *rhs =
+            dyn_cast<clang::DeclRefExpr>(init_expr)) {
       debugLifetimes("RHS is a DeclRefExpr");
+      state_->CreateDependency(var_decl, rhs);
     }
     // TODO implement
   }
   // return std::nullopt;
+}
+
+void LifetimeAnnotationsProcessor::VisitCallExpr(
+    const clang::CallExpr *call_expr) {
+  debugLifetimes("[VisitCallExpr]");
 }
 
 void LifetimeAnnotationsProcessor::VisitAssignment(
@@ -100,14 +110,17 @@ void LifetimeAnnotationsProcessor::VisitAssignment(
 void LifetimeAnnotationsProcessor::run(
     const ast_matchers::MatchFinder::MatchResult &Result) {
   // DEBUG
-  // debugInfo("On run...");
+  debugInfo("On run...");
   if (const auto *var_decl =
           Result.Nodes.getNodeAs<clang::VarDecl>("var_decl")) {
     VisitVarDecl(var_decl);
     return;
   }
-  if (const auto *parm_decl = Result.Nodes.getNodeAs<clang::ParmVarDecl>("parm_decl")) {
 
+  if (const auto *call_expr =
+          Result.Nodes.getNodeAs<clang::CallExpr>("call_expr")) {
+    VisitCallExpr(call_expr);
+    return;
   }
 
   if (const auto *assignment =
@@ -115,6 +128,7 @@ void LifetimeAnnotationsProcessor::run(
     VisitAssignment(assignment);
     return;
   }
+  debugWarn("Matched something with no visit function");
 }
 
 }  // namespace
@@ -123,21 +137,27 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::Stmt *functionBody, clang::ASTContext &Context,
     const clang::FunctionDecl *func, FunctionLifetimes &func_info) {
   debugLifetimes("[GetLifetimeDependencies]");
+  auto expr_matcher = findAll(expr());
   auto var_decl_matcher =
       findAll(varDecl(unless(parmVarDecl())).bind("var_decl"));
-      // TODO maybe in same matcher
-  auto parm_decl_matcher = findAll(parmVarDecl().bind("parm_decl"));
+
+  auto call_expr_matcher = findAll(callExpr().bind("call_expr"));
+
   // FIXME
-  auto assign_matcher = findAll(
-      binaryOperator(hasOperatorName("="),
-                     hasLHS(declRefExpr(to(varDecl().bind("rhs_vardecl")))))
-          .bind("assignment"));
+  // auto assign_matcher = findAll(
+  //     binaryOperator(hasOperatorName("="),
+  //                    hasLHS(declRefExpr(to(varDecl().bind("rhs_vardecl")))))
+  //         .bind("assignment"));
+  auto assign_matcher = binaryOperator();
 
   MatchFinder Finder;
   LifetimeAnnotationsProcessor Callback(&state_, &func_info);
   Finder.addMatcher(var_decl_matcher, &Callback);
-  Finder.addMatcher(parm_decl_matcher, &Callback);
+  Finder.addMatcher(call_expr_matcher, &Callback);
   Finder.addMatcher(assign_matcher, &Callback);
+  Finder.addMatcher(expr_matcher, &Callback);
+
+  // func->dump();
 
   Finder.match(*func, Context);
 
@@ -156,9 +176,8 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   clang::ASTContext &Context = func->getASTContext();
   state_ = LifetimeAnnotationsAnalysis(function_info.GetParamsLifetimes());
 
-  // TODO create new state for the new function 
+  // TODO create new state for the new function
   // TODO copy the lifetimes of the parameters to the new state
-
 
   // step 1
   GetLifetimeDependencies(function_body, Context, func, function_info);
@@ -175,10 +194,42 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   LifetimeAnnotationsChecker::CheckLifetimes();
 }
 
+// After capturing lifetimes from the function, apply the fixed point
+// algorithm
 void LifetimeAnnotationsChecker::PropagateLifetimes() {
+  auto children = state_.GetDependencies();
+  auto parents = std::move(state_.TransposeDependencies());
+
+  debugLifetimes("=== dependencies_ ===");
+  debugLifetimes(children);
+
+  debugLifetimes("=== parents (transposed) ===");
+  debugLifetimes(parents);
+
+  auto worklist = state_.InitializeWorklist();
+
+  debugLifetimes("=== worklist ===");
+  debugLifetimes(worklist);
+
+  while (!worklist.empty()) {
+    auto &el = worklist.back();
+    worklist.pop_back();
+    // TODO duplicates?
+    llvm::DenseSet<const clang::NamedDecl *> result = {el};
+    for (const auto &child : children[el]) {
+      if (child == el) continue;
+      result.insert(children[child].begin(), children[child].end());
+    }
+    if (children[el].size() != result.size()) {
+      children[el] = result;
+      for (const auto &parent : parents[el]) worklist.emplace_back(parent);
+    }
+    debugLifetimes("\nPropagation of", el->getNameAsString());
+    debugLifetimes("=== dependencies_ ===");
+    debugLifetimes(children[el]);
+  }
+  // return children;
   // TODO
-  // After capturing lifetimes from the function, apply the fixed point
-  // algorithm
 }
 
 void LifetimeAnnotationsChecker::CheckLifetimes() {
