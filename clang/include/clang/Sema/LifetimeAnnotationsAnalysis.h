@@ -26,6 +26,7 @@ using Dependencies =
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
  public:
+  LifetimeAnnotationsAnalysis();
   LifetimeAnnotationsAnalysis(
       llvm::DenseMap<const clang::ParmVarDecl *, Lifetime> params_lifetimes) {
     for (auto &pair : params_lifetimes) {
