@@ -137,7 +137,7 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::Stmt *functionBody, clang::ASTContext &Context,
     const clang::FunctionDecl *func, FunctionLifetimes &func_info) {
   debugLifetimes("[GetLifetimeDependencies]");
-  auto expr_matcher = findAll(expr());
+  // auto expr_matcher = findAll(expr());
   auto var_decl_matcher =
       findAll(varDecl(unless(parmVarDecl())).bind("var_decl"));
 
@@ -155,11 +155,14 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
   Finder.addMatcher(var_decl_matcher, &Callback);
   Finder.addMatcher(call_expr_matcher, &Callback);
   Finder.addMatcher(assign_matcher, &Callback);
-  Finder.addMatcher(expr_matcher, &Callback);
+  // Finder.addMatcher(expr_matcher, &Callback);
 
   // func->dump();
-
+  // decls need func
   Finder.match(*func, Context);
+  // exprs need functionBody
+  Finder.match(*functionBody, Context);
+  // FIXME operators?
 
   // DEBUG
   // functionBody->dump();
