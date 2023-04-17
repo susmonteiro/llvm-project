@@ -148,7 +148,8 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
   //     binaryOperator(hasOperatorName("="),
   //                    hasLHS(declRefExpr(to(varDecl().bind("rhs_vardecl")))))
   //         .bind("assignment"));
-  auto assign_matcher = binaryOperator();
+  // TODO try on a matcher which receives func->getCompoundStmt()
+  auto assign_matcher = compoundStmt(hasDescendant(binaryOperator()));
 
   MatchFinder Finder;
   LifetimeAnnotationsProcessor Callback(&state_, &func_info);
