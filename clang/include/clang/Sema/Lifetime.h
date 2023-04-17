@@ -11,11 +11,16 @@ namespace clang {
 class Lifetime {
  public:
   Lifetime();
-
+  Lifetime(const Lifetime &other) : id_(other.Id()) {}
   Lifetime(llvm::StringRef name);
+  
+  Lifetime& operator=(const Lifetime &other) {
+    id_ = other.Id();
+    return *this;
+  }
 
   // Returns whether this lifetime is valid
-  bool IsInvalid() const;
+  bool IsUnset() const;
 
   // Returns whether this lifetime is a static lifetime.
   bool IsStatic() const;

@@ -26,8 +26,8 @@ using namespace ast_matchers;
 namespace {
 class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
  public:
-  LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state)
-      : state_(state) {}
+  LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state, FunctionLifetimes *func_info)
+      : state_(state), func_info_(func_info) {}
 
  private:
   void VisitVarDecl(const clang::VarDecl *var_decl);
@@ -36,7 +36,35 @@ class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
   void run(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
   LifetimeAnnotationsAnalysis *state_;
+  FunctionLifetimes *func_info_;
 };
+
+}
+
+// TODO change to not void
+void GetExprObjectSet(const clang::Expr *expr, LifetimeAnnotationsAnalysis *state) {
+  // We can't handle `ParenExpr`s like other `Expr`s because the CFG doesn't
+  // contain `CFGStmt`s for them. Instead, if we encounter a `ParenExpr` here,
+  // we simply return the object set for its subexpression.
+  if (auto paren = clang::dyn_cast<clang::ParenExpr>(expr)) {
+    expr = paren->getSubExpr();
+  }
+
+  assert(expr->isGLValue() || expr->getType()->isPointerType() ||
+         expr->getType()->isArrayType() || expr->getType()->isFunctionType() ||
+         expr->getType()->isBuiltinType());
+
+  // TODO implement this better
+  
+  // const auto &variable_lifetimes = state->GetVariableLifetimes();
+  // auto iter = variable_lifetimes.find(expr);
+  // if (iter == variable_lifetimes.end()) {
+  //   // TODO error?
+  // }
+  // return iter->second();
+}
+
+namespace {
 
 void LifetimeAnnotationsProcessor::VisitVarDecl(
     const clang::VarDecl *var_decl) {
@@ -48,9 +76,16 @@ void LifetimeAnnotationsProcessor::VisitVarDecl(
   // Don't need to record initializers because initialization has already
   // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
   // VisitCallExpr().
-  if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
+  // If the variable of the LHS has a lifetime annotation, don't process RHS
+  if (var_decl->hasInit() && !var_decl->getType()->isRecordType() && state_->GetLifetime(var_decl).IsUnset()) {
     debugLifetimes("VarDecl has initializer!");
+    const clang::Expr *init_expr = var_decl->getInit();
+
     state_->CreateDependency(var_decl);
+    GetExprObjectSet(init_expr, state_);
+    if (const clang::DeclRefExpr *rhs = dyn_cast<clang::DeclRefExpr>(init_expr)) {
+      debugLifetimes("RHS is a DeclRefExpr");
+    }
     // TODO implement
   }
   // return std::nullopt;
@@ -67,9 +102,12 @@ void LifetimeAnnotationsProcessor::run(
   // DEBUG
   // debugInfo("On run...");
   if (const auto *var_decl =
-          Result.Nodes.getNodeAs<clang::VarDecl>("vardecl")) {
+          Result.Nodes.getNodeAs<clang::VarDecl>("var_decl")) {
     VisitVarDecl(var_decl);
     return;
+  }
+  if (const auto *parm_decl = Result.Nodes.getNodeAs<clang::ParmVarDecl>("parm_decl")) {
+
   }
 
   if (const auto *assignment =
@@ -83,10 +121,12 @@ void LifetimeAnnotationsProcessor::run(
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::Stmt *functionBody, clang::ASTContext &Context,
-    const clang::FunctionDecl *func) {
+    const clang::FunctionDecl *func, FunctionLifetimes &func_info) {
   debugLifetimes("[GetLifetimeDependencies]");
   auto var_decl_matcher =
-      findAll(varDecl(unless(parmVarDecl())).bind("vardecl"));
+      findAll(varDecl(unless(parmVarDecl())).bind("var_decl"));
+      // TODO maybe in same matcher
+  auto parm_decl_matcher = findAll(parmVarDecl().bind("parm_decl"));
   // FIXME
   auto assign_matcher = findAll(
       binaryOperator(hasOperatorName("="),
@@ -94,8 +134,9 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
           .bind("assignment"));
 
   MatchFinder Finder;
-  LifetimeAnnotationsProcessor Callback(&state_);
+  LifetimeAnnotationsProcessor Callback(&state_, &func_info);
   Finder.addMatcher(var_decl_matcher, &Callback);
+  Finder.addMatcher(parm_decl_matcher, &Callback);
   Finder.addMatcher(assign_matcher, &Callback);
 
   Finder.match(*func, Context);
@@ -110,11 +151,17 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   // DEBUG
   // DumpFunctionInfo();
 
-  auto functionBody = func->getBody();
+  auto function_body = func->getBody();
+  auto function_info = function_info_[func];
   clang::ASTContext &Context = func->getASTContext();
+  state_ = LifetimeAnnotationsAnalysis(function_info.GetParamsLifetimes());
+
+  // TODO create new state for the new function 
+  // TODO copy the lifetimes of the parameters to the new state
+
 
   // step 1
-  GetLifetimeDependencies(functionBody, Context, func);
+  GetLifetimeDependencies(function_body, Context, func, function_info);
 
   debugLifetimes(state_.DebugString());
 
@@ -139,30 +186,6 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
   // With all the lifetime information acquired, check that the return
   // statements and the attributions are correct
 }
-
-// void LifetimeAnnotationsChecker::transfer(
-//     const clang::CFGElement &elt, LifetimeLattice &state,
-//     clang::dataflow::Environment & /*environment*/) {
-//   if (state.IsError())
-//     return;
-
-//   auto cfg_stmt = elt.getAs<clang::CFGStmt>();
-//   if (!cfg_stmt)
-//     return;
-//   auto stmt = cfg_stmt->getStmt();
-
-//   TransferStmtVisitor visitor(object_repository_, state.PointsTo(),
-//                               state.Constraints(),
-//                               state.SingleValuedObjects(), func_,
-//                               callee_lifetimes_, diag_reporter_);
-
-//   // * visitor pattern -> visit the specific function and handle different
-//   // * elements in each specific way
-//   if (std::optional<std::string> err =
-//           visitor.Visit(const_cast<clang::Stmt *>(stmt))) {
-//     state = LifetimeLattice(*err);
-//   }
-// }
 
 // TODO this is just an experience - delete or change this
 // void CheckReturnLifetime(const clang::FunctionDecl *func,

@@ -526,7 +526,8 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
       }
 
       clang::QualType param_type = type->getParamType(i);
-      clang::QualType param_pointee = PointeeType(param_type);
+      // TODO remove this?
+      // clang::QualType param_pointee = PointeeType(param_type);
       Lifetime tmp;
 
       // TODO check if this covers everything that should have a lifetime
@@ -546,7 +547,7 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
                   .moveInto(tmp)) {
         return std::move(err);
       }
-      ret.InsertParamLifetime(tmp);
+      ret.InsertParamLifetime(param, tmp);
     }
   }
 

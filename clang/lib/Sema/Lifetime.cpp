@@ -57,7 +57,7 @@ std::string Lifetime::getLifetimeName() const {
   }
 }
 
-bool Lifetime::IsInvalid() const { return id_ == UNSET; }
+bool Lifetime::IsUnset() const { return id_ == UNSET; }
 bool Lifetime::IsStatic() const { return id_ == STATIC; }
 bool Lifetime::IsLocal() const { return id_ == LOCAL; }
 void Lifetime::SetStatic() { id_ = STATIC; }

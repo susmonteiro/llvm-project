@@ -62,16 +62,15 @@ class FunctionLifetimes {
   FunctionLifetimes(int func_id) : func_id_(func_id) {}
   // * Returns lifetimes for the `i`-th parameter.
   // * These are the same number and order as FunctionDecl::parameters()
-  const Lifetime &GetParamLifetime(size_t i) const {
-    return params_lifetimes_[i];
-  }
 
   int Id() { return func_id_; }
 
   // Returns the number of function parameters (excluding the implicit `this).
-  size_t GetNumParams() const { return params_lifetimes_.size(); }
+  size_t GetNumParams() const { return params_.size(); }
 
-  std::vector<Lifetime> GetParamsLifetimes() { return params_lifetimes_; }
+  llvm::DenseMap<const clang::ParmVarDecl*, Lifetime> GetParamsLifetimes() const {
+    return params_lifetimes_;
+  }
 
   Lifetime GetReturnLifetime() { return return_lifetime_; }
   void SetReturnLifetime(Lifetime l) { return_lifetime_ = l; }
@@ -81,21 +80,24 @@ class FunctionLifetimes {
   //   return lifetimes_id_set_.find(l.Id()) != lifetimes_id_set_.end();
   // }
 
-  void InsertParamLifetime(Lifetime l) { params_lifetimes_.emplace_back(l); }
+  void InsertParamLifetime(const clang::ParmVarDecl *param, Lifetime l) { 
+    params_.emplace_back(param);
+    params_lifetimes_[param] = l;
+   }
 
   void DumpParameters() const {
     std::cout << "[FunctionLifetimes]: Parameters Lifetimes\n";
     int i = 0;
-    for (const auto &param : params_lifetimes_) {
+    for (const auto &pair: params_lifetimes_) {
       debugLifetimes("Parameter ", i++);
       debugLifetimes("Lifetime",
-                     param.IsInvalid() ? "none" : param.getLifetimeName());
+                     pair.second.IsUnset() ? "none" : pair.second.getLifetimeName());
     }
   }
 
   void DumpReturn() const {
     std::cout << "[FunctionLifetimes]: Return lifetimes\n";
-    debugLifetimes("Lifetime", return_lifetime_.IsInvalid()
+    debugLifetimes("Lifetime", return_lifetime_.IsUnset()
                                    ? "none"
                                    : return_lifetime_.getLifetimeName());
   }
@@ -110,7 +112,8 @@ class FunctionLifetimes {
   // stores param lifetimes in order
   // TODO choose
   // std::vector<MaybeLifetime> params_lifetimes_;
-  std::vector<Lifetime> params_lifetimes_;
+  std::vector<const clang::ParmVarDecl*> params_;
+  llvm::DenseMap<const clang::ParmVarDecl*, Lifetime> params_lifetimes_;
   Lifetime return_lifetime_;
   int func_id_;
 

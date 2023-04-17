@@ -26,6 +26,13 @@ using Dependencies =
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
  public:
+  LifetimeAnnotationsAnalysis(
+      llvm::DenseMap<const clang::ParmVarDecl *, Lifetime> params_lifetimes) {
+    for (auto &pair : params_lifetimes) {
+      variable_lifetimes_.insert({pair.first, pair.second});
+    }
+  }
+
   // TODO 2 options: remove or different structures for params and other vars
   // * Returns lifetimes for the `i`-th parameter.
   // * These are the same number and order as FunctionDecl::parameters()
@@ -36,11 +43,9 @@ class LifetimeAnnotationsAnalysis {
   // Returns the number of function parameters (excluding the implicit `this).
   // size_t GetNumParams() const { return param_lifetimes_.size(); }
 
-  VariableLifetimes GetVariableLifetimes() {
-    return variable_lifetimes_;
-  }
+  VariableLifetimes GetVariableLifetimes() { return variable_lifetimes_; }
 
-  Lifetime& GetLifetime(const clang::VarDecl *var_decl) {
+  Lifetime &GetLifetime(const clang::VarDecl *var_decl) {
     VariableLifetimes::iterator it = variable_lifetimes_.find(var_decl);
     if (it == variable_lifetimes_.end()) {
       // TODO error
@@ -52,6 +57,10 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateVariable(const clang::VarDecl *var_decl) {
     variable_lifetimes_[var_decl] = Lifetime();
+  }
+
+  void CreateVariable(const clang::VarDecl *var_decl, Lifetime lifetime) {
+    variable_lifetimes_[var_decl] = Lifetime(lifetime);
   }
 
   void CreateDependency(const clang::VarDecl *var_decl);
@@ -81,7 +90,7 @@ class LifetimeAnnotationsAnalysis {
 
   // void DumpReturn() const {
   //   std::cout << "[FunctionLifetimes]: Return lifetimes\n";
-  //   if (return_lifetime_.IsInvalid()) {
+  //   if (return_lifetime_.IsUnset()) {
   //     debugLifetimes("Return value has no lifetime");
   //   } else {
   //     debugLifetimes("Lifetime", return_lifetime_.getLifetimeName());
@@ -96,7 +105,8 @@ class LifetimeAnnotationsAnalysis {
     std::string str = "[LifetimeAnnotationsAnalysis]\n";
     str += ">> variable_lifetimes_\n";
     for (const auto &pair : variable_lifetimes_) {
-      str += pair.first->getNameAsString() + ": " + pair.second.getLifetimeName() + '\n';
+      str += pair.first->getNameAsString() + ": " +
+             pair.second.getLifetimeName() + '\n';
     }
     // TODO dependencies
     return str;
@@ -118,10 +128,11 @@ class LifetimeAnnotationsAnalysis {
   //       const FunctionLifetimeFactory &lifetime_factory);
 };
 
-  // friend std::ostream& operator<<(std::ostream& os, LifetimeAnnotationsAnalysis analysis) {
-  //   os << "[LifetimeAnnotationsAnalysis]\n";
-  //   os << ""
-  // }
+// friend std::ostream& operator<<(std::ostream& os, LifetimeAnnotationsAnalysis
+// analysis) {
+//   os << "[LifetimeAnnotationsAnalysis]\n";
+//   os << ""
+// }
 
 }  // namespace clang
 
