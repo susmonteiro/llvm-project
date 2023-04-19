@@ -275,7 +275,11 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
       if (child == el) continue;
       result.insert(children[child].begin(), children[child].end());
       auto tmp_lifetimes = state_.GetShortestLifetimes(child);
-      shortest_lifetimes.insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
+      if (state_.IsLifetimeNotset(child)) {
+        shortest_lifetimes.insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
+      } else {
+        shortest_lifetimes.insert(state_.GetLifetime(child)->Id());
+      }
       // TODO here we should insert in shortest lifetimes and not in
       // dependencies
       // - result = all shortest_lifetimes and actual lifetimes (from
@@ -293,7 +297,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
       // the main lifetime
       // - static? Probably nothing to do
     }
-    if (children[el] != result) {
+    if (children[el] != result || state_.GetShortestLifetimes(el) != shortest_lifetimes) {
       children[el].insert(result.begin(), result.end());
       state_.PropagateShortestLifetimes(el, shortest_lifetimes);
 
