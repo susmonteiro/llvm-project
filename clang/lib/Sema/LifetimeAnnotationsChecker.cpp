@@ -23,29 +23,30 @@ namespace clang {
 
 using namespace ast_matchers;
 
-namespace {
-class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
- public:
-  // TODO change from * to &
-  LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state,
-                               FunctionLifetimes *func_info)
-      : state_(state), func_info_(func_info) {}
+// === MATCHER ===
+// namespace {
+// class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
+//  public:
+//   // TODO change from * to &
+//   LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state,
+//                                FunctionLifetimes *func_info)
+//       : state_(state), func_info_(func_info) {}
 
- private:
-  // x = (p-q == 0) ? p : p;
-  void VisitExpr(const clang::Expr *expr,
-                 const clang::DeclRefExpr **decl_ref_expr);
-  void VisitVarDecl(const clang::VarDecl *var_decl);
-  void VisitCallExpr(const clang::CallExpr *call_expr);
-  void VisitAssignment(const clang::BinaryOperator *bin_op);
+//  private:
+//   // x = (p-q == 0) ? p : p;
+//   void VisitExpr(const clang::Expr *expr,
+//                  const clang::DeclRefExpr **decl_ref_expr);
+//   void VisitVarDecl(const clang::VarDecl *var_decl);
+//   void VisitCallExpr(const clang::CallExpr *call_expr);
+//   void VisitAssignment(const clang::BinaryOperator *bin_op);
 
-  void run(const ast_matchers::MatchFinder::MatchResult &Result) override;
+//   void run(const ast_matchers::MatchFinder::MatchResult &Result) override;
 
-  LifetimeAnnotationsAnalysis *state_;
-  FunctionLifetimes *func_info_;
-};
+//   LifetimeAnnotationsAnalysis *state_;
+//   FunctionLifetimes *func_info_;
+// };
 
-}  // namespace
+// }  // namespace
 
 // TODO change to not void
 void GetExprObjectSet(const clang::Expr *expr,
@@ -71,258 +72,6 @@ void GetExprObjectSet(const clang::Expr *expr,
   // return iter->second();
 }
 
-namespace {
-
-void LifetimeAnnotationsProcessor::VisitExpr(
-    const clang::Expr *expr,
-    const clang::DeclRefExpr **decl_ref_expr = nullptr) {
-  debugLifetimes("[VisitExpr]");
-  if (const clang::ImplicitCastExpr *implicit_cast_expr =
-          dyn_cast<clang::ImplicitCastExpr>(expr)) {
-    // debugLifetimes("Is implicit cast");
-    // implicit_cast_expr->dump();
-    const auto &children = implicit_cast_expr->children();
-    for (const auto &child : children) {
-      // debugLifetimes("This is a child of implicit_cast");
-      // child->dump();
-      if (const clang::DeclRefExpr *decl =
-              dyn_cast<clang::DeclRefExpr>(child)) {
-        // debugLifetimes("Is declRefExpr");
-        *decl_ref_expr = decl;
-        return;
-      }
-    }
-  }
-}
-
-void LifetimeAnnotationsProcessor::VisitVarDecl(
-    const clang::VarDecl *var_decl) {
-  debugLifetimes("[VisitVarDecl]", var_decl->getNameAsString());
-  // TODO check if pointer?
-  state_->CreateVariable(var_decl);
-  // TODO if annotations, store annotation
-
-  // Don't need to record initializers because initialization has already
-  // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
-  // VisitCallExpr().
-  // If the variable of the LHS has a lifetime annotation, don't process RHS
-  if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
-      state_->IsLifetimeNotset(var_decl)) {
-    debugLifetimes("VarDecl has initializer!");
-    const clang::Expr *init_expr = var_decl->getInit();
-
-    // debugLifetimes("Dump init expr");
-    // init_expr->dump();
-
-    const clang::DeclRefExpr *decl_ref_expr = nullptr;
-    VisitExpr(init_expr, &decl_ref_expr);
-
-    if (decl_ref_expr != nullptr) {
-      // debugLifetimes("RHS is a DeclRefExpr");
-      state_->CreateDependency(var_decl, decl_ref_expr);
-      // ! old
-      // const auto &rhs_decl = decl_ref_expr->getDecl();
-      // if (state_->IsLifetimeNotset(rhs_decl)) {
-      //   state_->CreateDependency(var_decl, decl_ref_expr);
-      // } else {
-      //   Lifetime *rhs_lifetime = state_->GetLifetime(rhs_decl);
-      //   state_->InsertShortestLifetimes(var_decl, rhs_lifetime);
-      // }
-    }
-
-    GetExprObjectSet(init_expr, state_);
-    // TODO implement
-  }
-  // return std::nullopt;
-}
-
-void LifetimeAnnotationsProcessor::VisitCallExpr(
-    const clang::CallExpr *call_expr) {
-  debugLifetimes("[VisitCallExpr]");
-}
-
-void LifetimeAnnotationsProcessor::VisitAssignment(
-    const clang::BinaryOperator *bin_op) {
-  debugLifetimes("[VisitAssignment]");
-  bin_op->dump();
-}
-
-void LifetimeAnnotationsProcessor::run(
-    const ast_matchers::MatchFinder::MatchResult &Result) {
-  // DEBUG
-  // debugInfo("On run...");
-  if (const auto *var_decl =
-          Result.Nodes.getNodeAs<clang::VarDecl>("var_decl")) {
-    VisitVarDecl(var_decl);
-    return;
-  }
-
-  if (const auto *call_expr =
-          Result.Nodes.getNodeAs<clang::CallExpr>("call_expr")) {
-    VisitCallExpr(call_expr);
-    return;
-  }
-
-  if (const auto *assignment =
-          Result.Nodes.getNodeAs<clang::BinaryOperator>("assignment")) {
-    VisitAssignment(assignment);
-    return;
-  }
-  debugWarn("Matched something with no visit function");
-}
-
-}  // namespace
-
-void LifetimeAnnotationsChecker::GetLifetimeDependencies(
-    const clang::Stmt *functionBody, clang::ASTContext &Context,
-    const clang::FunctionDecl *func, FunctionLifetimes &func_info) {
-  debugLifetimes("[GetLifetimeDependencies]");
-  // auto expr_matcher = findAll(expr());
-  auto var_decl_matcher = findAll(
-      varDecl(
-          unless(
-              parmVarDecl()) /* , hasInitializer(expr().bind("initializer")) */)
-          .bind("var_decl"));
-
-  auto call_expr_matcher = findAll(callExpr().bind("call_expr"));
-
-  // FIXME
-  // auto assign_matcher = findAll(
-  //     binaryOperator(hasOperatorName("="),
-  //                    hasLHS(declRefExpr(to(varDecl().bind("rhs_vardecl")))))
-  //         .bind("assignment"));
-  // TODO try on a matcher which receives func->getCompoundStmt()
-  // auto assign_matcher =
-  // compoundStmt(eachOf(binaryOperator().bind("assignment")));
-  auto assign_matcher = binaryOperator().bind("assignment");
-
-  MatchFinder Finder;
-  LifetimeAnnotationsProcessor Callback(&state_, &func_info);
-  Finder.addMatcher(var_decl_matcher, &Callback);
-  Finder.addMatcher(call_expr_matcher, &Callback);
-  Finder.addMatcher(assign_matcher, &Callback);
-  // Finder.addMatcher(expr_matcher, &Callback);
-
-  // func->dump();
-  // decls need func
-  Finder.match(*func, Context);
-  // exprs need functionBody
-  Finder.match(*functionBody, Context);
-  // FIXME operators?
-
-  // DEBUG
-  // functionBody->dump();
-  // func->dump();
-}
-
-void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
-                                                     Sema &S) {
-  // DEBUG
-  // DumpFunctionInfo();
-
-  auto function_body = func->getBody();
-  auto function_info = function_info_[func];
-  clang::ASTContext &Context = func->getASTContext();
-  state_ = LifetimeAnnotationsAnalysis(function_info.GetParamsLifetimes());
-
-  // step 1
-  debugInfo("\n====== START STEP 1 ======\n");
-
-  GetLifetimeDependencies(function_body, Context, func, function_info);
-
-  debugInfo("\n====== FINISH STEP 1 ======\n");
-  debugLifetimes(state_.DebugString());
-
-  // clang::SourceManager &source_manager = ast_context.getSourceManager();
-  // clang::SourceRange func_source_range = func->getSourceRange();
-
-  // step 2
-  debugInfo("\n====== START STEP 2 ======\n");
-  LifetimeAnnotationsChecker::PropagateLifetimes();
-  debugInfo("\n====== FINISH STEP 2 ======\n");
-  debugLifetimes(state_.DebugString());
-
-  // step 3
-  debugInfo("\n====== START STEP 3 ======\n");
-  LifetimeAnnotationsChecker::CheckLifetimes();
-  debugInfo("\n====== FINISH STEP 3 ======\n");
-}
-
-// After capturing lifetimes from the function, apply the fixed point
-// algorithm
-void LifetimeAnnotationsChecker::PropagateLifetimes() {
-  auto children = state_.GetDependencies();
-  auto parents = std::move(state_.TransposeDependencies());
-
-  debugLifetimes("=== dependencies_ ===");
-  debugLifetimes(children);
-
-  debugLifetimes("=== parents (transposed) ===");
-  debugLifetimes(parents);
-
-  auto worklist = state_.InitializeWorklist();
-
-  while (!worklist.empty()) {
-    debugLifetimes("=== worklist ===");
-    debugLifetimes(worklist);
-
-    auto &el = worklist.back();
-    worklist.pop_back();
-
-    llvm::DenseSet<const clang::NamedDecl *> result = {el};
-    llvm::DenseSet<char> shortest_lifetimes;
-    for (const auto &child : children[el]) {
-      if (child == el) continue;
-      result.insert(children[child].begin(), children[child].end());
-      auto tmp_lifetimes = state_.GetShortestLifetimes(child);
-      if (state_.IsLifetimeNotset(child)) {
-        shortest_lifetimes.insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
-      } else {
-        shortest_lifetimes.insert(state_.GetLifetime(child)->Id());
-      }
-    }
-    if (children[el] != result ||
-        state_.GetShortestLifetimes(el) != shortest_lifetimes) {
-      children[el].insert(result.begin(), result.end());
-      state_.PropagateShortestLifetimes(el, shortest_lifetimes);
-
-      for (const auto &parent : parents[el]) {
-        worklist.emplace_back(parent);
-      }
-    }
-    debugLifetimes("\nPropagation of", el->getNameAsString());
-    debugLifetimes("=== children ===");
-    debugLifetimes(children);
-  }
-  // return children;
-
-  state_.SetDependencies(children);
-
-  // TODO
-  debugLifetimes("=== state_.dependencies_ ===");
-  debugLifetimes(state_.GetDependencies());
-
-  // ! if a Lifetime is unset and has no shortest_lifetimes, do nothing
-  // ! if a lifetime is local, then set el to local
-  // ! if a lifetime is static, then include it in el
-  // ! if a lifetime has id_, then skip shortest_lifetimes
-  // TODO at the end of the cycle
-  // - check if id is local and if so skip next steps
-  // - check if a variable has only one "shortest_lifetimes" and set it to
-  // the main lifetime
-  // - static? Probably nothing to do
-
-  // finally, process the lifetimes dependencies to attribute the correct set of
-  // lifetimes to each variable
-  // state_.ProcessVarLifetimes();
-}
-
-void LifetimeAnnotationsChecker::CheckLifetimes() {
-  // TODO
-  // With all the lifetime information acquired, check that the return
-  // statements and the attributions are correct
-}
-
 // TODO this is just an experience - delete or change this
 // void CheckReturnLifetime(const clang::FunctionDecl *func,
 //                          FunctionLifetimes &function_lifetimes, Sema &S) {
@@ -337,6 +86,153 @@ void LifetimeAnnotationsChecker::CheckLifetimes() {
 //         << func->getSourceRange();
 // }
 
+// === MATCHER ===
+// namespace {
+
+// void LifetimeAnnotationsProcessor::VisitExpr(
+//     const clang::Expr *expr,
+//     const clang::DeclRefExpr **decl_ref_expr = nullptr) {
+//   debugLifetimes("[VisitExpr]");
+//   if (const clang::ImplicitCastExpr *implicit_cast_expr =
+//           dyn_cast<clang::ImplicitCastExpr>(expr)) {
+//     // debugLifetimes("Is implicit cast");
+//     // implicit_cast_expr->dump();
+//     const auto &children = implicit_cast_expr->children();
+//     for (const auto &child : children) {
+//       // debugLifetimes("This is a child of implicit_cast");
+//       // child->dump();
+//       if (const clang::DeclRefExpr *decl =
+//               dyn_cast<clang::DeclRefExpr>(child)) {
+//         // debugLifetimes("Is declRefExpr");
+//         *decl_ref_expr = decl;
+//         return;
+//       }
+//     }
+//   }
+// }
+
+// void LifetimeAnnotationsProcessor::VisitVarDecl(
+//     const clang::VarDecl *var_decl) {
+//   debugLifetimes("[VisitVarDecl]", var_decl->getNameAsString());
+//   // TODO check if pointer?
+//   state_->CreateVariable(var_decl);
+//   // TODO if annotations, store annotation
+
+//   // Don't need to record initializers because initialization has already
+//   // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
+//   // VisitCallExpr().
+//   // If the variable of the LHS has a lifetime annotation, don't process RHS
+//   if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
+//       state_->IsLifetimeNotset(var_decl)) {
+//     debugLifetimes("VarDecl has initializer!");
+//     const clang::Expr *init_expr = var_decl->getInit();
+
+//     // debugLifetimes("Dump init expr");
+//     // init_expr->dump();
+
+//     const clang::DeclRefExpr *decl_ref_expr = nullptr;
+//     VisitExpr(init_expr, &decl_ref_expr);
+
+//     if (decl_ref_expr != nullptr) {
+//       // debugLifetimes("RHS is a DeclRefExpr");
+//       state_->CreateDependency(var_decl, decl_ref_expr);
+//       // ! old
+//       // const auto &rhs_decl = decl_ref_expr->getDecl();
+//       // if (state_->IsLifetimeNotset(rhs_decl)) {
+//       //   state_->CreateDependency(var_decl, decl_ref_expr);
+//       // } else {
+//       //   Lifetime *rhs_lifetime = state_->GetLifetime(rhs_decl);
+//       //   state_->InsertShortestLifetimes(var_decl, rhs_lifetime);
+//       // }
+//     }
+
+//     GetExprObjectSet(init_expr, state_);
+//     // TODO implement
+//   }
+//   // return std::nullopt;
+// }
+
+// void LifetimeAnnotationsProcessor::VisitCallExpr(
+//     const clang::CallExpr *call_expr) {
+//   debugLifetimes("[VisitCallExpr]");
+// }
+
+// void LifetimeAnnotationsProcessor::VisitAssignment(
+//     const clang::BinaryOperator *bin_op) {
+//   debugLifetimes("[VisitAssignment]");
+//   bin_op->dump();
+// }
+
+// void LifetimeAnnotationsProcessor::run(
+//     const ast_matchers::MatchFinder::MatchResult &Result) {
+//   // DEBUG
+//   // debugInfo("On run...");
+//   if (const auto *var_decl =
+//           Result.Nodes.getNodeAs<clang::VarDecl>("var_decl")) {
+//     VisitVarDecl(var_decl);
+//     return;
+//   }
+
+//   if (const auto *call_expr =
+//           Result.Nodes.getNodeAs<clang::CallExpr>("call_expr")) {
+//     VisitCallExpr(call_expr);
+//     return;
+//   }
+
+//   if (const auto *assignment =
+//           Result.Nodes.getNodeAs<clang::BinaryOperator>("assignment")) {
+//     VisitAssignment(assignment);
+//     return;
+//   }
+//   debugWarn("Matched something with no visit function");
+// }
+
+// }  // namespace
+
+namespace {
+class TransferStmtVisitor
+    : public clang::StmtVisitor<TransferStmtVisitor,
+                                std::optional<std::string>> {
+ public:
+  TransferStmtVisitor(const clang::FunctionDecl *func) : func_(func) {}
+
+  std::optional<std::string> VisitExpr(const clang::Expr *expr);
+  std::optional<std::string> VisitBinaryOperator(
+      const clang::BinaryOperator *op);
+  std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
+
+ private:
+  const clang::FunctionDecl *func_;
+};
+
+}  // namespace
+
+namespace {
+
+std::optional<std::string> TransferStmtVisitor::VisitExpr(
+    const clang::Expr *expr) {
+  debugLifetimes("[VisitExpr] - VISITOR");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitBinaryOperator(
+    const clang::BinaryOperator *op) {
+  debugLifetimes("[VisitBinaryOperator] - VISITOR");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitStmt(
+    const clang::Stmt *stmt) {
+  debugLifetimes("[VisitStmt] - VISITOR");
+  // TODO
+  return std::nullopt;
+}
+
+}  // namespace
+
+// Process functions' headers
 void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
                                               Sema &S) {
   debugLifetimes("GetLifetimes of function", func->getNameAsString());
@@ -435,124 +331,167 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
   }
 }
 
-// namespace {
+// Process functions' bodies
+void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
+                                                     Sema &S) {
+  // DEBUG
+  // DumpFunctionInfo();
+  auto function_info = function_info_[func];
+  clang::ASTContext &Context = func->getASTContext();
+  state_ = LifetimeAnnotationsAnalysis(function_info.GetParamsLifetimes());
 
-// std::optional<std::string> TransferStmtVisitor::VisitExpr(
-//     const clang::Expr *expr) {
-//   debugLifetimes("[VisitExpr]");
-//   // TODO
-//   return std::nullopt;
-// }
+  // step 1
+  debugInfo("\n====== START STEP 1 ======\n");
 
-// std::optional<std::string> TransferStmtVisitor::VisitDeclRefExpr(
-//     const clang::DeclRefExpr *decl_ref) {
-//   debugLifetimes("[VisitDeclRefExpr]");
-//   // TODO
-//   return std::nullopt;
-// }
+  GetLifetimeDependencies(func, Context, function_info);
 
-// std::optional<std::string> TransferStmtVisitor::VisitStringLiteral(
-//     const clang::StringLiteral *strlit) {
-//   debugLifetimes("[VisitStringLiteral]");
-//   // TODO
-//   return std::nullopt;
-// }
+  debugInfo("\n====== FINISH STEP 1 ======\n");
+  debugLifetimes(state_.DebugString());
 
-// std::optional<std::string> TransferStmtVisitor::VisitCastExpr(
-//     const clang::CastExpr *cast) {
-//   debugLifetimes("[VisitCastExpr]");
-//   // TODO
-//   return std::nullopt;
-// }
+  // clang::SourceManager &source_manager = ast_context.getSourceManager();
+  // clang::SourceRange func_source_range = func->getSourceRange();
 
-// std::optional<std::string> TransferStmtVisitor::VisitReturnStmt(
-//     const clang::ReturnStmt *return_stmt) {
-//   debugLifetimes("[VisitReturnStmt]");
-//   // TODO
-//   return std::nullopt;
-// }
+  // step 2
+  debugInfo("\n====== START STEP 2 ======\n");
+  LifetimeAnnotationsChecker::PropagateLifetimes();
+  debugInfo("\n====== FINISH STEP 2 ======\n");
+  debugLifetimes(state_.DebugString());
 
-// std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
-//     const clang::DeclStmt *decl_stmt) {
-//   debugLifetimes("[VisitVarDecl]");
-//   decl_stmt->dump();
-//   return std::nullopt;
-// }
+  // step 3
+  debugInfo("\n====== START STEP 3 ======\n");
+  LifetimeAnnotationsChecker::CheckLifetimes();
+  debugInfo("\n====== FINISH STEP 3 ======\n");
+}
 
-// std::optional<std::string> TransferStmtVisitor::VisitUnaryOperator(
-//     const clang::UnaryOperator *op) {
-//   debugLifetimes("[VisitUnaryOperator]");
-//   // TODO
-//   return std::nullopt;
-// }
+void LifetimeAnnotationsChecker::GetLifetimeDependencies(
+    const clang::FunctionDecl *func, clang::ASTContext &Context,
+    FunctionLifetimes &func_info) {
+  debugLifetimes("[GetLifetimeDependencies]");
 
-// std::optional<std::string> TransferStmtVisitor::VisitArraySubscriptExpr(
-//     const clang::ArraySubscriptExpr *subscript) {
-//   debugLifetimes("[VisitArraySubscriptExpr]");
-//   // TODO
-//   return std::nullopt;
-// }
+  // === VISITOR ===
 
-// std::optional<std::string> TransferStmtVisitor::VisitBinaryOperator(
-//     const clang::BinaryOperator *op) {
-//   debugLifetimes("[VisitBinaryOperator]");
-//   // TODO
-//   return std::nullopt;
-// }
+  TransferStmtVisitor visitor(func);
 
-// std::optional<std::string> TransferStmtVisitor::VisitConditionalOperator(
-//     const clang::ConditionalOperator *op) {
-//   debugLifetimes("[VisitConditionalOperator]");
-//   // TODO
-//   return std::nullopt;
-// }
+  // debugLifetimes(">> Dumping function body before visit...");
+  // func->getBody()->dump();
+  
+  std::optional<std::string> err =
+      visitor.Visit(const_cast<clang::Stmt *>(func->getBody()));
 
-// std::optional<std::string> TransferStmtVisitor::VisitInitListExpr(
-//     const clang::InitListExpr *init_list) {
-//   debugLifetimes("[VisitInitListExpr]");
-//   // TODO
-//   return std::nullopt;
-// }
+  // === MATCHER ===
 
-// std::optional<std::string>
-// TransferStmtVisitor::VisitMaterializeTemporaryExpr(
-//     const clang::MaterializeTemporaryExpr *temporary_expr) {
-// debugLifetimes("[VisitMaterializeTemporaryExpr]");
-//   // TODO
-//   return std::nullopt;}
+  // auto expr_matcher = findAll(expr());
+  // auto var_decl_matcher = findAll(
+  //     varDecl(
+  //         unless(
+  //             parmVarDecl()) /* , hasInitializer(expr().bind("initializer"))
+  //             */)
+  //         .bind("var_decl"));
 
-// std::optional<std::string> TransferStmtVisitor::VisitMemberExpr(
-//     const clang::MemberExpr *member) {
-// debugLifetimes("[VisitMembersExpr]");
-//   // TODO
-//   return std::nullopt;}
+  // auto call_expr_matcher = findAll(callExpr().bind("call_expr"));
 
-// std::optional<std::string> TransferStmtVisitor::VisitCXXThisExpr(
-//     const clang::CXXThisExpr *this_expr) {
-// debugLifetimes("[VisitCXXThisExpr]");
-//   // TODO
-//   return std::nullopt;}
+  // FIXME
+  // auto assign_matcher = findAll(
+  //     binaryOperator(hasOperatorName("="),
+  //                    hasLHS(declRefExpr(to(varDecl().bind("rhs_vardecl")))))
+  //         .bind("assignment"));
+  // TODO try on a matcher which receives func->getCompoundStmt()
+  // auto assign_matcher =
+  // compoundStmt(eachOf(binaryOperator().bind("assignment")));
+  // auto assign_matcher = binaryOperator().bind("assignment");
 
-// std::optional<std::string> TransferStmtVisitor::VisitCallExpr(
-//     const clang::CallExpr *call) {
-// debugLifetimes("[VisitCallExpr]");
-//   // TODO
-//   return std::nullopt;}
+  // MatchFinder Finder;
+  // LifetimeAnnotationsProcessor Callback(&state_, &func_info);
+  // Finder.addMatcher(var_decl_matcher, &Callback);
+  // Finder.addMatcher(call_expr_matcher, &Callback);
+  // Finder.addMatcher(assign_matcher, &Callback);
+  // Finder.addMatcher(expr_matcher, &Callback);
 
-// std::optional<std::string> TransferStmtVisitor::VisitCXXConstructExpr(
-//     const clang::CXXConstructExpr *construct_expr) {
-//   debugLifetimes("[VisitCXXConstructExpr]");
-//   // TODO
-//   return std::nullopt;
-// }
+  // func->dump();
+  // decls need func
+  // Finder.match(*func, Context);
+  // exprs need functionBody
+  // Finder.match(*functionBody, Context);
+  // FIXME operators?
 
-//   // std::optional<std::string> TransferStmtVisitor::VisitStmt(const
-//   clang::Stmt *stmt) {
-//   //   debugLifetimes("[VisitStmt] - default?");
-//   //   // TODO
-//   //   return std::nullopt;
-//   // }
+  // DEBUG
+  // functionBody->dump();
+  // func->dump();
+}
 
-// }  // namespace
+// After capturing lifetimes from the function, apply the fixed point
+// algorithm
+void LifetimeAnnotationsChecker::PropagateLifetimes() {
+  auto children = state_.GetDependencies();
+  auto parents = std::move(state_.TransposeDependencies());
+
+  debugLifetimes("=== dependencies_ ===");
+  debugLifetimes(children);
+
+  debugLifetimes("=== parents (transposed) ===");
+  debugLifetimes(parents);
+
+  auto worklist = state_.InitializeWorklist();
+
+  while (!worklist.empty()) {
+    debugLifetimes("=== worklist ===");
+    debugLifetimes(worklist);
+
+    auto &el = worklist.back();
+    worklist.pop_back();
+
+    llvm::DenseSet<const clang::NamedDecl *> result = {el};
+    llvm::DenseSet<char> shortest_lifetimes;
+    for (const auto &child : children[el]) {
+      if (child == el) continue;
+      result.insert(children[child].begin(), children[child].end());
+      auto tmp_lifetimes = state_.GetShortestLifetimes(child);
+      if (state_.IsLifetimeNotset(child)) {
+        shortest_lifetimes.insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
+      } else {
+        shortest_lifetimes.insert(state_.GetLifetime(child)->Id());
+      }
+    }
+    if (children[el] != result ||
+        state_.GetShortestLifetimes(el) != shortest_lifetimes) {
+      children[el].insert(result.begin(), result.end());
+      state_.PropagateShortestLifetimes(el, shortest_lifetimes);
+
+      for (const auto &parent : parents[el]) {
+        worklist.emplace_back(parent);
+      }
+    }
+    debugLifetimes("\nPropagation of", el->getNameAsString());
+    debugLifetimes("=== children ===");
+    debugLifetimes(children);
+  }
+  // return children;
+
+  state_.SetDependencies(children);
+
+  // TODO
+  debugLifetimes("=== state_.dependencies_ ===");
+  debugLifetimes(state_.GetDependencies());
+
+  // ! if a Lifetime is unset and has no shortest_lifetimes, do nothing
+  // ! if a lifetime is local, then set el to local
+  // ! if a lifetime is static, then include it in el
+  // ! if a lifetime has id_, then skip shortest_lifetimes
+  // TODO at the end of the cycle
+  // - check if id is local and if so skip next steps
+  // - check if a variable has only one "shortest_lifetimes" and set it to
+  // the main lifetime
+  // - static? Probably nothing to do
+
+  // finally, process the lifetimes dependencies to attribute the correct set of
+  // lifetimes to each variable
+  // state_.ProcessVarLifetimes();
+}
+
+// With all the lifetime information acquired, check that the return
+// statements and the attributions are correct
+void LifetimeAnnotationsChecker::CheckLifetimes() {
+  // TODO
+}
 
 }  // namespace clang

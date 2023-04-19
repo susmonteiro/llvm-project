@@ -41,7 +41,7 @@ class Lifetime {
 
   std::string DebugString() const {
     std::string res;
-    res += "[Lifetime]: " + GetLifetimeName() + "; ";
+    res += "[Lifetime] -> " + GetLifetimeName() + "; ";
     if (IsNotSet()) {
       res += "Shortest Lifetimes of this variable: { ";
       for (char l : shortest_lifetimes_) {
