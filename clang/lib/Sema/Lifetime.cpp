@@ -9,7 +9,7 @@
 
 namespace clang {
 
-constexpr char UNSET = -1;
+constexpr char NOTSET = -1;
 constexpr char STATIC = -2;
 constexpr char LOCAL = -3;
 constexpr char INVALID_ID_TOMBSTONE = -4;
@@ -18,7 +18,7 @@ constexpr char TODO = 100;
 constexpr llvm::StringRef STATIC_NAME = "static";
 constexpr llvm::StringRef LOCAL_NAME = "local";
 
-Lifetime::Lifetime() : id_(UNSET) {}
+Lifetime::Lifetime() : id_(NOTSET) {}
 
 Lifetime::Lifetime(char id) : id_(id) {}
 
@@ -37,12 +37,12 @@ Lifetime::Lifetime(llvm::StringRef name) {
   }
 }
 
-std::string Lifetime::getLifetimeName() const {
-  switch(id_) {
-    case UNSET:
+std::string Lifetime::GetLifetimeName(char id) const {
+  switch(id) {
+    case NOTSET:
     case INVALID_ID_TOMBSTONE:
     case TODO:
-      return "unset";
+      return "not-set";
       break;
     case STATIC:
       return "static";
@@ -51,19 +51,19 @@ std::string Lifetime::getLifetimeName() const {
       return "local";
       break;
     default:
-      if (id_ >= 0) return std::string(1, id_ + 'a'); 
+      if (id >= 0 && id <= 25) return std::string(1, id + 'a'); 
       // TODO error
       else return "error";
   }
 }
 
-bool Lifetime::IsUnset() const { return id_ == UNSET; }
+bool Lifetime::IsNotSet() const { return id_ == NOTSET; }
 bool Lifetime::IsStatic() const { return id_ == STATIC; }
 bool Lifetime::IsLocal() const { return id_ == LOCAL; }
 void Lifetime::SetStatic() { id_ = STATIC; }
 void Lifetime::SetLocal() { id_ = LOCAL; }
 
-Lifetime Lifetime::InvalidEmpty() { return Lifetime(UNSET); }
+Lifetime Lifetime::InvalidEmpty() { return Lifetime(NOTSET); }
 
 Lifetime Lifetime::InvalidTombstone() { return Lifetime(INVALID_ID_TOMBSTONE); }
 }  // namespace clang

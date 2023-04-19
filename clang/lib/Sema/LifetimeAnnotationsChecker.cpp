@@ -31,6 +31,9 @@ class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
       : state_(state), func_info_(func_info) {}
 
  private:
+  // x = (p-q == 0) ? p : p;
+  void VisitExpr(const clang::Expr *expr,
+                 const clang::DeclRefExpr **decl_ref_expr);
   void VisitVarDecl(const clang::VarDecl *var_decl);
   void VisitCallExpr(const clang::CallExpr *call_expr);
   void VisitAssignment(const clang::BinaryOperator *bin_op);
@@ -69,6 +72,28 @@ void GetExprObjectSet(const clang::Expr *expr,
 
 namespace {
 
+void LifetimeAnnotationsProcessor::VisitExpr(
+    const clang::Expr *expr,
+    const clang::DeclRefExpr **decl_ref_expr = nullptr) {
+  debugLifetimes("[VisitExpr]");
+  if (const clang::ImplicitCastExpr *implicit_cast_expr =
+          dyn_cast<clang::ImplicitCastExpr>(expr)) {
+    // debugLifetimes("Is implicit cast");
+    // implicit_cast_expr->dump();
+    const auto &children = implicit_cast_expr->children();
+    for (const auto &child : children) {
+      // debugLifetimes("This is a child of implicit_cast");
+      // child->dump();
+      if (const clang::DeclRefExpr *decl =
+              dyn_cast<clang::DeclRefExpr>(child)) {
+        // debugLifetimes("Is declRefExpr");
+        *decl_ref_expr = decl;
+        return;
+      }
+    }
+  }
+}
+
 void LifetimeAnnotationsProcessor::VisitVarDecl(
     const clang::VarDecl *var_decl) {
   debugLifetimes("[VisitVarDecl]", var_decl->getNameAsString());
@@ -81,16 +106,30 @@ void LifetimeAnnotationsProcessor::VisitVarDecl(
   // VisitCallExpr().
   // If the variable of the LHS has a lifetime annotation, don't process RHS
   if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
-      state_->GetLifetime(var_decl).IsUnset()) {
+      state_->IsLifetimeNotset(var_decl)) {
     debugLifetimes("VarDecl has initializer!");
     const clang::Expr *init_expr = var_decl->getInit();
 
-    GetExprObjectSet(init_expr, state_);
-    if (const clang::DeclRefExpr *rhs =
-            dyn_cast<clang::DeclRefExpr>(init_expr)) {
-      debugLifetimes("RHS is a DeclRefExpr");
-      state_->CreateDependency(var_decl, rhs);
+    // debugLifetimes("Dump init expr");
+    // init_expr->dump();
+
+    const clang::DeclRefExpr *decl_ref_expr = nullptr;
+    VisitExpr(init_expr, &decl_ref_expr);
+
+    if (decl_ref_expr != nullptr) {
+      // debugLifetimes("RHS is a DeclRefExpr");
+      state_->CreateDependency(var_decl, decl_ref_expr);
+      // ! old
+      // const auto &rhs_decl = decl_ref_expr->getDecl();
+      // if (state_->IsLifetimeNotset(rhs_decl)) {
+      //   state_->CreateDependency(var_decl, decl_ref_expr);
+      // } else {
+      //   Lifetime *rhs_lifetime = state_->GetLifetime(rhs_decl);
+      //   state_->InsertShortestLifetimes(var_decl, rhs_lifetime);
+      // }
     }
+
+    GetExprObjectSet(init_expr, state_);
     // TODO implement
   }
   // return std::nullopt;
@@ -110,7 +149,7 @@ void LifetimeAnnotationsProcessor::VisitAssignment(
 void LifetimeAnnotationsProcessor::run(
     const ast_matchers::MatchFinder::MatchResult &Result) {
   // DEBUG
-  debugInfo("On run...");
+  // debugInfo("On run...");
   if (const auto *var_decl =
           Result.Nodes.getNodeAs<clang::VarDecl>("var_decl")) {
     VisitVarDecl(var_decl);
@@ -138,8 +177,11 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::FunctionDecl *func, FunctionLifetimes &func_info) {
   debugLifetimes("[GetLifetimeDependencies]");
   // auto expr_matcher = findAll(expr());
-  auto var_decl_matcher =
-      findAll(varDecl(unless(parmVarDecl())).bind("var_decl"));
+  auto var_decl_matcher = findAll(
+      varDecl(
+          unless(
+              parmVarDecl()) /* , hasInitializer(expr().bind("initializer")) */)
+          .bind("var_decl"));
 
   auto call_expr_matcher = findAll(callExpr().bind("call_expr"));
 
@@ -149,7 +191,9 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
   //                    hasLHS(declRefExpr(to(varDecl().bind("rhs_vardecl")))))
   //         .bind("assignment"));
   // TODO try on a matcher which receives func->getCompoundStmt()
-  auto assign_matcher = compoundStmt(hasDescendant(binaryOperator()));
+  // auto assign_matcher =
+  // compoundStmt(eachOf(binaryOperator().bind("assignment")));
+  auto assign_matcher = binaryOperator().bind("assignment");
 
   MatchFinder Finder;
   LifetimeAnnotationsProcessor Callback(&state_, &func_info);
@@ -180,22 +224,28 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   clang::ASTContext &Context = func->getASTContext();
   state_ = LifetimeAnnotationsAnalysis(function_info.GetParamsLifetimes());
 
-  // TODO create new state for the new function
-  // TODO copy the lifetimes of the parameters to the new state
-
   // step 1
+  debugInfo("\n====== START STEP 1 ======\n");
+
   GetLifetimeDependencies(function_body, Context, func, function_info);
 
+  debugInfo("\n====== FINISH STEP 1 ======\n");
   debugLifetimes(state_.DebugString());
 
   // clang::SourceManager &source_manager = ast_context.getSourceManager();
   // clang::SourceRange func_source_range = func->getSourceRange();
 
   // step 2
+  debugInfo("\n====== START STEP 2 ======\n");
   LifetimeAnnotationsChecker::PropagateLifetimes();
+  debugInfo("\n====== FINISH STEP 2 ======\n");
+  debugLifetimes(state_.DebugString());
+
 
   // step 3
+  debugInfo("\n====== START STEP 3 ======\n");
   LifetimeAnnotationsChecker::CheckLifetimes();
+  debugInfo("\n====== FINISH STEP 3 ======\n");
 }
 
 // After capturing lifetimes from the function, apply the fixed point
@@ -212,28 +262,60 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
   auto worklist = state_.InitializeWorklist();
 
-  debugLifetimes("=== worklist ===");
-  debugLifetimes(worklist);
-
   while (!worklist.empty()) {
+    debugLifetimes("=== worklist ===");
+    debugLifetimes(worklist);
+
     auto &el = worklist.back();
     worklist.pop_back();
-    // TODO duplicates?
+
     llvm::DenseSet<const clang::NamedDecl *> result = {el};
+    llvm::DenseSet<char> shortest_lifetimes;
     for (const auto &child : children[el]) {
       if (child == el) continue;
       result.insert(children[child].begin(), children[child].end());
+      auto tmp_lifetimes = state_.GetShortestLifetimes(child);
+      shortest_lifetimes.insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
+      // TODO here we should insert in shortest lifetimes and not in
+      // dependencies
+      // - result = all shortest_lifetimes and actual lifetimes (from
+      // annotation) of children
+      // - check if result == el.shortest_lifetimes (instead of size - size is
+      // not enough)
+      // - propagate until there are no more changes
+      // ! if a Lifetime is unset and has no shortest_lifetimes, do nothing
+      // ! if a lifetime is local, then set el to local
+      // ! if a lifetime is static, then include it in el
+      // ! if a lifetime has id_, then skip shortest_lifetimes
+      // TODO at the end of the cycle
+      // - check if id is local and if so skip next steps
+      // - check if a variable has only one "shortest_lifetimes" and set it to
+      // the main lifetime
+      // - static? Probably nothing to do
     }
-    if (children[el].size() != result.size()) {
-      children[el] = result;
-      for (const auto &parent : parents[el]) worklist.emplace_back(parent);
+    if (children[el] != result) {
+      children[el].insert(result.begin(), result.end());
+      state_.PropagateShortestLifetimes(el, shortest_lifetimes);
+
+      for (const auto &parent : parents[el]) {
+        worklist.emplace_back(parent);
+      }
     }
     debugLifetimes("\nPropagation of", el->getNameAsString());
-    debugLifetimes("=== dependencies_ ===");
-    debugLifetimes(children[el]);
+    debugLifetimes("=== children ===");
+    debugLifetimes(children);
   }
   // return children;
+
+  state_.SetDependencies(children);
+
   // TODO
+  debugLifetimes("=== state_.dependencies_ ===");
+  debugLifetimes(state_.GetDependencies());
+
+  // finally, process the lifetimes dependencies to attribute the correct set of
+  // lifetimes to each variable
+  // state_.ProcessVarLifetimes();
 }
 
 void LifetimeAnnotationsChecker::CheckLifetimes() {

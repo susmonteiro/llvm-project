@@ -20,7 +20,6 @@ namespace clang {
 
 class LifetimeAnnotationsChecker {
  public:
-  void VisitVarDecl(const clang::VarDecl *var_decl);
 
   void GetLifetimes(const FunctionDecl *func, Sema &S);
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);

@@ -15499,7 +15499,6 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
 
       if (!Diags.isIgnored(diag::print_lifetime_annotations,
                              FD->getLocation())) {
-        debugInfo("Analyzing function body from function ActOnFinishFunctionBody");
         LAChecker->AnalyzeFunctionBody(FD, *this);
       }
 

@@ -33,9 +33,12 @@ void debugLifetimes(llvm::SmallVector<std::string> vec) {
 }
 
 void debugLifetimes(std::vector<const clang::NamedDecl*> vec) {
+  std::string res;
   for (const auto &el : vec) {
-    debugLifetimes(el->getNameAsString());
+    res += el->getNameAsString() + ' ';
   }
+  res += '\n';
+  debugLifetimes(res);
 }
 
 void debugLifetimes(llvm::DenseSet<const clang::NamedDecl*> vec) {
@@ -43,7 +46,6 @@ void debugLifetimes(llvm::DenseSet<const clang::NamedDecl*> vec) {
     debugLifetimes(el->getNameAsString());
   }
 }
-
 
 void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::NamedDecl*>> m) {
   std::string res;

@@ -90,16 +90,14 @@ class FunctionLifetimes {
     int i = 0;
     for (const auto &pair: params_lifetimes_) {
       debugLifetimes("Parameter ", i++);
-      debugLifetimes("Lifetime",
-                     pair.second.IsUnset() ? "none" : pair.second.getLifetimeName());
+      const Lifetime *l = &pair.second;
+      debugLifetimes(l->DebugString());
     }
   }
 
   void DumpReturn() const {
     std::cout << "[FunctionLifetimes]: Return lifetimes\n";
-    debugLifetimes("Lifetime", return_lifetime_.IsUnset()
-                                   ? "none"
-                                   : return_lifetime_.getLifetimeName());
+    debugLifetimes("Lifetime", return_lifetime_.DebugString());
   }
 
   static llvm::Expected<FunctionLifetimes> CreateForDecl(

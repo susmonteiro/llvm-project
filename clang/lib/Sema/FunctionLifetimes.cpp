@@ -525,7 +525,8 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
 
-      clang::QualType param_type = type->getParamType(i);
+      // TODO remove this?
+      // clang::QualType param_type = type->getParamType(i);
       // TODO remove this?
       // clang::QualType param_pointee = PointeeType(param_type);
       Lifetime tmp;

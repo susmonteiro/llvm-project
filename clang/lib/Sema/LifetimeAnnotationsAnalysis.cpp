@@ -3,7 +3,7 @@
 namespace clang {
 
 void LifetimeAnnotationsAnalysis::CreateDependency(
-    const clang::VarDecl *from, const clang::DeclRefExpr *to) {
+    const clang::NamedDecl *from, const clang::DeclRefExpr *to) {
   // TODO implement
   // clang::QualType type = to->getType().getCanonicalType();
   // // TODO necessary?
@@ -26,9 +26,11 @@ void LifetimeAnnotationsAnalysis::CreateDependency(
 
 Dependencies LifetimeAnnotationsAnalysis::TransposeDependencies() const {
   Dependencies result;
-  for (const auto &el : dependencies_) {
-    for (const auto &child : el.second) {
-      result[child].insert(el.first);
+  for (const auto &pair : dependencies_) {
+    for (const auto &child : pair.second) {
+      // don't insert annotated variables into the parents graph
+      if (IsLifetimeNotset(child))
+        result[child].insert(pair.first);
     }
   }
   return result;
@@ -42,5 +44,4 @@ LifetimeAnnotationsAnalysis::InitializeWorklist() const {
   }
   return worklist;
 }
-
 }  // namespace clang
