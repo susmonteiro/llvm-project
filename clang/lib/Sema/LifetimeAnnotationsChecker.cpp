@@ -26,6 +26,7 @@ using namespace ast_matchers;
 namespace {
 class LifetimeAnnotationsProcessor : public MatchFinder::MatchCallback {
  public:
+  // TODO change from * to &
   LifetimeAnnotationsProcessor(LifetimeAnnotationsAnalysis *state,
                                FunctionLifetimes *func_info)
       : state_(state), func_info_(func_info) {}
@@ -241,7 +242,6 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   debugInfo("\n====== FINISH STEP 2 ======\n");
   debugLifetimes(state_.DebugString());
 
-
   // step 3
   debugInfo("\n====== START STEP 3 ======\n");
   LifetimeAnnotationsChecker::CheckLifetimes();
@@ -280,24 +280,9 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
       } else {
         shortest_lifetimes.insert(state_.GetLifetime(child)->Id());
       }
-      // TODO here we should insert in shortest lifetimes and not in
-      // dependencies
-      // - result = all shortest_lifetimes and actual lifetimes (from
-      // annotation) of children
-      // - check if result == el.shortest_lifetimes (instead of size - size is
-      // not enough)
-      // - propagate until there are no more changes
-      // ! if a Lifetime is unset and has no shortest_lifetimes, do nothing
-      // ! if a lifetime is local, then set el to local
-      // ! if a lifetime is static, then include it in el
-      // ! if a lifetime has id_, then skip shortest_lifetimes
-      // TODO at the end of the cycle
-      // - check if id is local and if so skip next steps
-      // - check if a variable has only one "shortest_lifetimes" and set it to
-      // the main lifetime
-      // - static? Probably nothing to do
     }
-    if (children[el] != result || state_.GetShortestLifetimes(el) != shortest_lifetimes) {
+    if (children[el] != result ||
+        state_.GetShortestLifetimes(el) != shortest_lifetimes) {
       children[el].insert(result.begin(), result.end());
       state_.PropagateShortestLifetimes(el, shortest_lifetimes);
 
@@ -316,6 +301,16 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   // TODO
   debugLifetimes("=== state_.dependencies_ ===");
   debugLifetimes(state_.GetDependencies());
+
+  // ! if a Lifetime is unset and has no shortest_lifetimes, do nothing
+  // ! if a lifetime is local, then set el to local
+  // ! if a lifetime is static, then include it in el
+  // ! if a lifetime has id_, then skip shortest_lifetimes
+  // TODO at the end of the cycle
+  // - check if id is local and if so skip next steps
+  // - check if a variable has only one "shortest_lifetimes" and set it to
+  // the main lifetime
+  // - static? Probably nothing to do
 
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable
