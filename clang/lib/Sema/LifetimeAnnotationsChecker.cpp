@@ -201,10 +201,13 @@ class TransferStmtVisitor
 
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
+  std::optional<std::string> VisitDeclRefExpr(
+      const clang::DeclRefExpr *decl_ref);
   std::optional<std::string> VisitBinaryOperator(
       const clang::BinaryOperator *op);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
   std::optional<std::string> VisitCompoundStmt(const clang::CompoundStmt *stmt);
+  std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
 
  private:
   const clang::FunctionDecl *func_;
@@ -219,6 +222,131 @@ std::optional<std::string> TransferStmtVisitor::VisitExpr(
     const clang::Expr *expr) {
   debugLifetimes("[VisitExpr]");
   // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitDeclRefExpr(
+    const clang::DeclRefExpr *decl_ref) {
+  debugLifetimes("[VisitDeclRefExpr]");
+
+  // auto *decl = decl_ref->getDecl();
+  // if (!clang::isa<clang::VarDecl>(decl) &&
+  //     !clang::isa<clang::FunctionDecl>(decl)) {
+  //   return std::nullopt;
+  // }
+
+  // const Object *object = object_repository_.GetDeclObject(decl);
+
+  // assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
+
+  // clang::QualType type = decl->getType().getCanonicalType();
+
+  // if (type->isReferenceType()) {
+  //   points_to_map_.SetExprObjectSet(
+  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
+  // } else {
+  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
+  // }
+
+  return std::nullopt;
+}
+
+std::optional<std::string> TransferStmtVisitor::VisitCastExpr(
+    const clang::CastExpr *cast) {
+  debugLifetimes("[VisitCastExpr]");
+  switch (cast->getCastKind()) {
+    case clang::CK_LValueToRValue: {
+      // TODO
+      debugLifetimes("\t> Case LValueToRValue");
+      if (cast->getType()->isPointerType()) {
+        // Converting from a glvalue to a prvalue means that we need to perform
+        // a dereferencing operation because the objects associated with
+        // glvalues and prvalues have different meanings:
+        // - A glvalue is associated with the object identified by the glvalue.
+        // - A prvalue is only associated with an object if the prvalue is of
+        //   pointer type; the object it is associated with is the object the
+        //   pointer points to.
+        // See also documentation for PointsToMap.
+
+        // ObjectSet points_to = points_to_map_.GetPointerPointsToSet(
+        //     points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+        // points_to_map_.SetExprObjectSet(cast, points_to);
+      }
+      for (const auto &child : cast->children()) {
+        Visit(const_cast<clang::Stmt*>(child));
+      }
+      break;
+    }
+    case clang::CK_NullToPointer: {
+      // TODO
+      debugLifetimes("\t> Case NullToPointer");
+
+      // points_to_map_.SetExprObjectSet(cast, {});
+      break;
+    }
+    // These casts are just no-ops from a Object point of view.
+    case clang::CK_FunctionToPointerDecay:
+    case clang::CK_BuiltinFnToFnPtr:
+    case clang::CK_ArrayToPointerDecay:
+    case clang::CK_UserDefinedConversion:
+      // Note on CK_UserDefinedConversion: The actual conversion happens in a
+      // CXXMemberCallExpr that is a subexpression of this CastExpr. The
+      // CK_UserDefinedConversion is just used to mark the fact that this is a
+      // user-defined conversion; it's therefore a no-op for our purposes.
+    case clang::CK_NoOp: {
+      // TODO
+      debugLifetimes("\t> Case No-ops");
+
+      // clang::QualType type = cast->getType().getCanonicalType();
+      // if (type->isPointerType() || cast->isGLValue()) {
+      //   points_to_map_.SetExprObjectSet(
+      //       cast, points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+      // }
+      break;
+    }
+    case clang::CK_DerivedToBase:
+    case clang::CK_UncheckedDerivedToBase:
+    case clang::CK_BaseToDerived:
+    case clang::CK_Dynamic: {
+      // TODO
+      debugLifetimes("\t> Case SubExpressions");
+
+      // These need to be mapped to what the subexpr points to.
+      // (Simple cases just work okay with this; may need to be revisited when
+      // we add more inheritance support.)
+
+      // ObjectSet points_to =
+      // points_to_map_.GetExprObjectSet(cast->getSubExpr());
+      // points_to_map_.SetExprObjectSet(cast, points_to);
+      break;
+    }
+    case clang::CK_BitCast:
+    case clang::CK_LValueBitCast:
+    case clang::CK_IntegralToPointer: {
+      // We don't support analyzing functions that perform a reinterpret_cast.
+
+      // TODO
+      debugLifetimes("\t> Case Reinterpret cast");
+
+      // diag_reporter_(
+      //     func_->getBeginLoc(),
+      //     "cannot infer lifetimes because function uses a type-unsafe cast",
+      //     clang::DiagnosticIDs::Warning);
+      // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
+      //                clang::DiagnosticIDs::Note);
+      // return "type-unsafe cast prevents analysis";
+      break;
+    }
+    default: {
+      if (cast->isGLValue() ||
+          cast->getType().getCanonicalType()->isPointerType()) {
+        llvm::errs() << "Unknown cast type:\n";
+        cast->dump();
+        // No-noop casts of pointer types are not handled yet.
+        llvm::report_fatal_error("unknown cast type encountered");
+      }
+    }
+  }
   return std::nullopt;
 }
 
@@ -245,7 +373,10 @@ std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
         //                     TargetPointeeBehavior::kIgnore, points_to_map_,
         //                     constraints_);
         debugLifetimes("VarDecl has initializer!");
-        const clang::Expr *init_expr = var_decl->getInit();
+        const clang::Stmt *init_expr = var_decl->getInit();
+        Visit(const_cast<clang::Stmt*>(init_expr));
+
+
         // TODO implement DeclRefExpr
         // TODO store result of DeclRef in ObjectSet and here retrieve it from
         // there const clang::DeclRefExpr *decl_ref_expr = nullptr;
@@ -432,8 +563,8 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
 
   TransferStmtVisitor visitor(func, state_);
 
-  // debugLifetimes(">> Dumping function body before visit...");
-  // func->getBody()->dump();
+  debugLifetimes(">> Dumping function body before visit...");
+  func->getBody()->dump();
 
   std::optional<std::string> err = visitor.Visit(func->getBody());
 
