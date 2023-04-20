@@ -72,15 +72,15 @@ class LifetimesStmtVisitor
                        LifetimeAnnotationsAnalysis &state)
       : func_(func), state_(state) {}
 
-  std::optional<std::string> VisitExpr(const clang::Expr *expr);
-  std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
-  std::optional<std::string> VisitDeclRefExpr(
-      const clang::DeclRefExpr *decl_ref);
   std::optional<std::string> VisitBinaryOperator(
       const clang::BinaryOperator *op);
-  std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
-  std::optional<std::string> VisitCompoundStmt(const clang::CompoundStmt *stmt);
   std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
+  std::optional<std::string> VisitCompoundStmt(const clang::CompoundStmt *stmt);
+  std::optional<std::string> VisitDeclRefExpr(
+      const clang::DeclRefExpr *decl_ref);
+  std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
+  std::optional<std::string> VisitExpr(const clang::Expr *expr);
+  std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
 
  private:
   const clang::FunctionDecl *func_;
@@ -92,45 +92,10 @@ class LifetimesStmtVisitor
 
 namespace {
 
-std::optional<std::string> LifetimesStmtVisitor::VisitExpr(
-    const clang::Expr *expr) {
-  debugLifetimes("[VisitExpr]");
+std::optional<std::string> LifetimesStmtVisitor::VisitBinaryOperator(
+    const clang::BinaryOperator *op) {
+  debugLifetimes("[VisitBinaryOperator]");
   // TODO
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesStmtVisitor::VisitDeclRefExpr(
-    const clang::DeclRefExpr *decl_ref) {
-  debugLifetimes("[VisitDeclRefExpr]");
-
-  auto *decl = decl_ref->getDecl();
-  if (!clang::isa<clang::VarDecl>(decl) &&
-      !clang::isa<clang::FunctionDecl>(decl)) {
-    return std::nullopt;
-  }
-
-  // const Object *object = object_repository_.GetDeclObject(decl);
-
-  assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
-
-  clang::QualType type = decl->getType().getCanonicalType();
-
-  if (type->isReferenceType()) {
-    debugLifetimes("It's reference type!");
-
-  } else {
-    debugLifetimes("It's not reference type");
-  }
-
-  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
-
-  // if (type->isReferenceType()) {
-  //   points_to_map_.SetExprObjectSet(
-  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
-  // } else {
-  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
-  // }
-
   return std::nullopt;
 }
 
@@ -238,6 +203,49 @@ std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
   return std::nullopt;
 }
 
+std::optional<std::string> LifetimesStmtVisitor::VisitCompoundStmt(
+    const clang::CompoundStmt *stmt) {
+  debugLifetimes("[VisitCompoundStmt]");
+  for (const auto &child : stmt->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesStmtVisitor::VisitDeclRefExpr(
+    const clang::DeclRefExpr *decl_ref) {
+  debugLifetimes("[VisitDeclRefExpr]");
+
+  auto *decl = decl_ref->getDecl();
+  if (!clang::isa<clang::VarDecl>(decl) &&
+      !clang::isa<clang::FunctionDecl>(decl)) {
+    return std::nullopt;
+  }
+
+  assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
+
+  clang::QualType type = decl->getType().getCanonicalType();
+
+  if (type->isReferenceType()) {
+    debugLifetimes("It's reference type!");
+
+  } else {
+    debugLifetimes("It's not reference type");
+  }
+
+  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
+
+  // TODO
+  // if (type->isReferenceType()) {
+  //   points_to_map_.SetExprObjectSet(
+  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
+  // } else {
+  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
+  // }
+
+  return std::nullopt;
+}
+
 std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
     const clang::DeclStmt *decl_stmt) {
   debugLifetimes("[VisitDeclStmt]");
@@ -255,11 +263,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
       // VisitCallExpr().
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
           state_.IsLifetimeNotset(var_decl)) {
-        // TransferInitializer(var_object, var_decl->getType(),
-        // object_repository_,
-        //                     var_decl->getInit(),
-        //                     TargetPointeeBehavior::kIgnore, points_to_map_,
-        //                     constraints_);
+
         debugLifetimes("VarDecl has initializer!");
         const clang::Expr *init = var_decl->getInit();
         Visit(const_cast<clang::Expr *>(init));
@@ -275,31 +279,15 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
             state_.CreateDependency(var_decl, rhs_ref_decl);
           }
         }
-
-        // TODO implement DeclRefExpr
-        // TODO store result of DeclRef in ObjectSet and here retrieve it from
-        // there const clang::DeclRefExpr *decl_ref_expr = nullptr;
-        // VisitExpr(init_expr, &decl_ref_expr);
-        // if (decl_ref_expr != nullptr) {
-        // debugLifetimes("RHS is a DeclRefExpr");
-        // state_.CreateDependency(var_decl, decl_ref_expr);
-        // ! old
-        // const auto &rhs_decl = decl_ref_expr->getDecl();
-        // if (state_->IsLifetimeNotset(rhs_decl)) {
-        //   state_->CreateDependency(var_decl, decl_ref_expr);
-        // } else {
-        //   Lifetime *rhs_lifetime = state_->GetLifetime(rhs_decl);
-        //   state_->InsertShortestLifetimes(var_decl, rhs_lifetime);
-        // }
       }
     }
   }
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitBinaryOperator(
-    const clang::BinaryOperator *op) {
-  debugLifetimes("[VisitBinaryOperator]");
+std::optional<std::string> LifetimesStmtVisitor::VisitExpr(
+    const clang::Expr *expr) {
+  debugLifetimes("[VisitExpr]");
   // TODO
   return std::nullopt;
 }
@@ -308,15 +296,6 @@ std::optional<std::string> LifetimesStmtVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   debugLifetimes("[VisitStmt]");
   // TODO
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesStmtVisitor::VisitCompoundStmt(
-    const clang::CompoundStmt *stmt) {
-  debugLifetimes("[VisitCompoundStmt]");
-  for (const auto &child : stmt->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-  }
   return std::nullopt;
 }
 
