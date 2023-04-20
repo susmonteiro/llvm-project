@@ -144,12 +144,12 @@ class LifetimeAnnotationsAnalysis {
 
   std::string DebugString() {
     std::string str = "[LifetimeAnnotationsAnalysis] - STATE\n\n";
-    str += ">> variable_lifetimes_\n";
+    str += ">> variable_lifetimes_\n\n";
     for (const auto &pair : variable_lifetimes_) {
       str += pair.first->getNameAsString() + ": " + pair.second.DebugString() +
              '\n';
     }
-    str += ">> dependencies_\n";
+    str += "\n>> dependencies_\n\n";
     for (const auto &pair : dependencies_) {
       str += pair.first->getNameAsString() + ": ";
       for (const auto &var : pair.second) {

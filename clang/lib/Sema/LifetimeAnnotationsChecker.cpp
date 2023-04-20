@@ -480,12 +480,18 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
   auto worklist = state_.InitializeWorklist();
 
+  // DEBUG
+  int i = 1;
+
   while (!worklist.empty()) {
+    debugInfo("---> Iteration", i++);
     debugLifetimes("=== worklist ===");
     debugLifetimes(worklist);
 
     auto &el = worklist.back();
     worklist.pop_back();
+
+    debugLifetimes("\nPropagation of", el->getNameAsString());
 
     llvm::DenseSet<const clang::NamedDecl *> result = {el};
     llvm::DenseSet<char> shortest_lifetimes;
@@ -508,7 +514,6 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         worklist.emplace_back(parent);
       }
     }
-    debugLifetimes("\nPropagation of", el->getNameAsString());
     debugLifetimes("=== children ===");
     debugLifetimes(children);
   }
