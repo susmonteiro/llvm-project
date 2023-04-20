@@ -28,6 +28,7 @@ add_clang_library(clangSema
   MultiplexExternalSemaSource.cpp
   ParsedAttr.cpp
   PointeeType.cpp
+  PointsToMap.cpp
   Scope.cpp
   ScopeInfo.cpp
   Sema.cpp

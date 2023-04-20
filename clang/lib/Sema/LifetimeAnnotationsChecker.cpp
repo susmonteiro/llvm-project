@@ -15,6 +15,7 @@
 #include "clang/Basic/PartialDiagnostic.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/IdentifierResolver.h"
+#include "clang/Sema/PointsToMap.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Error.h"
@@ -61,15 +62,14 @@ void GetExprObjectSet(const clang::Expr *expr,
 //         << func->getSourceRange();
 // }
 
-
 namespace {
-class TransferStmtVisitor
-    : public clang::StmtVisitor<TransferStmtVisitor,
+class LifetimesStmtVisitor
+    : public clang::StmtVisitor<LifetimesStmtVisitor,
                                 std::optional<std::string>> {
  public:
   // TODO func: pointer or reference?
-  TransferStmtVisitor(const clang::FunctionDecl *func,
-                      LifetimeAnnotationsAnalysis &state)
+  LifetimesStmtVisitor(const clang::FunctionDecl *func,
+                       LifetimeAnnotationsAnalysis &state)
       : func_(func), state_(state) {}
 
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
@@ -85,20 +85,21 @@ class TransferStmtVisitor
  private:
   const clang::FunctionDecl *func_;
   LifetimeAnnotationsAnalysis &state_;
+  PointsToMap points_to_map;
 };
 
 }  // namespace
 
 namespace {
 
-std::optional<std::string> TransferStmtVisitor::VisitExpr(
+std::optional<std::string> LifetimesStmtVisitor::VisitExpr(
     const clang::Expr *expr) {
   debugLifetimes("[VisitExpr]");
   // TODO
   return std::nullopt;
 }
 
-std::optional<std::string> TransferStmtVisitor::VisitDeclRefExpr(
+std::optional<std::string> LifetimesStmtVisitor::VisitDeclRefExpr(
     const clang::DeclRefExpr *decl_ref) {
   debugLifetimes("[VisitDeclRefExpr]");
 
@@ -114,6 +115,15 @@ std::optional<std::string> TransferStmtVisitor::VisitDeclRefExpr(
 
   clang::QualType type = decl->getType().getCanonicalType();
 
+  if (type->isReferenceType()) {
+    debugLifetimes("It's reference type!");
+
+  } else {
+    debugLifetimes("It's not reference type");
+  }
+
+  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
+
   // if (type->isReferenceType()) {
   //   points_to_map_.SetExprObjectSet(
   //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
@@ -124,7 +134,7 @@ std::optional<std::string> TransferStmtVisitor::VisitDeclRefExpr(
   return std::nullopt;
 }
 
-std::optional<std::string> TransferStmtVisitor::VisitCastExpr(
+std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
     const clang::CastExpr *cast) {
   debugLifetimes("[VisitCastExpr]");
   switch (cast->getCastKind()) {
@@ -145,8 +155,13 @@ std::optional<std::string> TransferStmtVisitor::VisitCastExpr(
         //     points_to_map_.GetExprObjectSet(cast->getSubExpr()));
         // points_to_map_.SetExprObjectSet(cast, points_to);
       }
-      for (const auto &child : cast->children()) {
+
+      for (const auto *child : cast->children()) {
         Visit(const_cast<clang::Stmt *>(child));
+
+        if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+          points_to_map.InsertExprLifetimes(cast, child_expr);
+        }
       }
       break;
     }
@@ -223,7 +238,7 @@ std::optional<std::string> TransferStmtVisitor::VisitCastExpr(
   return std::nullopt;
 }
 
-std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
+std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
     const clang::DeclStmt *decl_stmt) {
   debugLifetimes("[VisitDeclStmt]");
 
@@ -246,8 +261,20 @@ std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
         //                     TargetPointeeBehavior::kIgnore, points_to_map_,
         //                     constraints_);
         debugLifetimes("VarDecl has initializer!");
-        const clang::Stmt *init_expr = var_decl->getInit();
-        Visit(const_cast<clang::Stmt *>(init_expr));
+        const clang::Expr *init = var_decl->getInit();
+        Visit(const_cast<clang::Expr *>(init));
+        const auto &points_to = points_to_map.GetExprPoints(init);
+
+        debugLifetimes("This is the points to in the DeclStmt");
+        for (const auto &expr : points_to) {
+          if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+            expr->dump();
+            const auto *rhs_ref_decl =
+                clang::dyn_cast<clang::DeclRefExpr>(expr);
+            debugLifetimes("Yes it is a rhs_decl!");
+            state_.CreateDependency(var_decl, rhs_ref_decl);
+          }
+        }
 
         // TODO implement DeclRefExpr
         // TODO store result of DeclRef in ObjectSet and here retrieve it from
@@ -270,21 +297,21 @@ std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
   return std::nullopt;
 }
 
-std::optional<std::string> TransferStmtVisitor::VisitBinaryOperator(
+std::optional<std::string> LifetimesStmtVisitor::VisitBinaryOperator(
     const clang::BinaryOperator *op) {
   debugLifetimes("[VisitBinaryOperator]");
   // TODO
   return std::nullopt;
 }
 
-std::optional<std::string> TransferStmtVisitor::VisitStmt(
+std::optional<std::string> LifetimesStmtVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   debugLifetimes("[VisitStmt]");
   // TODO
   return std::nullopt;
 }
 
-std::optional<std::string> TransferStmtVisitor::VisitCompoundStmt(
+std::optional<std::string> LifetimesStmtVisitor::VisitCompoundStmt(
     const clang::CompoundStmt *stmt) {
   debugLifetimes("[VisitCompoundStmt]");
   for (const auto &child : stmt->children()) {
@@ -431,10 +458,10 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     FunctionLifetimes &func_info) {
   debugLifetimes("[GetLifetimeDependencies]");
 
-  TransferStmtVisitor visitor(func, state_);
+  LifetimesStmtVisitor visitor(func, state_);
 
-  debugLifetimes(">> Dumping function body before visit...");
-  func->getBody()->dump();
+  // debugLifetimes(">> Dumping function body before visit...");
+  // func->getBody()->dump();
 
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
