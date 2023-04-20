@@ -152,39 +152,10 @@ void GetExprObjectSet(const clang::Expr *expr,
 //   // return std::nullopt;
 // }
 
-// void LifetimeAnnotationsProcessor::VisitCallExpr(
-//     const clang::CallExpr *call_expr) {
-//   debugLifetimes("[VisitCallExpr]");
-// }
-
 // void LifetimeAnnotationsProcessor::VisitAssignment(
 //     const clang::BinaryOperator *bin_op) {
 //   debugLifetimes("[VisitAssignment]");
 //   bin_op->dump();
-// }
-
-// void LifetimeAnnotationsProcessor::run(
-//     const ast_matchers::MatchFinder::MatchResult &Result) {
-//   // DEBUG
-//   // debugInfo("On run...");
-//   if (const auto *var_decl =
-//           Result.Nodes.getNodeAs<clang::VarDecl>("var_decl")) {
-//     VisitVarDecl(var_decl);
-//     return;
-//   }
-
-//   if (const auto *call_expr =
-//           Result.Nodes.getNodeAs<clang::CallExpr>("call_expr")) {
-//     VisitCallExpr(call_expr);
-//     return;
-//   }
-
-//   if (const auto *assignment =
-//           Result.Nodes.getNodeAs<clang::BinaryOperator>("assignment")) {
-//     VisitAssignment(assignment);
-//     return;
-//   }
-//   debugWarn("Matched something with no visit function");
 // }
 
 // }  // namespace
@@ -229,17 +200,17 @@ std::optional<std::string> TransferStmtVisitor::VisitDeclRefExpr(
     const clang::DeclRefExpr *decl_ref) {
   debugLifetimes("[VisitDeclRefExpr]");
 
-  // auto *decl = decl_ref->getDecl();
-  // if (!clang::isa<clang::VarDecl>(decl) &&
-  //     !clang::isa<clang::FunctionDecl>(decl)) {
-  //   return std::nullopt;
-  // }
+  auto *decl = decl_ref->getDecl();
+  if (!clang::isa<clang::VarDecl>(decl) &&
+      !clang::isa<clang::FunctionDecl>(decl)) {
+    return std::nullopt;
+  }
 
   // const Object *object = object_repository_.GetDeclObject(decl);
 
-  // assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
+  assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
 
-  // clang::QualType type = decl->getType().getCanonicalType();
+  clang::QualType type = decl->getType().getCanonicalType();
 
   // if (type->isReferenceType()) {
   //   points_to_map_.SetExprObjectSet(
@@ -273,7 +244,7 @@ std::optional<std::string> TransferStmtVisitor::VisitCastExpr(
         // points_to_map_.SetExprObjectSet(cast, points_to);
       }
       for (const auto &child : cast->children()) {
-        Visit(const_cast<clang::Stmt*>(child));
+        Visit(const_cast<clang::Stmt *>(child));
       }
       break;
     }
@@ -374,8 +345,7 @@ std::optional<std::string> TransferStmtVisitor::VisitDeclStmt(
         //                     constraints_);
         debugLifetimes("VarDecl has initializer!");
         const clang::Stmt *init_expr = var_decl->getInit();
-        Visit(const_cast<clang::Stmt*>(init_expr));
-
+        Visit(const_cast<clang::Stmt *>(init_expr));
 
         // TODO implement DeclRefExpr
         // TODO store result of DeclRef in ObjectSet and here retrieve it from
