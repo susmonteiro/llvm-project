@@ -4,7 +4,6 @@ namespace clang {
 
 void LifetimeAnnotationsAnalysis::CreateDependency(
     const clang::NamedDecl *from, const clang::DeclRefExpr *to) {
-      debugLifetimes("Inside create dependency");
   // TODO implement
   // clang::QualType type = to->getType().getCanonicalType();
   // // TODO necessary?
@@ -22,9 +21,7 @@ void LifetimeAnnotationsAnalysis::CreateDependency(
   //   // TODO implement
   // }
   const clang::NamedDecl *decl = to->getFoundDecl();
-  debugLifetimes("After getting the decl");
   dependencies_[from].insert(decl);
-  debugLifetimes("End of create dependency");
 }
 
 Dependencies LifetimeAnnotationsAnalysis::TransposeDependencies() const {

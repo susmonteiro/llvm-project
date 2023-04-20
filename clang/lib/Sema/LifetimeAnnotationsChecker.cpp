@@ -62,6 +62,24 @@ void GetExprObjectSet(const clang::Expr *expr,
 //         << func->getSourceRange();
 // }
 
+void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
+                 PointsToMap &points_to_map,
+                 LifetimeAnnotationsAnalysis &state) {
+  debugLifetimes("\t[TransferRHS]");
+  const auto &points_to = points_to_map.GetExprPoints(rhs);
+
+  // debugLifetimes("This is the points to in the TransferRHS");
+  for (const auto &expr : points_to) {
+    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+      // DEBUG
+      // expr->dump();
+      const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
+      // debugLifetimes("Yes it is a rhs_decl!");
+      state.CreateDependency(lhs, rhs_ref_decl);
+    }
+  }
+}
+
 namespace {
 class LifetimesStmtVisitor
     : public clang::StmtVisitor<LifetimesStmtVisitor,
@@ -74,6 +92,7 @@ class LifetimesStmtVisitor
 
   std::optional<std::string> VisitBinaryOperator(
       const clang::BinaryOperator *op);
+  std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
   std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
   std::optional<std::string> VisitCompoundStmt(const clang::CompoundStmt *stmt);
   std::optional<std::string> VisitDeclRefExpr(
@@ -99,13 +118,48 @@ std::optional<std::string> LifetimesStmtVisitor::VisitBinaryOperator(
   return std::nullopt;
 }
 
+std::optional<std::string> LifetimesStmtVisitor::VisitBinAssign(
+    const clang::BinaryOperator *op) {
+  debugLifetimes("[VisitBinAssign]");
+
+  assert(op->getLHS()->isGLValue());
+
+  const auto &lhs = op->getLHS();
+  Visit(lhs);
+  const auto &lhs_points_to = points_to_map.GetExprPoints(lhs);
+  points_to_map.InsertExprLifetimes(op, lhs);
+
+  // Because of how we handle reference-like structs, a member access to a
+  // non-reference-like field in a struct might still produce lifetimes. We
+  // don't want to change points-to sets in those cases.
+  if (!lhs->getType()->isPointerType()) {
+    debugWarn("LHS of bin_op is not pointer type");
+    return std::nullopt;
+  }
+
+  const auto &rhs = op->getRHS();
+
+  Visit(rhs);
+
+  const auto &rhs_points_to = points_to_map.GetExprPoints(rhs);
+  points_to_map.InsertExprLifetimes(op, rhs);
+
+  if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
+    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, points_to_map, state_);
+  } else {
+    // TODO
+  }
+
+  return std::nullopt;
+}
+
 std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
     const clang::CastExpr *cast) {
   debugLifetimes("[VisitCastExpr]");
   switch (cast->getCastKind()) {
     case clang::CK_LValueToRValue: {
       // TODO
-      debugLifetimes("\t> Case LValueToRValue");
+      debugLight("> Case LValueToRValue");
       if (cast->getType()->isPointerType()) {
         // Converting from a glvalue to a prvalue means that we need to perform
         // a dereferencing operation because the objects associated with
@@ -132,7 +186,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
     }
     case clang::CK_NullToPointer: {
       // TODO
-      debugLifetimes("\t> Case NullToPointer");
+      debugLight("> Case NullToPointer");
 
       // points_to_map_.SetExprObjectSet(cast, {});
       break;
@@ -148,7 +202,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
       // user-defined conversion; it's therefore a no-op for our purposes.
     case clang::CK_NoOp: {
       // TODO
-      debugLifetimes("\t> Case No-ops");
+      debugLight("> Case No-ops");
 
       // clang::QualType type = cast->getType().getCanonicalType();
       // if (type->isPointerType() || cast->isGLValue()) {
@@ -162,7 +216,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
     case clang::CK_BaseToDerived:
     case clang::CK_Dynamic: {
       // TODO
-      debugLifetimes("\t> Case SubExpressions");
+      debugLight("> Case SubExpressions");
 
       // These need to be mapped to what the subexpr points to.
       // (Simple cases just work okay with this; may need to be revisited when
@@ -179,7 +233,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
       // We don't support analyzing functions that perform a reinterpret_cast.
 
       // TODO
-      debugLifetimes("\t> Case Reinterpret cast");
+      debugLight("> Case Reinterpret cast");
 
       // diag_reporter_(
       //     func_->getBeginLoc(),
@@ -224,14 +278,14 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclRefExpr(
 
   assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
 
-  clang::QualType type = decl->getType().getCanonicalType();
+  // clang::QualType type = decl->getType().getCanonicalType();
 
-  if (type->isReferenceType()) {
-    debugLifetimes("It's reference type!");
+  // if (type->isReferenceType()) {
+  //   debugLifetimes("It's reference type!");
 
-  } else {
-    debugLifetimes("It's not reference type");
-  }
+  // } else {
+  //   debugLifetimes("It's not reference type");
+  // }
 
   points_to_map.InsertExprLifetimes(decl_ref, nullptr);
 
@@ -263,22 +317,23 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
       // VisitCallExpr().
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
           state_.IsLifetimeNotset(var_decl)) {
-
-        debugLifetimes("VarDecl has initializer!");
+        // debugLifetimes("VarDecl has initializer!");
         const clang::Expr *init = var_decl->getInit();
         Visit(const_cast<clang::Expr *>(init));
-        const auto &points_to = points_to_map.GetExprPoints(init);
+        TransferRHS(var_decl, init, points_to_map, state_);
+        // const auto &points_to = points_to_map.GetExprPoints(init);
 
-        debugLifetimes("This is the points to in the DeclStmt");
-        for (const auto &expr : points_to) {
-          if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-            expr->dump();
-            const auto *rhs_ref_decl =
-                clang::dyn_cast<clang::DeclRefExpr>(expr);
-            debugLifetimes("Yes it is a rhs_decl!");
-            state_.CreateDependency(var_decl, rhs_ref_decl);
-          }
-        }
+        // debugLifetimes("This is the points to in the DeclStmt");
+        // for (const auto &expr : points_to) {
+        //   if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+        //     // DEBUG
+        //     // expr->dump();
+        //     const auto *rhs_ref_decl =
+        //         clang::dyn_cast<clang::DeclRefExpr>(expr);
+        //     // debugLifetimes("Yes it is a rhs_decl!");
+        //     state_.CreateDependency(var_decl, rhs_ref_decl);
+        //   }
+        // }
       }
     }
   }
