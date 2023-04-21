@@ -22,11 +22,9 @@ class LifetimeAnnotationsChecker {
  public:
   void GetLifetimes(const FunctionDecl *func, Sema &S);
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
-  void GetLifetimeDependencies(const clang::FunctionDecl *func,
-                               clang::ASTContext &Context,
-                               FunctionLifetimes &func_info);
+  void GetLifetimeDependencies(const clang::FunctionDecl *func);
   void PropagateLifetimes();
-  void CheckLifetimes();
+  void CheckLifetimes(const clang::FunctionDecl *func);
 
   void DumpFunctionInfo() const {
     debugLifetimes("[LifetimeAnnotationsChecker]: Functions Information");

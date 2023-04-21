@@ -19,6 +19,8 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/Error.h"
+#include "clang/Sema/LifetimesPropagationVisitor.h"
+#include "clang/Sema/LifetimesCheckerVisitor.h"
 
 namespace clang {
 
@@ -62,446 +64,6 @@ void GetExprObjectSet(const clang::Expr *expr,
 //         << func->getSourceRange();
 // }
 
-void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
-                 PointsToMap &points_to_map,
-                 LifetimeAnnotationsAnalysis &state) {
-  debugLifetimes("\t[TransferRHS]");
-  const auto &points_to = points_to_map.GetExprPoints(rhs);
-
-  // debugLifetimes("This is the points to in the TransferRHS");
-  for (const auto &expr : points_to) {
-    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      // DEBUG
-      // expr->dump();
-      const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      // debugLifetimes("Yes it is a rhs_decl!");
-      state.CreateDependency(lhs, rhs_ref_decl);
-    }
-  }
-}
-
-// llvm::Expected<Lifetime> CreateLifetime(
-//     clang::QualType type, clang::TypeLoc type_loc,
-//     LifetimeFactory lifetime_factory) {
-//   assert(!type.isNull());
-//   if (type_loc) {
-//     assert(FunctionLifetimes::SameType(type_loc.getType(), type));
-//   }
-
-//   // DEBUG
-//   // debugLifetimes("Type");
-//   // type.dump();
-
-//   type = type.IgnoreParens();
-//   type = StripAttributes(type);
-
-//   llvm::SmallVector<const clang::Attr*> attrs;
-//   if (!type_loc.isNull()) {
-//     type_loc = StripAttributes(type_loc, attrs);
-//     // DEBUG
-//     // debugLifetimes("Attributes");
-//     // debugLifetimes(attrs);
-//   }
-
-//   llvm::SmallVector<const clang::Expr*> lifetime_names;
-//   if (llvm::Error err =
-//   GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
-//     return std::move(err);
-//   }
-
-//   // DEBUG
-//   // debugLifetimes("Lifetime names");
-//   // debugLifetimes(lifetime_names);
-
-//   Lifetime ret;
-
-//   llvm::SmallVector<std::string> lifetime_params =
-//   GetLifetimeParameters(type);
-
-//   // DEBUG
-//   // debugLifetimes("Lifetime parameters");
-//   // debugLifetimes(lifetime_params);
-
-//   if (!lifetime_params.empty() && !lifetime_names.empty() &&
-//       lifetime_names.size() != lifetime_params.size()) {
-//     return llvm::createStringError(
-//         llvm::inconvertibleErrorCode(),
-//         "Number of types and lifetimes not the same"
-//         // TODO abseil
-//         /* absl::StrCat("Type has ", lifetime_params.size(),
-//                      " lifetime parameters but ", lifetime_names.size(),
-//                      " lifetime arguments were given") */);
-//   }
-
-//   // debugLifetimes("Size of lifetime_params", lifetime_params.size());
-
-//   for (size_t i = 0; i < lifetime_params.size(); ++i) {
-//     // debugLifetimes("Inside loop of parameters");
-//     Lifetime l;
-//     const clang::Expr* lifetime_name = nullptr;
-//     if (i < lifetime_names.size()) {
-//       lifetime_name = lifetime_names[i];
-//     }
-//     if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(l)) {
-//       return std::move(err);
-//     }
-//   }
-
-//   // TODO this is already done in the previous function
-//   clang::QualType pointee = PointeeType(type);
-//   // TODO change this
-//   if (pointee.isNull()) return Lifetime();
-
-//   clang::TypeLoc pointee_type_loc;
-//   if (type_loc) {
-//     pointee_type_loc = PointeeTypeLoc(type_loc);
-//     // Note: We can't assert that `pointee_type_loc` is non-null here. If
-//     // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
-//     // the pointee type because the pointee type never got spelled out at the
-//     // location of the original `TypeLoc`.
-//   }
-
-//   // TODO is this ok?
-//   // recursive call
-//   Lifetime lifetime;
-//   if (llvm::Error err =
-//           CreateLifetime(pointee, pointee_type_loc, lifetime_factory)
-//               .moveInto(lifetime)) {
-//     return std::move(err);
-//   }
-
-//   const clang::Expr* lifetime_name = nullptr;
-//   // debugLifetimes("Let's see if lifetime names is empty...");
-//   if (!lifetime_names.empty()) {
-//     // debugLifetimes("Lifetime names is not emptyyyyyyy");
-//     if (lifetime_names.size() != 1) {
-//       return llvm::createStringError(
-//           llvm::inconvertibleErrorCode(),
-//           // TODO abseil
-//           "Expected a single lifetime but multiple were given"
-//           /* absl::StrCat("Expected a single lifetime but ",
-//           lifetime_names.size(),
-//                        " were given") */);
-//     }
-//     lifetime_name = lifetime_names.front();
-//   }
-//   // DEBUG
-//   // else {
-//   //   debugLifetimes("Yep lifetime names is empty...");
-//   // }
-
-//   if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(ret)) {
-//     return std::move(err);
-//   }
-
-//   // TODO change to optional maybe
-//   return ret;
-// }
-
-Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
-                            FunctionLifetimeFactory &lifetime_factory) {
-  clang::QualType type = var_decl->getType();
-  clang::TypeLoc type_loc;
-  if (var_decl->getTypeSourceInfo()) {
-    type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
-  }
-  // TODO delete this
-  // debugLifetimes("Types: done");
-  Lifetime lifetime;
-  if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
-                            .moveInto(lifetime)) {
-    // TODO error
-    return Lifetime();
-    // return std::move(err);
-  }
-  return lifetime;
-}
-
-namespace {
-class LifetimesPropagationVisitor
-    : public clang::StmtVisitor<LifetimesPropagationVisitor,
-                                std::optional<std::string>> {
- public:
-  // TODO func: pointer or reference?
-  LifetimesPropagationVisitor(const clang::FunctionDecl *func,
-                       LifetimeAnnotationsAnalysis &state)
-      : func_(func), state_(state), factory(func) {}
-
-  std::optional<std::string> VisitBinaryOperator(
-      const clang::BinaryOperator *op);
-  std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
-  std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
-  std::optional<std::string> VisitCompoundStmt(const clang::CompoundStmt *stmt);
-  std::optional<std::string> VisitDeclRefExpr(
-      const clang::DeclRefExpr *decl_ref);
-  std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
-  std::optional<std::string> VisitExpr(const clang::Expr *expr);
-  std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
-
- private:
-  const clang::FunctionDecl *func_;
-  LifetimeAnnotationsAnalysis &state_;
-  PointsToMap points_to_map;
-  FunctionLifetimeFactory factory;
-};
-
-}  // namespace
-
-namespace {
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitBinaryOperator(
-    const clang::BinaryOperator *op) {
-  debugLifetimes("[VisitBinaryOperator]");
-  // TODO
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
-    const clang::BinaryOperator *op) {
-  debugLifetimes("[VisitBinAssign]");
-
-  assert(op->getLHS()->isGLValue());
-
-  const auto &lhs = op->getLHS();
-  Visit(lhs);
-  const auto &lhs_points_to = points_to_map.GetExprPoints(lhs);
-  points_to_map.InsertExprLifetimes(op, lhs);
-
-  // Because of how we handle reference-like structs, a member access to a
-  // non-reference-like field in a struct might still produce lifetimes. We
-  // don't want to change points-to sets in those cases.
-  if (!lhs->getType()->isPointerType()) {
-    debugWarn("LHS of bin_op is not pointer type");
-    return std::nullopt;
-  }
-
-  const auto &rhs = op->getRHS();
-
-  Visit(rhs);
-
-  const auto &rhs_points_to = points_to_map.GetExprPoints(rhs);
-  points_to_map.InsertExprLifetimes(op, rhs);
-
-  const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
-
-  if (lhs_decl_ref_expr &&
-      state_.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
-    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, points_to_map, state_);
-  } else {
-    // TODO
-  }
-
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
-    const clang::CastExpr *cast) {
-  debugLifetimes("[VisitCastExpr]");
-  switch (cast->getCastKind()) {
-    case clang::CK_LValueToRValue: {
-      // TODO
-      debugLight("> Case LValueToRValue");
-      if (cast->getType()->isPointerType()) {
-        // Converting from a glvalue to a prvalue means that we need to perform
-        // a dereferencing operation because the objects associated with
-        // glvalues and prvalues have different meanings:
-        // - A glvalue is associated with the object identified by the glvalue.
-        // - A prvalue is only associated with an object if the prvalue is of
-        //   pointer type; the object it is associated with is the object the
-        //   pointer points to.
-        // See also documentation for PointsToMap.
-
-        // ObjectSet points_to = points_to_map_.GetPointerPointsToSet(
-        //     points_to_map_.GetExprObjectSet(cast->getSubExpr()));
-        // points_to_map_.SetExprObjectSet(cast, points_to);
-      }
-
-      for (const auto *child : cast->children()) {
-        Visit(const_cast<clang::Stmt *>(child));
-
-        if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-          points_to_map.InsertExprLifetimes(cast, child_expr);
-        }
-      }
-      break;
-    }
-    case clang::CK_NullToPointer: {
-      // TODO
-      debugLight("> Case NullToPointer");
-
-      // points_to_map_.SetExprObjectSet(cast, {});
-      break;
-    }
-    // These casts are just no-ops from a Object point of view.
-    case clang::CK_FunctionToPointerDecay:
-    case clang::CK_BuiltinFnToFnPtr:
-    case clang::CK_ArrayToPointerDecay:
-    case clang::CK_UserDefinedConversion:
-      // Note on CK_UserDefinedConversion: The actual conversion happens in a
-      // CXXMemberCallExpr that is a subexpression of this CastExpr. The
-      // CK_UserDefinedConversion is just used to mark the fact that this is a
-      // user-defined conversion; it's therefore a no-op for our purposes.
-    case clang::CK_NoOp: {
-      // TODO
-      debugLight("> Case No-ops");
-
-      // clang::QualType type = cast->getType().getCanonicalType();
-      // if (type->isPointerType() || cast->isGLValue()) {
-      //   points_to_map_.SetExprObjectSet(
-      //       cast, points_to_map_.GetExprObjectSet(cast->getSubExpr()));
-      // }
-      break;
-    }
-    case clang::CK_DerivedToBase:
-    case clang::CK_UncheckedDerivedToBase:
-    case clang::CK_BaseToDerived:
-    case clang::CK_Dynamic: {
-      // TODO
-      debugLight("> Case SubExpressions");
-
-      // These need to be mapped to what the subexpr points to.
-      // (Simple cases just work okay with this; may need to be revisited when
-      // we add more inheritance support.)
-
-      // ObjectSet points_to =
-      // points_to_map_.GetExprObjectSet(cast->getSubExpr());
-      // points_to_map_.SetExprObjectSet(cast, points_to);
-      break;
-    }
-    case clang::CK_BitCast:
-    case clang::CK_LValueBitCast:
-    case clang::CK_IntegralToPointer: {
-      // We don't support analyzing functions that perform a reinterpret_cast.
-
-      // TODO
-      debugLight("> Case Reinterpret cast");
-
-      // diag_reporter_(
-      //     func_->getBeginLoc(),
-      //     "cannot infer lifetimes because function uses a type-unsafe cast",
-      //     clang::DiagnosticIDs::Warning);
-      // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
-      //                clang::DiagnosticIDs::Note);
-      // return "type-unsafe cast prevents analysis";
-      break;
-    }
-    default: {
-      if (cast->isGLValue() ||
-          cast->getType().getCanonicalType()->isPointerType()) {
-        llvm::errs() << "Unknown cast type:\n";
-        cast->dump();
-        // No-noop casts of pointer types are not handled yet.
-        llvm::report_fatal_error("unknown cast type encountered");
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitCompoundStmt(
-    const clang::CompoundStmt *stmt) {
-  debugLifetimes("[VisitCompoundStmt]");
-  for (const auto &child : stmt->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-  }
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
-    const clang::DeclRefExpr *decl_ref) {
-  debugLifetimes("[VisitDeclRefExpr]");
-
-  auto *decl = decl_ref->getDecl();
-  if (!clang::isa<clang::VarDecl>(decl) &&
-      !clang::isa<clang::FunctionDecl>(decl)) {
-    return std::nullopt;
-  }
-
-  assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
-
-  // clang::QualType type = decl->getType().getCanonicalType();
-
-  // if (type->isReferenceType()) {
-  //   debugLifetimes("It's reference type!");
-
-  // } else {
-  //   debugLifetimes("It's not reference type");
-  // }
-
-  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
-
-  // TODO
-  // if (type->isReferenceType()) {
-  //   points_to_map_.SetExprObjectSet(
-  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
-  // } else {
-  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
-  // }
-
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
-    const clang::DeclStmt *decl_stmt) {
-  debugLifetimes("[VisitDeclStmt]");
-
-  for (const clang::Decl *decl : decl_stmt->decls()) {
-    if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      // TODO check if pointer?
-      // TODO if annotations, store annotation
-
-      Lifetime lifetime = GetVarDeclLifetime(var_decl, factory);
-      // TODO delete this
-
-      // debugLifetimes("Lifetime has sucessfully been retrieved");
-      // state_.CreateVariable(var_decl, Lifetime());
-      state_.CreateVariable(var_decl, lifetime);
-
-      // const Object *var_object = object_repository_.GetDeclObject(var_decl);
-
-      // Don't need to record initializers because initialization has already
-      // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
-      // VisitCallExpr().
-      if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
-          state_.IsLifetimeNotset(var_decl)) {
-        // debugLifetimes("VarDecl has initializer!");
-        const clang::Expr *init = var_decl->getInit();
-        Visit(const_cast<clang::Expr *>(init));
-        TransferRHS(var_decl, init, points_to_map, state_);
-        // const auto &points_to = points_to_map.GetExprPoints(init);
-
-        // debugLifetimes("This is the points to in the DeclStmt");
-        // for (const auto &expr : points_to) {
-        //   if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-        //     // DEBUG
-        //     // expr->dump();
-        //     const auto *rhs_ref_decl =
-        //         clang::dyn_cast<clang::DeclRefExpr>(expr);
-        //     // debugLifetimes("Yes it is a rhs_decl!");
-        //     state_.CreateDependency(var_decl, rhs_ref_decl);
-        //   }
-        // }
-      }
-    }
-  }
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
-    const clang::Expr *expr) {
-  debugLifetimes("[VisitExpr]");
-  // TODO
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
-    const clang::Stmt *stmt) {
-  debugLifetimes("[VisitStmt]");
-  // TODO
-  return std::nullopt;
-}
-
-}  // namespace
 
 // Process functions' headers
 void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
@@ -608,12 +170,12 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   // DEBUG
   // DumpFunctionInfo();
   auto function_info = function_info_[func];
-  clang::ASTContext &Context = func->getASTContext();
-  state_ = LifetimeAnnotationsAnalysis(function_info.GetParamsLifetimes());
+  // clang::ASTContext &Context = func->getASTContext();
+  state_ = LifetimeAnnotationsAnalysis(function_info);
 
   // step 1
   debugInfo("\n====== START STEP 1 ======\n");
-  GetLifetimeDependencies(func, Context, function_info);
+  GetLifetimeDependencies(func);
   debugInfo("\n====== FINISH STEP 1 ======\n");
   debugLifetimes(state_.DebugString());
 
@@ -628,22 +190,16 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
 
   // step 3
   debugInfo("\n====== START STEP 3 ======\n");
-  LifetimeAnnotationsChecker::CheckLifetimes();
+  LifetimeAnnotationsChecker::CheckLifetimes(func);
   debugInfo("\n====== FINISH STEP 3 ======\n");
-    debugLifetimes(state_.DebugString());
-
+  debugLifetimes(state_.DebugString());
 }
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
-    const clang::FunctionDecl *func, clang::ASTContext &Context,
-    FunctionLifetimes &func_info) {
-  debugLifetimes("[GetLifetimeDependencies]");
-
+    const clang::FunctionDecl *func) {
   LifetimesPropagationVisitor visitor(func, state_);
-
   // debugLifetimes(">> Dumping function body before visit...");
   // func->getBody()->dump();
-
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
 
@@ -711,14 +267,16 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable
   state_.ProcessShortestLifetimes();
-  
+
   // TODO
 }
 
 // With all the lifetime information acquired, check that the return
 // statements and the attributions are correct
-void LifetimeAnnotationsChecker::CheckLifetimes() {
-  // TODO
+void LifetimeAnnotationsChecker::CheckLifetimes(const clang::FunctionDecl *func) {
+  LifetimesCheckerVisitor visitor(func, state_);
+  std::optional<std::string> err = visitor.Visit(func->getBody());
+
 }
 
 }  // namespace clang

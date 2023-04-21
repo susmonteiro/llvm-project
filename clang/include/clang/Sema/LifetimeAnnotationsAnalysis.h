@@ -5,6 +5,7 @@
 
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/PointeeType.h"
 #include "llvm/ADT/Optional.h"
@@ -27,11 +28,13 @@ using Dependencies = llvm::DenseMap<const clang::NamedDecl *,
 class LifetimeAnnotationsAnalysis {
  public:
   LifetimeAnnotationsAnalysis() {}
-  LifetimeAnnotationsAnalysis(
-      llvm::DenseMap<const clang::ParmVarDecl *, Lifetime> params_lifetimes) {
+  LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info) {
+    const auto &params_lifetimes = function_info.GetParamsLifetimes();
     for (auto &pair : params_lifetimes) {
       variable_lifetimes_.insert({pair.first, pair.second});
     }
+
+    return_lifetime_ = Lifetime(function_info.GetReturnLifetime());
   }
 
   // TODO 2 options: remove or different structures for params and other vars
@@ -58,6 +61,8 @@ class LifetimeAnnotationsAnalysis {
     return l;
   }
 
+  Lifetime &GetReturnLifetime() { return return_lifetime_; }
+
   bool IsLifetimeNotset(const clang::NamedDecl *var_decl) const {
     auto it = variable_lifetimes_.find(var_decl);
     if (it != variable_lifetimes_.end()) {
@@ -77,12 +82,13 @@ class LifetimeAnnotationsAnalysis {
     variable_lifetimes_[var_decl].InsertShortestLifetimes(id);
   }
 
-  void PropagateShortestLifetimes(const clang::NamedDecl *target, llvm::DenseSet<char> shortest_lifetimes) {
+  void PropagateShortestLifetimes(const clang::NamedDecl *target,
+                                  llvm::DenseSet<char> shortest_lifetimes) {
     variable_lifetimes_[target].InsertShortestLifetimes(shortest_lifetimes);
   }
 
-
-  void PropagateShortestLifetimes(const clang::NamedDecl *to, const clang::NamedDecl *from) {
+  void PropagateShortestLifetimes(const clang::NamedDecl *to,
+                                  const clang::NamedDecl *from) {
     const auto from_lifetimes = GetShortestLifetimes(from);
     PropagateShortestLifetimes(to, from_lifetimes);
   }
@@ -169,6 +175,7 @@ class LifetimeAnnotationsAnalysis {
   // ? needed or enough in FunctionLifetimes
   // Lifetime return_lifetime_;
   Dependencies dependencies_;
+  Lifetime return_lifetime_;
 
   // TODO this
   // std::optional<ValueLifetimes> this_lifetimes_;

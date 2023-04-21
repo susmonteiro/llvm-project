@@ -25,6 +25,8 @@ add_clang_library(clangSema
   Lifetime.cpp
   LifetimeAnnotationsAnalysis.cpp
   LifetimeAnnotationsChecker.cpp
+  LifetimesCheckerVisitor.cpp
+  LifetimesPropagationVisitor.cpp
   MultiplexExternalSemaSource.cpp
   ParsedAttr.cpp
   PointeeType.cpp

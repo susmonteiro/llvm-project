@@ -61,6 +61,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   // Because of how we handle reference-like structs, a member access to a
   // non-reference-like field in a struct might still produce lifetimes. We
   // don't want to change points-to sets in those cases.
+  // TODO need to check for references?
   if (!lhs->getType()->isPointerType()) {
     debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
@@ -192,6 +193,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
 std::optional<std::string> LifetimesPropagationVisitor::VisitCompoundStmt(
     const clang::CompoundStmt *stmt) {
   debugLifetimes("[VisitCompoundStmt]");
+  // TODO maybe this is just the same as VisitStmt and I can delete this
   for (const auto &child : stmt->children()) {
     Visit(const_cast<clang::Stmt *>(child));
   }
@@ -241,6 +243,12 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
       // TODO check if pointer?
       // TODO if annotations, store annotation
 
+      if (!var_decl->getType()->isPointerType()) {
+        debugWarn("Var decl is not pointer type");
+        // return std::nullopt;
+        continue;
+      }
+
       Lifetime lifetime = GetVarDeclLifetime(var_decl, factory);
       // TODO delete this
 
@@ -288,7 +296,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
 std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   debugLifetimes("[VisitStmt]");
-  // TODO
+  for (const auto &child : stmt->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
   return std::nullopt;
 }
 

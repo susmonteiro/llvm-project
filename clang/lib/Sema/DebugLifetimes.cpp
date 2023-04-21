@@ -47,6 +47,14 @@ void debugLifetimes(llvm::DenseSet<const clang::NamedDecl*> vec) {
   }
 }
 
+void debugLifetimes(llvm::DenseSet<char> vec) {
+  std::string res = "DenseSet contains: ";
+  for (const auto el : vec) {
+    res += el + ' ';
+  }
+  debugLifetimes(res);
+}
+
 void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::NamedDecl*>> m) {
   std::string res;
   for (const auto &pair : m) {
