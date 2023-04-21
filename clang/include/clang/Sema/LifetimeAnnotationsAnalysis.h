@@ -101,6 +101,8 @@ class LifetimeAnnotationsAnalysis {
     dependencies_ = std::move(dependencies);
   }
 
+  void ProcessShortestLifetimes();
+
   // void ProcessVarLifetimes();
 
   Dependencies TransposeDependencies() const;

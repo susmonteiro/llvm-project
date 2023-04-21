@@ -61,6 +61,8 @@ void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<cons
 
 
 void debugInfo(std::string txt) { std::cout << "\033[1;34m" << txt << "\033[0m\n"; }
+void debugInfo2(std::string txt) { std::cout << "\033[1;35m" << txt << "\033[0m\n"; }
 void debugInfo(std::string txt, int i) { std::cout << "\033[1;92m" << txt << ' ' << i << "\033[0m\n\n" ; }
 void debugWarn(std::string txt) { std::cout << "\033[1;31m" << txt << "\033[0m\n"; }
+void debugWarn2(std::string txt) { std::cout << "\033[1;36m" << txt << "\033[0m\n"; }
 void debugLight(std::string txt) { std::cout << "\033[1;90m" << txt << "\033[0m\n"; }

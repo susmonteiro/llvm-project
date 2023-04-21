@@ -218,12 +218,12 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
 }
 
 namespace {
-class LifetimesStmtVisitor
-    : public clang::StmtVisitor<LifetimesStmtVisitor,
+class LifetimesPropagationVisitor
+    : public clang::StmtVisitor<LifetimesPropagationVisitor,
                                 std::optional<std::string>> {
  public:
   // TODO func: pointer or reference?
-  LifetimesStmtVisitor(const clang::FunctionDecl *func,
+  LifetimesPropagationVisitor(const clang::FunctionDecl *func,
                        LifetimeAnnotationsAnalysis &state)
       : func_(func), state_(state), factory(func) {}
 
@@ -249,14 +249,14 @@ class LifetimesStmtVisitor
 
 namespace {
 
-std::optional<std::string> LifetimesStmtVisitor::VisitBinaryOperator(
+std::optional<std::string> LifetimesPropagationVisitor::VisitBinaryOperator(
     const clang::BinaryOperator *op) {
   debugLifetimes("[VisitBinaryOperator]");
   // TODO
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitBinAssign(
+std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   debugLifetimes("[VisitBinAssign]");
 
@@ -294,7 +294,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitBinAssign(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
+std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     const clang::CastExpr *cast) {
   debugLifetimes("[VisitCastExpr]");
   switch (cast->getCastKind()) {
@@ -398,7 +398,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitCastExpr(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitCompoundStmt(
+std::optional<std::string> LifetimesPropagationVisitor::VisitCompoundStmt(
     const clang::CompoundStmt *stmt) {
   debugLifetimes("[VisitCompoundStmt]");
   for (const auto &child : stmt->children()) {
@@ -407,7 +407,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitCompoundStmt(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitDeclRefExpr(
+std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
     const clang::DeclRefExpr *decl_ref) {
   debugLifetimes("[VisitDeclRefExpr]");
 
@@ -441,7 +441,7 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclRefExpr(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
+std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
     const clang::DeclStmt *decl_stmt) {
   debugLifetimes("[VisitDeclStmt]");
 
@@ -487,14 +487,14 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitExpr(
+std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
     const clang::Expr *expr) {
   debugLifetimes("[VisitExpr]");
   // TODO
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesStmtVisitor::VisitStmt(
+std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   debugLifetimes("[VisitStmt]");
   // TODO
@@ -613,9 +613,7 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
 
   // step 1
   debugInfo("\n====== START STEP 1 ======\n");
-
   GetLifetimeDependencies(func, Context, function_info);
-
   debugInfo("\n====== FINISH STEP 1 ======\n");
   debugLifetimes(state_.DebugString());
 
@@ -632,6 +630,8 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   debugInfo("\n====== START STEP 3 ======\n");
   LifetimeAnnotationsChecker::CheckLifetimes();
   debugInfo("\n====== FINISH STEP 3 ======\n");
+    debugLifetimes(state_.DebugString());
+
 }
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
@@ -639,7 +639,7 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     FunctionLifetimes &func_info) {
   debugLifetimes("[GetLifetimeDependencies]");
 
-  LifetimesStmtVisitor visitor(func, state_);
+  LifetimesPropagationVisitor visitor(func, state_);
 
   // debugLifetimes(">> Dumping function body before visit...");
   // func->getBody()->dump();
@@ -702,23 +702,17 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
   state_.SetDependencies(children);
 
-  // TODO
-  debugLifetimes("=== state_.dependencies_ ===");
-  debugLifetimes(state_.GetDependencies());
+  debugLifetimes("=== children ===");
+  debugLifetimes(children);
 
-  // ! if a Lifetime is unset and has no shortest_lifetimes, do nothing
-  // ! if a lifetime is local, then set el to local
-  // ! if a lifetime is static, then include it in el
-  // ! if a lifetime has id_, then skip shortest_lifetimes
-  // TODO at the end of the cycle
-  // - check if id is local and if so skip next steps
-  // - check if a variable has only one "shortest_lifetimes" and set it to
-  // the main lifetime
-  // - static? Probably nothing to do
+  debugInfo2("\n====== BEFORE PROCESSING SHORTEST LIFETIMES ======\n");
+  debugLifetimes(state_.DebugString());
 
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable
-  // state_.ProcessVarLifetimes();
+  state_.ProcessShortestLifetimes();
+  
+  // TODO
 }
 
 // With all the lifetime information acquired, check that the return

@@ -23,8 +23,10 @@ void debugLifetimes(llvm::DenseSet<const clang::NamedDecl*> vec);
 void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::NamedDecl *>> m);
 
 void debugInfo(std::string txt);
+void debugInfo2(std::string txt);
 void debugInfo(std::string txt, int i);
 void debugWarn(std::string txt);
+void debugWarn2(std::string txt);
 void debugLight(std::string txt);
 
 #endif  // LIFETIME_ANNOTATIONS_DEBUG_H_

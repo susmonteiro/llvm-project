@@ -26,9 +26,11 @@ class Lifetime {
 
   // Returns whether this lifetime is a static lifetime.
   bool IsStatic() const;
+  bool ContainsStatic() const;
 
   // Returns whether this lifetime is a local lifetime.
   bool IsLocal() const;
+  bool ContainsLocal() const;
 
   // Sets the id_ to $static
   void SetStatic();
@@ -38,6 +40,9 @@ class Lifetime {
 
   // Returns the numeric ID for the lifetime.
   char Id() const { return id_; }
+  void SetId(char id) { id_ = id; }
+
+  void ProcessShortestLifetimes();
 
   std::string DebugString() const {
     std::string res;
@@ -56,11 +61,22 @@ class Lifetime {
   std::string GetLifetimeName(char id) const;
   std::string GetLifetimeName() const { return GetLifetimeName(id_); }
 
-  llvm::DenseSet<char> GetShortestLifetimes() const { return shortest_lifetimes_; }
+  llvm::DenseSet<char> GetShortestLifetimes() const {
+    return shortest_lifetimes_;
+  }
   void InsertShortestLifetimes(char id) { shortest_lifetimes_.insert(id); }
-  void InsertShortestLifetimes(llvm::DenseSet<char> shortest_lifetimes) { shortest_lifetimes_.insert(shortest_lifetimes.begin(), shortest_lifetimes.end()); }
+  void InsertShortestLifetimes(llvm::DenseSet<char> shortest_lifetimes) {
+    shortest_lifetimes_.insert(shortest_lifetimes.begin(),
+                               shortest_lifetimes.end());
+  }
   void SetShortestLifetimes(llvm::DenseSet<char> shortest_lifetimes) {
     shortest_lifetimes_ = std::move(shortest_lifetimes);
+  }
+  void RemoveFromShortestLifetimes(char id) {
+    auto it = shortest_lifetimes_.find(id);
+    if (it != shortest_lifetimes_.end()) {
+      shortest_lifetimes_.erase(it);
+    }
   }
 
  private:

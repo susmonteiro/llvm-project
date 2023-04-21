@@ -57,9 +57,38 @@ std::string Lifetime::GetLifetimeName(char id) const {
   }
 }
 
+void Lifetime::ProcessShortestLifetimes() {
+  // should only reach this if lifetime is not set
+  assert(IsNotSet());
+
+  if (ContainsLocal()) {
+    // lifetime $local is the shortest possible
+    SetLocal();
+    return;
+  }
+
+  if (shortest_lifetimes_.size() > 1 && ContainsStatic()) {
+    // static outlives all others
+    // if there are others lifetimes, static should not belong to shortest lifetimes
+    RemoveFromShortestLifetimes(STATIC);
+  }
+
+  if (shortest_lifetimes_.size() == 1) {
+    SetId(*shortest_lifetimes_.begin());
+    return;
+  }
+
+  // in all other cases, the id_ of the lifetime remains NOTSET
+  // if shortest_lifetimes_ is empty, that the lifetime of this variable is undefined
+  // if shortest_lifetimes_ contains multiple lifetimes, then the lifetime is the shortest among them
+  // since we cannot now which lifetimes outlives which, then all of them are considered the shortest
+}
+
 bool Lifetime::IsNotSet() const { return id_ == NOTSET; }
 bool Lifetime::IsStatic() const { return id_ == STATIC; }
+bool Lifetime::ContainsStatic() const { return shortest_lifetimes_.count(STATIC); }
 bool Lifetime::IsLocal() const { return id_ == LOCAL; }
+bool Lifetime::ContainsLocal() const { return shortest_lifetimes_.count(LOCAL); }
 void Lifetime::SetStatic() { id_ = STATIC; }
 void Lifetime::SetLocal() { id_ = LOCAL; }
 
