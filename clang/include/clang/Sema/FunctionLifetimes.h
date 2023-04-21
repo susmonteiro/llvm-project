@@ -38,6 +38,9 @@ class FunctionLifetimeFactory {
   llvm::Expected<Lifetime> CreateReturnLifetimes(
       clang::QualType return_type, clang::TypeLoc return_type_loc) const;
 
+  llvm::Expected<Lifetime> CreateVarLifetimes(
+      clang::QualType var_type, clang::TypeLoc var_type_loc) const;
+
   static llvm::Expected<Lifetime> CreateLifetime(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
@@ -49,6 +52,7 @@ class FunctionLifetimeFactory {
 
   LifetimeFactory ParamLifetimeFactory() const;
   LifetimeFactory ReturnLifetimeFactory() const;
+  LifetimeFactory VarLifetimeFactory() const;
 
  private:
   bool elision_enabled;
@@ -68,7 +72,8 @@ class FunctionLifetimes {
   // Returns the number of function parameters (excluding the implicit `this).
   size_t GetNumParams() const { return params_.size(); }
 
-  llvm::DenseMap<const clang::ParmVarDecl*, Lifetime> GetParamsLifetimes() const {
+  llvm::DenseMap<const clang::ParmVarDecl *, Lifetime> GetParamsLifetimes()
+      const {
     return params_lifetimes_;
   }
 
@@ -80,15 +85,15 @@ class FunctionLifetimes {
   //   return lifetimes_id_set_.find(l.Id()) != lifetimes_id_set_.end();
   // }
 
-  void InsertParamLifetime(const clang::ParmVarDecl *param, Lifetime l) { 
+  void InsertParamLifetime(const clang::ParmVarDecl *param, Lifetime l) {
     params_.emplace_back(param);
     params_lifetimes_[param] = l;
-   }
+  }
 
   void DumpParameters() const {
     std::cout << "[FunctionLifetimes]: Parameters Lifetimes\n";
     int i = 0;
-    for (const auto &pair: params_lifetimes_) {
+    for (const auto &pair : params_lifetimes_) {
       debugLifetimes("Parameter ", i++);
       const Lifetime *l = &pair.second;
       debugLifetimes(l->DebugString());
@@ -110,8 +115,8 @@ class FunctionLifetimes {
   // stores param lifetimes in order
   // TODO choose
   // std::vector<MaybeLifetime> params_lifetimes_;
-  std::vector<const clang::ParmVarDecl*> params_;
-  llvm::DenseMap<const clang::ParmVarDecl*, Lifetime> params_lifetimes_;
+  std::vector<const clang::ParmVarDecl *> params_;
+  llvm::DenseMap<const clang::ParmVarDecl *, Lifetime> params_lifetimes_;
   Lifetime return_lifetime_;
   int func_id_;
 

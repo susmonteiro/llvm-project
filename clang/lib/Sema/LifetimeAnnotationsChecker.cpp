@@ -80,6 +80,142 @@ void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
   }
 }
 
+// llvm::Expected<Lifetime> CreateLifetime(
+//     clang::QualType type, clang::TypeLoc type_loc,
+//     LifetimeFactory lifetime_factory) {
+//   assert(!type.isNull());
+//   if (type_loc) {
+//     assert(FunctionLifetimes::SameType(type_loc.getType(), type));
+//   }
+
+//   // DEBUG
+//   // debugLifetimes("Type");
+//   // type.dump();
+
+//   type = type.IgnoreParens();
+//   type = StripAttributes(type);
+
+//   llvm::SmallVector<const clang::Attr*> attrs;
+//   if (!type_loc.isNull()) {
+//     type_loc = StripAttributes(type_loc, attrs);
+//     // DEBUG
+//     // debugLifetimes("Attributes");
+//     // debugLifetimes(attrs);
+//   }
+
+//   llvm::SmallVector<const clang::Expr*> lifetime_names;
+//   if (llvm::Error err =
+//   GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
+//     return std::move(err);
+//   }
+
+//   // DEBUG
+//   // debugLifetimes("Lifetime names");
+//   // debugLifetimes(lifetime_names);
+
+//   Lifetime ret;
+
+//   llvm::SmallVector<std::string> lifetime_params =
+//   GetLifetimeParameters(type);
+
+//   // DEBUG
+//   // debugLifetimes("Lifetime parameters");
+//   // debugLifetimes(lifetime_params);
+
+//   if (!lifetime_params.empty() && !lifetime_names.empty() &&
+//       lifetime_names.size() != lifetime_params.size()) {
+//     return llvm::createStringError(
+//         llvm::inconvertibleErrorCode(),
+//         "Number of types and lifetimes not the same"
+//         // TODO abseil
+//         /* absl::StrCat("Type has ", lifetime_params.size(),
+//                      " lifetime parameters but ", lifetime_names.size(),
+//                      " lifetime arguments were given") */);
+//   }
+
+//   // debugLifetimes("Size of lifetime_params", lifetime_params.size());
+
+//   for (size_t i = 0; i < lifetime_params.size(); ++i) {
+//     // debugLifetimes("Inside loop of parameters");
+//     Lifetime l;
+//     const clang::Expr* lifetime_name = nullptr;
+//     if (i < lifetime_names.size()) {
+//       lifetime_name = lifetime_names[i];
+//     }
+//     if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(l)) {
+//       return std::move(err);
+//     }
+//   }
+
+//   // TODO this is already done in the previous function
+//   clang::QualType pointee = PointeeType(type);
+//   // TODO change this
+//   if (pointee.isNull()) return Lifetime();
+
+//   clang::TypeLoc pointee_type_loc;
+//   if (type_loc) {
+//     pointee_type_loc = PointeeTypeLoc(type_loc);
+//     // Note: We can't assert that `pointee_type_loc` is non-null here. If
+//     // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
+//     // the pointee type because the pointee type never got spelled out at the
+//     // location of the original `TypeLoc`.
+//   }
+
+//   // TODO is this ok?
+//   // recursive call
+//   Lifetime lifetime;
+//   if (llvm::Error err =
+//           CreateLifetime(pointee, pointee_type_loc, lifetime_factory)
+//               .moveInto(lifetime)) {
+//     return std::move(err);
+//   }
+
+//   const clang::Expr* lifetime_name = nullptr;
+//   // debugLifetimes("Let's see if lifetime names is empty...");
+//   if (!lifetime_names.empty()) {
+//     // debugLifetimes("Lifetime names is not emptyyyyyyy");
+//     if (lifetime_names.size() != 1) {
+//       return llvm::createStringError(
+//           llvm::inconvertibleErrorCode(),
+//           // TODO abseil
+//           "Expected a single lifetime but multiple were given"
+//           /* absl::StrCat("Expected a single lifetime but ",
+//           lifetime_names.size(),
+//                        " were given") */);
+//     }
+//     lifetime_name = lifetime_names.front();
+//   }
+//   // DEBUG
+//   // else {
+//   //   debugLifetimes("Yep lifetime names is empty...");
+//   // }
+
+//   if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(ret)) {
+//     return std::move(err);
+//   }
+
+//   // TODO change to optional maybe
+//   return ret;
+// }
+
+Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
+                            FunctionLifetimeFactory &lifetime_factory) {
+  clang::QualType type = var_decl->getType();
+  clang::TypeLoc type_loc;
+  if (var_decl->getTypeSourceInfo()) {
+    type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
+  }
+  debugLifetimes("Types: done");
+  Lifetime lifetime;
+  if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
+                            .moveInto(lifetime)) {
+    // TODO error
+    return Lifetime();
+    // return std::move(err);
+  }
+  return lifetime;
+}
+
 namespace {
 class LifetimesStmtVisitor
     : public clang::StmtVisitor<LifetimesStmtVisitor,
@@ -88,7 +224,7 @@ class LifetimesStmtVisitor
   // TODO func: pointer or reference?
   LifetimesStmtVisitor(const clang::FunctionDecl *func,
                        LifetimeAnnotationsAnalysis &state)
-      : func_(func), state_(state) {}
+      : func_(func), state_(state), factory(func) {}
 
   std::optional<std::string> VisitBinaryOperator(
       const clang::BinaryOperator *op);
@@ -105,6 +241,7 @@ class LifetimesStmtVisitor
   const clang::FunctionDecl *func_;
   LifetimeAnnotationsAnalysis &state_;
   PointsToMap points_to_map;
+  FunctionLifetimeFactory factory;
 };
 
 }  // namespace
@@ -144,7 +281,9 @@ std::optional<std::string> LifetimesStmtVisitor::VisitBinAssign(
   const auto &rhs_points_to = points_to_map.GetExprPoints(rhs);
   points_to_map.InsertExprLifetimes(op, rhs);
 
-  if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
+  const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
+
+  if (lhs_decl_ref_expr && state_.IsLifetimeNotset(lhs_decl_ref_expr->getDecl()) ) {
     TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, points_to_map, state_);
   } else {
     // TODO
@@ -309,7 +448,11 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
       // TODO check if pointer?
       // TODO if annotations, store annotation
 
-      state_.CreateVariable(var_decl);
+      Lifetime lifetime = GetVarDeclLifetime(var_decl, factory);
+      debugLifetimes("Lifetime has sucessfully been retrieved");
+      // state_.CreateVariable(var_decl, Lifetime());
+      state_.CreateVariable(var_decl, lifetime);
+
       // const Object *var_object = object_repository_.GetDeclObject(var_decl);
 
       // Don't need to record initializers because initialization has already

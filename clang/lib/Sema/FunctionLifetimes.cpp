@@ -212,9 +212,15 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
   return CreateLifetime(return_type, return_type_loc, ReturnLifetimeFactory());
 }
 
+llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateVarLifetimes(
+    clang::QualType var_type, clang::TypeLoc var_type_loc) const {
+  return CreateLifetime(var_type, var_type_loc, VarLifetimeFactory());
+}
+
 llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
     clang::QualType type, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
+      debugLifetimes("Inside create lifetimes");
   assert(!type.isNull());
   if (type_loc) {
     assert(SameType(type_loc.getType(), type));
@@ -400,6 +406,25 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
     // });
   // TODO remove this
   return Lifetime();
+  };
+}
+
+LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
+  return [this](const clang::Expr* name) -> llvm::Expected<Lifetime> {
+    // DEBUG
+    // debugLifetimes(">> Expression name:");
+    // name->dump();
+    debugLifetimes("Inside the varlifetimefactory");
+    if (name) {
+      // debugLifetimes(">>> The lifetime has a name");
+      Lifetime lifetime;
+      if (llvm::Error err = LifetimeFromName(name).moveInto(lifetime)) {
+        return std::move(err);
+      }
+      return lifetime;
+    }
+    // TODO error?
+    return Lifetime();
   };
 }
 
