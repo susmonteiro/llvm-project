@@ -1,0 +1,295 @@
+#include "clang/Sema/LifetimesPropagationVisitor.h"
+
+namespace clang {
+
+void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
+                 PointsToMap &points_to_map,
+                 LifetimeAnnotationsAnalysis &state) {
+  debugLifetimes("\t[TransferRHS]");
+  const auto &points_to = points_to_map.GetExprPoints(rhs);
+
+  // debugLifetimes("This is the points to in the TransferRHS");
+  for (const auto &expr : points_to) {
+    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+      // DEBUG
+      // expr->dump();
+      const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
+      // debugLifetimes("Yes it is a rhs_decl!");
+      state.CreateDependency(lhs, rhs_ref_decl);
+    }
+  }
+}
+
+Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
+                            FunctionLifetimeFactory &lifetime_factory) {
+  clang::QualType type = var_decl->getType();
+  clang::TypeLoc type_loc;
+  if (var_decl->getTypeSourceInfo()) {
+    type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
+  }
+  // TODO delete this
+  // debugLifetimes("Types: done");
+  Lifetime lifetime;
+  if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
+                            .moveInto(lifetime)) {
+    // TODO error
+    return Lifetime();
+    // return std::move(err);
+  }
+  return lifetime;
+}
+
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitBinaryOperator(
+    const clang::BinaryOperator *op) {
+  debugLifetimes("[VisitBinaryOperator]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
+    const clang::BinaryOperator *op) {
+  debugLifetimes("[VisitBinAssign]");
+
+  assert(op->getLHS()->isGLValue());
+
+  const auto &lhs = op->getLHS();
+  Visit(lhs);
+  const auto &lhs_points_to = points_to_map.GetExprPoints(lhs);
+  points_to_map.InsertExprLifetimes(op, lhs);
+
+  // Because of how we handle reference-like structs, a member access to a
+  // non-reference-like field in a struct might still produce lifetimes. We
+  // don't want to change points-to sets in those cases.
+  if (!lhs->getType()->isPointerType()) {
+    debugWarn("LHS of bin_op is not pointer type");
+    return std::nullopt;
+  }
+
+  const auto &rhs = op->getRHS();
+
+  Visit(rhs);
+
+  const auto &rhs_points_to = points_to_map.GetExprPoints(rhs);
+  points_to_map.InsertExprLifetimes(op, rhs);
+
+  const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
+
+  if (lhs_decl_ref_expr &&
+      state_.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
+    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, points_to_map, state_);
+  } else {
+    // TODO
+  }
+
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
+    const clang::CastExpr *cast) {
+  debugLifetimes("[VisitCastExpr]");
+  switch (cast->getCastKind()) {
+    case clang::CK_LValueToRValue: {
+      // TODO
+      debugLight("> Case LValueToRValue");
+      if (cast->getType()->isPointerType()) {
+        // Converting from a glvalue to a prvalue means that we need to perform
+        // a dereferencing operation because the objects associated with
+        // glvalues and prvalues have different meanings:
+        // - A glvalue is associated with the object identified by the glvalue.
+        // - A prvalue is only associated with an object if the prvalue is of
+        //   pointer type; the object it is associated with is the object the
+        //   pointer points to.
+        // See also documentation for PointsToMap.
+
+        // ObjectSet points_to = points_to_map_.GetPointerPointsToSet(
+        //     points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+        // points_to_map_.SetExprObjectSet(cast, points_to);
+      }
+
+      for (const auto *child : cast->children()) {
+        Visit(const_cast<clang::Stmt *>(child));
+
+        if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+          points_to_map.InsertExprLifetimes(cast, child_expr);
+        }
+      }
+      break;
+    }
+    case clang::CK_NullToPointer: {
+      // TODO
+      debugLight("> Case NullToPointer");
+
+      // points_to_map_.SetExprObjectSet(cast, {});
+      break;
+    }
+    // These casts are just no-ops from a Object point of view.
+    case clang::CK_FunctionToPointerDecay:
+    case clang::CK_BuiltinFnToFnPtr:
+    case clang::CK_ArrayToPointerDecay:
+    case clang::CK_UserDefinedConversion:
+      // Note on CK_UserDefinedConversion: The actual conversion happens in a
+      // CXXMemberCallExpr that is a subexpression of this CastExpr. The
+      // CK_UserDefinedConversion is just used to mark the fact that this is a
+      // user-defined conversion; it's therefore a no-op for our purposes.
+    case clang::CK_NoOp: {
+      // TODO
+      debugLight("> Case No-ops");
+
+      // clang::QualType type = cast->getType().getCanonicalType();
+      // if (type->isPointerType() || cast->isGLValue()) {
+      //   points_to_map_.SetExprObjectSet(
+      //       cast, points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+      // }
+      break;
+    }
+    case clang::CK_DerivedToBase:
+    case clang::CK_UncheckedDerivedToBase:
+    case clang::CK_BaseToDerived:
+    case clang::CK_Dynamic: {
+      // TODO
+      debugLight("> Case SubExpressions");
+
+      // These need to be mapped to what the subexpr points to.
+      // (Simple cases just work okay with this; may need to be revisited when
+      // we add more inheritance support.)
+
+      // ObjectSet points_to =
+      // points_to_map_.GetExprObjectSet(cast->getSubExpr());
+      // points_to_map_.SetExprObjectSet(cast, points_to);
+      break;
+    }
+    case clang::CK_BitCast:
+    case clang::CK_LValueBitCast:
+    case clang::CK_IntegralToPointer: {
+      // We don't support analyzing functions that perform a reinterpret_cast.
+
+      // TODO
+      debugLight("> Case Reinterpret cast");
+
+      // diag_reporter_(
+      //     func_->getBeginLoc(),
+      //     "cannot infer lifetimes because function uses a type-unsafe cast",
+      //     clang::DiagnosticIDs::Warning);
+      // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
+      //                clang::DiagnosticIDs::Note);
+      // return "type-unsafe cast prevents analysis";
+      break;
+    }
+    default: {
+      if (cast->isGLValue() ||
+          cast->getType().getCanonicalType()->isPointerType()) {
+        llvm::errs() << "Unknown cast type:\n";
+        cast->dump();
+        // No-noop casts of pointer types are not handled yet.
+        llvm::report_fatal_error("unknown cast type encountered");
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitCompoundStmt(
+    const clang::CompoundStmt *stmt) {
+  debugLifetimes("[VisitCompoundStmt]");
+  for (const auto &child : stmt->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
+    const clang::DeclRefExpr *decl_ref) {
+  debugLifetimes("[VisitDeclRefExpr]");
+
+  auto *decl = decl_ref->getDecl();
+  if (!clang::isa<clang::VarDecl>(decl) &&
+      !clang::isa<clang::FunctionDecl>(decl)) {
+    return std::nullopt;
+  }
+
+  assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
+
+  // clang::QualType type = decl->getType().getCanonicalType();
+
+  // if (type->isReferenceType()) {
+  //   debugLifetimes("It's reference type!");
+
+  // } else {
+  //   debugLifetimes("It's not reference type");
+  // }
+
+  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
+
+  // TODO
+  // if (type->isReferenceType()) {
+  //   points_to_map_.SetExprObjectSet(
+  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
+  // } else {
+  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
+  // }
+
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
+    const clang::DeclStmt *decl_stmt) {
+  debugLifetimes("[VisitDeclStmt]");
+
+  for (const clang::Decl *decl : decl_stmt->decls()) {
+    if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
+      // TODO check if pointer?
+      // TODO if annotations, store annotation
+
+      Lifetime lifetime = GetVarDeclLifetime(var_decl, factory);
+      // TODO delete this
+
+      // debugLifetimes("Lifetime has sucessfully been retrieved");
+      // state_.CreateVariable(var_decl, Lifetime());
+      state_.CreateVariable(var_decl, lifetime);
+
+      // const Object *var_object = object_repository_.GetDeclObject(var_decl);
+
+      // Don't need to record initializers because initialization has already
+      // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
+      // VisitCallExpr().
+      if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
+          state_.IsLifetimeNotset(var_decl)) {
+        // debugLifetimes("VarDecl has initializer!");
+        const clang::Expr *init = var_decl->getInit();
+        Visit(const_cast<clang::Expr *>(init));
+        TransferRHS(var_decl, init, points_to_map, state_);
+        // const auto &points_to = points_to_map.GetExprPoints(init);
+
+        // debugLifetimes("This is the points to in the DeclStmt");
+        // for (const auto &expr : points_to) {
+        //   if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+        //     // DEBUG
+        //     // expr->dump();
+        //     const auto *rhs_ref_decl =
+        //         clang::dyn_cast<clang::DeclRefExpr>(expr);
+        //     // debugLifetimes("Yes it is a rhs_decl!");
+        //     state_.CreateDependency(var_decl, rhs_ref_decl);
+        //   }
+        // }
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
+    const clang::Expr *expr) {
+  debugLifetimes("[VisitExpr]");
+  // TODO
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
+    const clang::Stmt *stmt) {
+  debugLifetimes("[VisitStmt]");
+  // TODO
+  return std::nullopt;
+}
+
+}  // namespace clang
