@@ -220,7 +220,8 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateVarLifetimes(
 llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
     clang::QualType type, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
-      debugLifetimes("Inside create lifetimes");
+  // TODO delete this
+  // debugLifetimes("Inside create lifetimes");
   assert(!type.isNull());
   if (type_loc) {
     assert(SameType(type_loc.getType(), type));
@@ -414,7 +415,8 @@ LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
     // DEBUG
     // debugLifetimes(">> Expression name:");
     // name->dump();
-    debugLifetimes("Inside the varlifetimefactory");
+    // TODO delete this
+    // debugLifetimes("Inside the varlifetimefactory");
     if (name) {
       // debugLifetimes(">>> The lifetime has a name");
       Lifetime lifetime;

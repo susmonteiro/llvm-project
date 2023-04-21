@@ -205,7 +205,8 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
   if (var_decl->getTypeSourceInfo()) {
     type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
   }
-  debugLifetimes("Types: done");
+  // TODO delete this
+  // debugLifetimes("Types: done");
   Lifetime lifetime;
   if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
                             .moveInto(lifetime)) {
@@ -283,7 +284,8 @@ std::optional<std::string> LifetimesStmtVisitor::VisitBinAssign(
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
 
-  if (lhs_decl_ref_expr && state_.IsLifetimeNotset(lhs_decl_ref_expr->getDecl()) ) {
+  if (lhs_decl_ref_expr &&
+      state_.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
     TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, points_to_map, state_);
   } else {
     // TODO
@@ -449,7 +451,9 @@ std::optional<std::string> LifetimesStmtVisitor::VisitDeclStmt(
       // TODO if annotations, store annotation
 
       Lifetime lifetime = GetVarDeclLifetime(var_decl, factory);
-      debugLifetimes("Lifetime has sucessfully been retrieved");
+      // TODO delete this
+
+      // debugLifetimes("Lifetime has sucessfully been retrieved");
       // state_.CreateVariable(var_decl, Lifetime());
       state_.CreateVariable(var_decl, lifetime);
 
