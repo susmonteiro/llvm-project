@@ -222,6 +222,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
   //   debugLifetimes("It's not reference type");
   // }
 
+  // TODO don't insert if it's not either reference or pointer type
+
   points_to_map.InsertExprLifetimes(decl_ref, nullptr);
 
   // TODO

@@ -2,6 +2,146 @@
 
 namespace clang {
 
+std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
+    const clang::CastExpr *cast) {
+  debugLifetimes("[VisitCastExpr]");
+  switch (cast->getCastKind()) {
+    case clang::CK_LValueToRValue: {
+      // TODO
+      debugLight("> Case LValueToRValue");
+      if (cast->getType()->isPointerType()) {
+        // Converting from a glvalue to a prvalue means that we need to perform
+        // a dereferencing operation because the objects associated with
+        // glvalues and prvalues have different meanings:
+        // - A glvalue is associated with the object identified by the glvalue.
+        // - A prvalue is only associated with an object if the prvalue is of
+        //   pointer type; the object it is associated with is the object the
+        //   pointer points to.
+        // See also documentation for PointsToMap.
+
+        // ObjectSet points_to = points_to_map_.GetPointerPointsToSet(
+        //     points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+        // points_to_map_.SetExprObjectSet(cast, points_to);
+      }
+
+      for (const auto *child : cast->children()) {
+        Visit(const_cast<clang::Stmt *>(child));
+
+        if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+          points_to_map.InsertExprLifetimes(cast, child_expr);
+        }
+      }
+      break;
+    }
+    case clang::CK_NullToPointer: {
+      // TODO
+      debugLight("> Case NullToPointer");
+
+      // points_to_map_.SetExprObjectSet(cast, {});
+      break;
+    }
+    // These casts are just no-ops from a Object point of view.
+    case clang::CK_FunctionToPointerDecay:
+    case clang::CK_BuiltinFnToFnPtr:
+    case clang::CK_ArrayToPointerDecay:
+    case clang::CK_UserDefinedConversion:
+      // Note on CK_UserDefinedConversion: The actual conversion happens in a
+      // CXXMemberCallExpr that is a subexpression of this CastExpr. The
+      // CK_UserDefinedConversion is just used to mark the fact that this is a
+      // user-defined conversion; it's therefore a no-op for our purposes.
+    case clang::CK_NoOp: {
+      // TODO
+      debugLight("> Case No-ops");
+
+      // clang::QualType type = cast->getType().getCanonicalType();
+      // if (type->isPointerType() || cast->isGLValue()) {
+      //   points_to_map_.SetExprObjectSet(
+      //       cast, points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+      // }
+      break;
+    }
+    case clang::CK_DerivedToBase:
+    case clang::CK_UncheckedDerivedToBase:
+    case clang::CK_BaseToDerived:
+    case clang::CK_Dynamic: {
+      // TODO
+      debugLight("> Case SubExpressions");
+
+      // These need to be mapped to what the subexpr points to.
+      // (Simple cases just work okay with this; may need to be revisited when
+      // we add more inheritance support.)
+
+      // ObjectSet points_to =
+      // points_to_map_.GetExprObjectSet(cast->getSubExpr());
+      // points_to_map_.SetExprObjectSet(cast, points_to);
+      break;
+    }
+    case clang::CK_BitCast:
+    case clang::CK_LValueBitCast:
+    case clang::CK_IntegralToPointer: {
+      // We don't support analyzing functions that perform a reinterpret_cast.
+
+      // TODO
+      debugLight("> Case Reinterpret cast");
+
+      // diag_reporter_(
+      //     func_->getBeginLoc(),
+      //     "cannot infer lifetimes because function uses a type-unsafe cast",
+      //     clang::DiagnosticIDs::Warning);
+      // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
+      //                clang::DiagnosticIDs::Note);
+      // return "type-unsafe cast prevents analysis";
+      break;
+    }
+    default: {
+      if (cast->isGLValue() ||
+          cast->getType().getCanonicalType()->isPointerType()) {
+        llvm::errs() << "Unknown cast type:\n";
+        cast->dump();
+        // No-noop casts of pointer types are not handled yet.
+        llvm::report_fatal_error("unknown cast type encountered");
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesCheckerVisitor::VisitDeclRefExpr(
+    const clang::DeclRefExpr *decl_ref) {
+  debugLifetimes("[VisitDeclRefExpr]");
+
+  auto *decl = decl_ref->getDecl();
+  if (!clang::isa<clang::VarDecl>(decl) &&
+      !clang::isa<clang::FunctionDecl>(decl)) {
+    return std::nullopt;
+  }
+
+  assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
+
+  // clang::QualType type = decl->getType().getCanonicalType();
+
+  // if (type->isReferenceType()) {
+  //   debugLifetimes("It's reference type!");
+
+  // } else {
+  //   debugLifetimes("It's not reference type");
+  // }
+
+  // TODO don't insert if it's not either reference or pointer type
+
+  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
+
+  // TODO
+  // if (type->isReferenceType()) {
+  //   points_to_map_.SetExprObjectSet(
+  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
+  // } else {
+  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
+  // }
+
+  return std::nullopt;
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitExpr(
     const clang::Expr *expr) {
   debugLifetimes("[VisitExpr]");
@@ -31,9 +171,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     // TODO error
   }
 
-  // TODO need to analyze expression from ReturnStmt and then get the value from points_to
+  // TODO need to analyze expression from ReturnStmt and then get the value from
+  // points_to
   Visit(const_cast<clang::Expr*>(return_stmt->getRetValue()));
   // TODO need to implement operator == for Lifetimes
+
+  const auto &return_expr = points_to_map.GetExprPoints(return_stmt->getRetValue());
 
   // TODO
   return std::nullopt;

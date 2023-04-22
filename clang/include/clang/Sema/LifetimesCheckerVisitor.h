@@ -29,16 +29,19 @@ class LifetimesCheckerVisitor
  public:
   // TODO func: pointer or reference?
   LifetimesCheckerVisitor(const clang::FunctionDecl *func,
-                              LifetimeAnnotationsAnalysis &state)
+                          LifetimeAnnotationsAnalysis &state)
       : func_(func), state_(state), factory(func) {}
 
   std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
+  std::optional<std::string> VisitDeclRefExpr(
+      const clang::DeclRefExpr *decl_ref);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
-  std::optional<std::string> VisitReturnStmt(const clang::ReturnStmt *return_stmt);
+  std::optional<std::string> VisitReturnStmt(
+      const clang::ReturnStmt *return_stmt);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
 
  private:
- // TODO check if all of these are necessary
+  // TODO check if all of these are necessary
   const clang::FunctionDecl *func_;
   LifetimeAnnotationsAnalysis &state_;
   PointsToMap points_to_map;
