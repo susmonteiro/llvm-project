@@ -85,7 +85,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   return std::nullopt;
 }
 
-std::optional<std::string> VisitCallExpr(const clang::CallExpr *call_expr) {
+std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(const clang::CallExpr *call_expr) {
     debugLifetimes("[VisitCallExpr]");
     // * no need to check the arguments lifetimes -> there is always a min lifetime between any set of lifetimes
     // * we need to get the lifetimes of the parameters and return of the called function

@@ -35,8 +35,8 @@ class LifetimesPropagationVisitor
   std::optional<std::string> VisitBinaryOperator(
       const clang::BinaryOperator *op);
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
-  std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
   std::optional<std::string> VisitCallExpr(const clang::CallExpr *call_expr);
+  std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
   std::optional<std::string> VisitCompoundStmt(const clang::CompoundStmt *stmt);
   std::optional<std::string> VisitDeclRefExpr(
       const clang::DeclRefExpr *decl_ref);
