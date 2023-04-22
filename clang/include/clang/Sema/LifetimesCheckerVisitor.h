@@ -32,7 +32,7 @@ class LifetimesCheckerVisitor
                               LifetimeAnnotationsAnalysis &state)
       : func_(func), state_(state), factory(func) {}
 
-  std::optional<std::string> VisitCompoundStmt(const clang::CompoundStmt *stmt);
+  std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitReturnStmt(const clang::ReturnStmt *return_stmt);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);

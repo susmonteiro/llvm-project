@@ -201,16 +201,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesPropagationVisitor::VisitCompoundStmt(
-    const clang::CompoundStmt *stmt) {
-  debugLifetimes("[VisitCompoundStmt]");
-  // TODO maybe this is just the same as VisitStmt and I can delete this
-  for (const auto &child : stmt->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-  }
-  return std::nullopt;
-}
-
 std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
     const clang::DeclRefExpr *decl_ref) {
   debugLifetimes("[VisitDeclRefExpr]");
