@@ -39,7 +39,6 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
   return lifetime;
 }
 
-
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinaryOperator(
     const clang::BinaryOperator *op) {
   debugLifetimes("[VisitBinaryOperator]");
@@ -83,6 +82,18 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     // TODO
   }
 
+  return std::nullopt;
+}
+
+std::optional<std::string> VisitCallExpr(const clang::CallExpr *call_expr) {
+    debugLifetimes("[VisitCallExpr]");
+    // * no need to check the arguments lifetimes -> there is always a min lifetime between any set of lifetimes
+    // * we need to get the lifetimes of the parameters and return of the called function
+    // * get all parameters whose lifetime is the same as the return
+    // * get the corresponding arguments
+    // * assign to the points_to map all the above arguments
+    // * this way, the lhs will get these dependencies
+  // TODO
   return std::nullopt;
 }
 
