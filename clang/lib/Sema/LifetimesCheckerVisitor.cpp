@@ -7,7 +7,6 @@
 #include "clang/Basic/DiagnosticSema.h"
 #include "clang/Sema/Sema.h"
 
-
 namespace clang {
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
@@ -179,27 +178,39 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     // TODO error
   }
 
-  // TODO need to analyze expression from ReturnStmt and then get the value from
-  // points_to
-  Visit(const_cast<clang::Expr*>(return_stmt->getRetValue()));
-  // TODO need to implement operator == for Lifetimes
-
-  const auto &return_expr = points_to_map.GetExprPoints(return_stmt->getRetValue());
+  Visit(const_cast<clang::Expr *>(return_stmt->getRetValue()));
+  const auto &return_expr =
+      points_to_map.GetExprPoints(return_stmt->getRetValue());
 
   for (const auto &expr : return_expr) {
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      // TODO probably need to check if this is pointer type
-      // ?
-      // there can only be one pointer/reference variable
       const auto *var = clang::dyn_cast<clang::DeclRefExpr>(expr);
+      clang::QualType var_type = var->getType();
+      if (!var_type->isPointerType() && !var_type->isReferenceType()) {
+        continue;
+      }
+
+      // there can only be one pointer/reference variable
       const auto *var_decl = var->getDecl();
       Lifetime &var_lifetime = state_.GetLifetime(var_decl);
-      if (return_lifetime != var_lifetime) {
-        // TODO error
-        S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ) << return_lifetime.GetLifetimeName() << var_lifetime.GetLifetimeName() << return_stmt->getSourceRange();
-        S.Diag(var_decl->getLocation(), diag::note_lifetime_declared_here) << var_decl->getDeclName() << var_decl->getSourceRange();
-      } else {
-        // TODO
+      if (return_lifetime < var_lifetime) { 
+        if (var_lifetime.IsNotSet()) {
+          for (char l : var_lifetime.GetShortestLifetimes()) {
+            if (l == return_lifetime.Id()) continue;
+            S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
+              << return_lifetime.GetLifetimeName()
+              << var_lifetime.GetLifetimeName(l)
+              << return_stmt->getSourceRange();
+          }
+          // TODO implement the notes in this case
+        } else {
+          S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
+              << return_lifetime.GetLifetimeName()
+              << var_lifetime.GetLifetimeName()
+              << return_stmt->getSourceRange();
+          S.Diag(var_decl->getLocation(), diag::note_lifetime_declared_here)
+              << var_lifetime.GetLifetimeName() << var_decl->getSourceRange();
+        }
       }
       break;
     }
