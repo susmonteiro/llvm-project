@@ -24,7 +24,7 @@ class LifetimeAnnotationsChecker {
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
   void GetLifetimeDependencies(const clang::FunctionDecl *func);
   void PropagateLifetimes();
-  void CheckLifetimes(const clang::FunctionDecl *func);
+  void CheckLifetimes(const clang::FunctionDecl *func, Sema &S);
 
   void DumpFunctionInfo() const {
     debugLifetimes("[LifetimeAnnotationsChecker]: Functions Information");

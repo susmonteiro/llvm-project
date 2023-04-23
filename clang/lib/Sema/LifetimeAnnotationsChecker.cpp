@@ -190,7 +190,7 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
 
   // step 3
   debugInfo("\n====== START STEP 3 ======\n");
-  LifetimeAnnotationsChecker::CheckLifetimes(func);
+  LifetimeAnnotationsChecker::CheckLifetimes(func, S);
   debugInfo("\n====== FINISH STEP 3 ======\n");
   debugLifetimes(state_.DebugString());
 }
@@ -273,8 +273,8 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
 // With all the lifetime information acquired, check that the return
 // statements and the attributions are correct
-void LifetimeAnnotationsChecker::CheckLifetimes(const clang::FunctionDecl *func) {
-  LifetimesCheckerVisitor visitor(func, state_);
+void LifetimeAnnotationsChecker::CheckLifetimes(const clang::FunctionDecl *func, Sema &S) {
+  LifetimesCheckerVisitor visitor(func, state_, S);
   std::optional<std::string> err = visitor.Visit(func->getBody());
 
 }

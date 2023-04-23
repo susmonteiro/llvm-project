@@ -42,16 +42,16 @@ std::string Lifetime::GetLifetimeName(char id) const {
     case NOTSET:
     case INVALID_ID_TOMBSTONE:
     case INVALID_EMPTY:
-      return "not-set";
+      return "$not-set";
       break;
     case STATIC:
-      return "static";
+      return "$static";
       break;
     case LOCAL:
-      return "local";
+      return "$local";
       break;
     default:
-      if (id >= 'a' && id <= 'z') return std::string(1, id);
+      if (id >= 'a' && id <= 'z') return "$" + std::string(1, id);
       // TODO error
       else
         return "error";

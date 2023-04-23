@@ -53,9 +53,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS();
-  Visit(lhs);
-  const auto &lhs_points_to = points_to_map.GetExprPoints(lhs);
-  points_to_map.InsertExprLifetimes(op, lhs);
 
   // Because of how we handle reference-like structs, a member access to a
   // non-reference-like field in a struct might still produce lifetimes. We
@@ -65,6 +62,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
+
+  Visit(lhs);
+  const auto &lhs_points_to = points_to_map.GetExprPoints(lhs);
+  points_to_map.InsertExprLifetimes(op, lhs);
 
   const auto &rhs = op->getRHS();
 
@@ -85,14 +86,17 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(const clang::CallExpr *call_expr) {
-    debugLifetimes("[VisitCallExpr]");
-    // * no need to check the arguments lifetimes -> there is always a min lifetime between any set of lifetimes
-    // * we need to get the lifetimes of the parameters and return of the called function
-    // * get all parameters whose lifetime is the same as the return
-    // * get the corresponding arguments
-    // * assign to the points_to map all the above arguments
-    // * this way, the lhs will get these dependencies
+std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
+    const clang::CallExpr *call_expr) {
+  debugLifetimes("[VisitCallExpr]");
+  // * no need to check the arguments lifetimes -> there is always a min
+  // lifetime between any set of lifetimes
+  // * we need to get the lifetimes of the parameters and return of the called
+  // function
+  // * get all parameters whose lifetime is the same as the return
+  // * get the corresponding arguments
+  // * assign to the points_to map all the above arguments
+  // * this way, the lhs will get these dependencies
   // TODO
   return std::nullopt;
 }
@@ -243,10 +247,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      // TODO check if pointer?
-      // TODO if annotations, store annotation
-
       if (!var_decl->getType()->isPointerType()) {
+        // TODO what happens when it's a reference? `isPointerType()` also
+        // catches this?
         debugWarn("Var decl is not pointer type");
         // return std::nullopt;
         continue;

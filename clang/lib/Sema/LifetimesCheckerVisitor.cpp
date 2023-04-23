@@ -1,5 +1,13 @@
 #include "clang/Sema/LifetimesCheckerVisitor.h"
 
+#include "clang/AST/ASTDiagnostic.h"
+#include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/DiagnosticIDs.h"
+#include "clang/Basic/DiagnosticOptions.h"
+#include "clang/Basic/DiagnosticSema.h"
+#include "clang/Sema/Sema.h"
+
+
 namespace clang {
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
@@ -184,10 +192,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
       // ?
       // there can only be one pointer/reference variable
       const auto *var = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      Lifetime &var_lifetime = state_.GetLifetime(var->getDecl());
+      const auto *var_decl = var->getDecl();
+      Lifetime &var_lifetime = state_.GetLifetime(var_decl);
       if (return_lifetime != var_lifetime) {
         // TODO error
-        debugWarn("Lifetimes of return and return value are different!");
+        S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ) << return_lifetime.GetLifetimeName() << var_lifetime.GetLifetimeName() << return_stmt->getSourceRange();
+        S.Diag(var_decl->getLocation(), diag::note_lifetime_declared_here) << var_decl->getDeclName() << var_decl->getSourceRange();
       } else {
         // TODO
       }
