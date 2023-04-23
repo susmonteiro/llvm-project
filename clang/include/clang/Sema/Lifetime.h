@@ -32,6 +32,21 @@ class Lifetime {
     return !operator==(Other);
   }
 
+  bool operator>=(const Lifetime &Other) const {
+    // $static outlives all lifetimes
+    // all lifetimes outlive $local
+    if (IsStatic() || Other.IsLocal()) return true;
+    if (IsLocal() || Other.IsStatic()) return false;
+
+    if (!IsNotSet()) return id_ == Other.Id();
+
+    return id_ == Other.Id() && shortest_lifetimes_ == Other.GetShortestLifetimes();
+  }
+
+  bool operator<(const Lifetime &Other) const {
+    return !operator>=(Other);
+  }
+
   // Returns whether this lifetime is valid
   bool IsNotSet() const;
 

@@ -42,7 +42,7 @@ std::string Lifetime::GetLifetimeName(char id) const {
     case NOTSET:
     case INVALID_ID_TOMBSTONE:
     case INVALID_EMPTY:
-      return "$not-set";
+      return "not-set";
       break;
     case STATIC:
       return "$static";
