@@ -11826,7 +11826,8 @@ def warn_return_undefined_lifetime : Warning<
 // TODO change the variables
 def warn_return_lifetimes_differ : Warning<
   "function should return data with lifetime '%0' but it is returning data with lifetime '%1'">;
-
-def note_lifetime_declared_here : Note<"declared with lifetime %0 here">;
+def warn_assign_lifetimes_differ : Warning<
+  "assignment requires that '%0' outlives '%1'">;
+def note_lifetime_declared_here : Note<"declared with lifetime '%0' here">;
 
 } // end of sema component.

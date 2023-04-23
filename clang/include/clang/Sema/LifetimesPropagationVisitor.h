@@ -43,7 +43,7 @@ class LifetimesPropagationVisitor
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
 
- private:
+private:
   const clang::FunctionDecl *func_;
   LifetimeAnnotationsAnalysis &state_;
   PointsToMap points_to_map;
