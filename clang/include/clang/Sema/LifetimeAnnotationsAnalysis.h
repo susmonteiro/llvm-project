@@ -51,13 +51,13 @@ class LifetimeAnnotationsAnalysis {
 
   Dependencies &GetDependencies() { return dependencies_; }
 
-  Lifetime *GetLifetime(const clang::NamedDecl *var_decl) {
+  Lifetime &GetLifetime(const clang::NamedDecl *var_decl) {
     VariableLifetimes::iterator it = variable_lifetimes_.find(var_decl);
     if (it == variable_lifetimes_.end()) {
       // TODO error
       CreateVariable(var_decl);
     }
-    Lifetime *l = &variable_lifetimes_[var_decl];
+    Lifetime &l = variable_lifetimes_[var_decl];
     return l;
   }
 

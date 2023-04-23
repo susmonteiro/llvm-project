@@ -48,9 +48,9 @@ LifetimeAnnotationsAnalysis::InitializeWorklist() const {
 void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   // iterate over variables with no fixed lifetime
   for (const auto &pair : dependencies_) {
-    const auto &lifetime = GetLifetime(pair.first);
-    if (lifetime != nullptr && lifetime->IsNotSet()) {
-      lifetime->ProcessShortestLifetimes();
+    auto &lifetime = GetLifetime(pair.first);
+    if (lifetime.IsNotSet()) {
+      lifetime.ProcessShortestLifetimes();
     } else {
       // TODO error
     }

@@ -178,6 +178,23 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
 
   const auto &return_expr = points_to_map.GetExprPoints(return_stmt->getRetValue());
 
+  for (const auto &expr : return_expr) {
+    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+      // TODO probably need to check if this is pointer type
+      // ?
+      // there can only be one pointer/reference variable
+      const auto *var = clang::dyn_cast<clang::DeclRefExpr>(expr);
+      Lifetime &var_lifetime = state_.GetLifetime(var->getDecl());
+      if (return_lifetime != var_lifetime) {
+        // TODO error
+        debugWarn("Lifetimes of return and return value are different!");
+      } else {
+        // TODO
+      }
+      break;
+    }
+  }
+
   // TODO
   return std::nullopt;
 }

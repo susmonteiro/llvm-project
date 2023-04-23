@@ -21,6 +21,17 @@ class Lifetime {
     return *this;
   }
 
+  bool operator==(const Lifetime &Other) const {
+    if (!IsNotSet()) {
+      return id_ == Other.Id();
+    }
+    return id_ == Other.Id() && shortest_lifetimes_ == Other.GetShortestLifetimes();
+  }
+
+  bool operator!=(const Lifetime &Other) const {
+    return !operator==(Other);
+  }
+
   // Returns whether this lifetime is valid
   bool IsNotSet() const;
 
