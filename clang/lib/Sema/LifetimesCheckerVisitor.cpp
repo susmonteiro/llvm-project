@@ -55,7 +55,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
       if (lhs_lifetime < rhs_lifetime) { 
         if (rhs_lifetime.IsNotSet()) {
           for (char l : rhs_lifetime.GetShortestLifetimes()) {
-            if (l == lhs_lifetime.Id()) continue;
+            if (l == lhs_lifetime.GetId()) continue;
             S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
               << lhs_lifetime.GetLifetimeName()
               << rhs_lifetime.GetLifetimeName(l)
@@ -64,7 +64,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
           // TODO implement the notes in this case
         } else if (lhs_lifetime.IsNotSet()) {
           for (char l : lhs_lifetime.GetShortestLifetimes()) {
-            if (l == rhs_lifetime.Id()) continue;
+            if (l == rhs_lifetime.GetId()) continue;
             S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
               << rhs_lifetime.GetLifetimeName()
               << lhs_lifetime.GetLifetimeName(l)
@@ -285,7 +285,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
       if (return_lifetime < var_lifetime) { 
         if (var_lifetime.IsNotSet()) {
           for (char l : var_lifetime.GetShortestLifetimes()) {
-            if (l == return_lifetime.Id()) continue;
+            if (l == return_lifetime.GetId()) continue;
             S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
               << return_lifetime.GetLifetimeName()
               << var_lifetime.GetLifetimeName(l)

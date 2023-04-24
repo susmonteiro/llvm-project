@@ -239,7 +239,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
       if (state_.IsLifetimeNotset(child)) {
         shortest_lifetimes.insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
       } else {
-        shortest_lifetimes.insert(state_.GetLifetime(child).Id());
+        shortest_lifetimes.insert(state_.GetLifetime(child).GetId());
       }
     }
     if (children[el] != result ||

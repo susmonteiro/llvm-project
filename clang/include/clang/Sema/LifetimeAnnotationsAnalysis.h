@@ -78,7 +78,7 @@ class LifetimeAnnotationsAnalysis {
   }
 
   void InsertShortestLifetimes(const clang::NamedDecl *var_decl, Lifetime *l) {
-    char id = l->Id();
+    char id = l->GetId();
     variable_lifetimes_[var_decl].InsertShortestLifetimes(id);
   }
 

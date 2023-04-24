@@ -1,12 +1,5 @@
 #include "clang/Sema/Lifetime.h"
 
-#include "clang/AST/Attr.h"
-#include "clang/AST/Attrs.inc"
-#include "clang/AST/DeclCXX.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/ErrorHandling.h"
-
 namespace clang {
 
 constexpr char NOTSET = 1;
@@ -18,16 +11,15 @@ constexpr char INVALID_EMPTY = 5;
 constexpr llvm::StringRef STATIC_NAME = "static";
 constexpr llvm::StringRef LOCAL_NAME = "local";
 
-Lifetime::Lifetime() : id_(NOTSET) {}
+Lifetime::Lifetime() : Id(NOTSET) {}
 
-Lifetime::Lifetime(char id) : id_(id) {}
+Lifetime::Lifetime(char id) : Id(id) {}
 
 Lifetime::Lifetime(llvm::StringRef name) {
   if (name.equals(STATIC_NAME)) {
     *this = Lifetime(STATIC);
   } else if (name.equals(LOCAL_NAME)) {
     *this = Lifetime(LOCAL);
-    // TODO is this check ok?
   } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
     *this = Lifetime(name.front());
   } else {
@@ -36,6 +28,20 @@ Lifetime::Lifetime(llvm::StringRef name) {
     *this = Lifetime(NOTSET);
   }
 }
+
+bool Lifetime::IsNotSet() const { return Id == NOTSET; }
+bool Lifetime::IsStatic() const { return Id == STATIC; }
+bool Lifetime::ContainsStatic() const {
+  return ShortestLifetimes.count(STATIC);
+}
+bool Lifetime::IsLocal() const { return Id == LOCAL; }
+bool Lifetime::ContainsLocal() const { return ShortestLifetimes.count(LOCAL); }
+void Lifetime::SetStatic() { Id = STATIC; }
+void Lifetime::SetLocal() { Id = LOCAL; }
+
+Lifetime Lifetime::InvalidEmpty() { return Lifetime(INVALID_EMPTY); }
+
+Lifetime Lifetime::InvalidTombstone() { return Lifetime(INVALID_ID_TOMBSTONE); }
 
 std::string Lifetime::GetLifetimeName(char id) const {
   switch (id) {
@@ -51,11 +57,25 @@ std::string Lifetime::GetLifetimeName(char id) const {
       return "$local";
       break;
     default:
-      if (id >= 'a' && id <= 'z') return "$" + std::string(1, id);
-      // TODO error
+      if (id >= 'a' && id <= 'z')
+        return "$" + std::string(1, id);
       else
+        // TODO error
         return "error";
   }
+}
+
+std::string Lifetime::DebugString() const {
+  std::string res;
+  res += "[Lifetime] -> " + GetLifetimeName() + "; ";
+  if (IsNotSet()) {
+    res += "Shortest Lifetimes of this variable: { ";
+    for (char l : ShortestLifetimes) {
+      res += GetLifetimeName(l) + ' ';
+    }
+    res += "}";
+  }
+  return res;
 }
 
 void Lifetime::ProcessShortestLifetimes() {
@@ -68,37 +88,56 @@ void Lifetime::ProcessShortestLifetimes() {
     return;
   }
 
-  if (shortest_lifetimes_.size() > 1 && ContainsStatic()) {
+  if (ShortestLifetimes.size() > 1 && ContainsStatic()) {
     // static outlives all others; if there are others lifetimes, static should
     // not belong to shortest lifetimes
     RemoveFromShortestLifetimes(STATIC);
   }
 
-  if (shortest_lifetimes_.size() == 1) {
-    SetId(*shortest_lifetimes_.begin());
+  if (ShortestLifetimes.size() == 1) {
+    SetId(*ShortestLifetimes.begin());
     return;
   }
 
-  // in all other cases, the id_ of the lifetime remains NOTSET
-  // if shortest_lifetimes_ is empty, that the lifetime of this variable is
-  // undefined if shortest_lifetimes_ contains multiple lifetimes, then the
+  // in all other cases, the Id of the lifetime remains NOTSET
+  // - if ShortestLifetimes is empty, the lifetime of this variable is
+  // undefined
+  // - if ShortestLifetimes contains multiple lifetimes, then the
   // lifetime is the shortest among them since we cannot now which lifetimes
   // outlives which, then all of them are considered the shortest
 }
 
-bool Lifetime::IsNotSet() const { return id_ == NOTSET; }
-bool Lifetime::IsStatic() const { return id_ == STATIC; }
-bool Lifetime::ContainsStatic() const {
-  return shortest_lifetimes_.count(STATIC);
+Lifetime &Lifetime::operator=(const Lifetime &other) {
+  Id = other.GetId();
+  return *this;
 }
-bool Lifetime::IsLocal() const { return id_ == LOCAL; }
-bool Lifetime::ContainsLocal() const {
-  return shortest_lifetimes_.count(LOCAL);
+
+bool Lifetime::operator==(const Lifetime &Other) const {
+  if (!IsNotSet()) {
+    return Id == Other.GetId();
+  }
+  return Id == Other.GetId() &&
+         ShortestLifetimes == Other.GetShortestLifetimes();
 }
-void Lifetime::SetStatic() { id_ = STATIC; }
-void Lifetime::SetLocal() { id_ = LOCAL; }
 
-Lifetime Lifetime::InvalidEmpty() { return Lifetime(INVALID_EMPTY); }
+bool Lifetime::operator!=(const Lifetime &Other) const {
+  return !operator==(Other);
+}
 
-Lifetime Lifetime::InvalidTombstone() { return Lifetime(INVALID_ID_TOMBSTONE); }
+bool Lifetime::operator>=(const Lifetime &Other) const {
+  // $static outlives all lifetimes
+  // all lifetimes outlive $local
+  if (IsStatic() || Other.IsLocal()) return true;
+  if (IsLocal() || Other.IsStatic()) return false;
+
+  if (!IsNotSet()) return Id == Other.GetId();
+
+  return Id == Other.GetId() &&
+         ShortestLifetimes == Other.GetShortestLifetimes();
+}
+
+bool Lifetime::operator<(const Lifetime &Other) const {
+  return !operator>=(Other);
+}
+
 }  // namespace clang
