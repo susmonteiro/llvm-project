@@ -105,16 +105,16 @@ class PointsToMap {
   //       Lifetime lifetime) const;
 
   llvm::SmallSet<const clang::Expr*, 2> GetExprPoints(const clang::Expr* expr) {
-    return expr_points_to_[expr];
+    return ExprPointsTo[expr];
   }
 
   void InsertExprLifetimes(const clang::Expr* parent,
                            const clang::Expr* child) {
-    expr_points_to_[parent].insert(child);
-    const auto child_points_to = expr_points_to_[child];
+    ExprPointsTo[parent].insert(child);
+    const auto child_points_to = ExprPointsTo[child];
     // propagate points-to
     // ? check if null?
-    expr_points_to_[parent].insert(child_points_to.begin(), child_points_to.end());
+    ExprPointsTo[parent].insert(child_points_to.begin(), child_points_to.end());
   }
 
  private:
@@ -126,7 +126,7 @@ class PointsToMap {
   //   llvm::DenseMap<const clang::Expr*, ObjectSet> expr_objects_;
   // TODO 2?
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::Expr*, 2>>
-      expr_points_to_;
+      ExprPointsTo;
 };
 
 }  // namespace clang

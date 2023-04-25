@@ -26,21 +26,19 @@ class LifetimeAnnotationsChecker {
   void PropagateLifetimes();
   void CheckLifetimes(const clang::FunctionDecl *func, Sema &S);
 
-  void DumpFunctionInfo() const {
-    debugLifetimes("[LifetimeAnnotationsChecker]: Functions Information");
-    for (const auto &pair : function_info_) {
-      debugLifetimes("Function", pair.first->getNameAsString());
-      debugLifetimes(pair.second.DebugString());
-      debugLifetimes("============");
+  std::string DebugString() const {
+    std::string res;
+    res += "[LifetimeAnnotationsChecker]: Functions Information\n";
+    for (const auto &pair : FunctionInfo) {
+      res += "Function " + pair.first->getNameAsString() + '\n' +
+             pair.second.DebugString() + "\n\n============\n\n";
     }
+    return res;
   }
 
  private:
-  // TODO maybe need to store the case where there are errors?
-  // llvm::DenseMap<const clang::FunctionDecl*, FunctionLifetimesOrError>
-  // function_info_;
-  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> function_info_;
-  LifetimeAnnotationsAnalysis state_;
+  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> FunctionInfo;
+  LifetimeAnnotationsAnalysis State;
 };
 
 }  // namespace clang
