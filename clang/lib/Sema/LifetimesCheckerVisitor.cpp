@@ -71,13 +71,14 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
             }
             // TODO implement the notes in this case
           } else if (lhs_lifetime.IsNotSet()) {
-            for (char l : lhs_lifetime.GetShortestLifetimes()) {
-              if (l == rhs_lifetime.GetId()) continue;
-              S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-                  << rhs_lifetime.GetLifetimeName()
-                  << lhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
-            }
-            // TODO implement the notes in this case
+            // TODO should this case exist?
+          //   for (char l : lhs_lifetime.GetShortestLifetimes()) {
+          //     if (l == rhs_lifetime.GetId()) continue;
+          //     S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+          //         << rhs_lifetime.GetLifetimeName()
+          //         << lhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
+          //   }
+          //   // TODO implement the notes in this case
           } else {
             S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
                 << lhs_lifetime.GetLifetimeName()
