@@ -127,16 +127,6 @@ class LifetimeAnnotationsAnalysis {
   //   lifetimes_id_set_.insert(l.Id());
   // }
 
-  // void DumpParameters() const {
-  //   std::cout << "[FunctionLifetimes]: Parameters Lifetimes\n";
-  //   for (const auto &pair : variable_lifetimes_) {
-  //     const clang::Decl *key = pair.first;
-  //     Lifetime value = pair.second;
-  //     key->dump();
-  //     debugLifetimes("Lifetime", value.GetLifetimeName());
-  //   }
-  // }
-
   // void DumpReturn() const {
   //   std::cout << "[FunctionLifetimes]: Return lifetimes\n";
   //   if (return_lifetime_.IsUnset()) {

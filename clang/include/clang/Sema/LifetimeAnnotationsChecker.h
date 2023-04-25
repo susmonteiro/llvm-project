@@ -30,8 +30,7 @@ class LifetimeAnnotationsChecker {
     debugLifetimes("[LifetimeAnnotationsChecker]: Functions Information");
     for (const auto &pair : function_info_) {
       debugLifetimes("Function", pair.first->getNameAsString());
-      pair.second.DumpParameters();
-      pair.second.DumpReturn();
+      debugLifetimes(pair.second.DebugString());
       debugLifetimes("============");
     }
   }

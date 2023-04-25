@@ -108,8 +108,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
   // if (function_info_[func]) {
   //   debugLifetimes("Before setting of map");
 
-  //   func_lifetimes.DumpParameters();
-  //   func_lifetimes.DumpReturn();
+  //   debugLifetimes(func_lifetimes.DebugString());
 
   //   function_info_[func] = std::move(func_lifetimes);
 
@@ -139,8 +138,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
     FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
 
     // DEBUG
-    // func_lifetimes.DumpParameters();
-    // func_lifetimes.DumpReturn();
+    // debugLifetimes(func_lifetimes.DebugString());
 
     // TODO insert on map
     // TODO std::move?

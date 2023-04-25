@@ -50,7 +50,7 @@ class Lifetime {
   void InsertShortestLifetimes(char id) { ShortestLifetimes.insert(id); }
 
   void SetShortestLifetimes(llvm::DenseSet<char> shortest_lifetimes) {
-    ShortestLifetimes = std::move(shortest_lifetimes);
+    ShortestLifetimes = shortest_lifetimes;
   }
 
   void InsertShortestLifetimes(llvm::DenseSet<char> shortest_lifetimes) {
