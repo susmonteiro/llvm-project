@@ -3,18 +3,13 @@
 namespace clang {
 
 void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
-                 PointsToMap &points_to_map,
+                 PointsToMap &PointsTo,
                  LifetimeAnnotationsAnalysis &state) {
-  debugLifetimes("\t[TransferRHS]");
-  const auto &points_to = points_to_map.GetExprPoints(rhs);
-
-  // debugLifetimes("This is the points to in the TransferRHS");
+  // debugLifetimes("\t[TransferRHS]");
+  const auto &points_to = PointsTo.GetExprPoints(rhs);
   for (const auto &expr : points_to) {
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      // DEBUG
-      // expr->dump();
       const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      // debugLifetimes("Yes it is a rhs_decl!");
       state.CreateDependency(lhs, rhs_ref_decl);
     }
   }
@@ -27,8 +22,6 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
   if (var_decl->getTypeSourceInfo()) {
     type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
   }
-  // TODO delete this
-  // debugLifetimes("Types: done");
   Lifetime lifetime;
   if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
                             .moveInto(lifetime)) {
@@ -49,7 +42,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinaryOperator(
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   debugLifetimes("[VisitBinAssign]");
-
   assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS();
@@ -64,21 +56,20 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   }
 
   Visit(lhs);
-  const auto &lhs_points_to = points_to_map.GetExprPoints(lhs);
-  points_to_map.InsertExprLifetimes(op, lhs);
+  const auto &lhs_points_to = PointsTo.GetExprPoints(lhs);
+  PointsTo.InsertExprLifetimes(op, lhs);
 
   const auto &rhs = op->getRHS();
-
   Visit(rhs);
 
-  const auto &rhs_points_to = points_to_map.GetExprPoints(rhs);
-  points_to_map.InsertExprLifetimes(op, rhs);
+  const auto &rhs_points_to = PointsTo.GetExprPoints(rhs);
+  PointsTo.InsertExprLifetimes(op, rhs);
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
 
   if (lhs_decl_ref_expr &&
-      state_.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
-    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, points_to_map, state_);
+      State.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
+    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, PointsTo, State);
   } else {
     // TODO
   }
@@ -118,16 +109,16 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
         //   pointer points to.
         // See also documentation for PointsToMap.
 
-        // ObjectSet points_to = points_to_map_.GetPointerPointsToSet(
-        //     points_to_map_.GetExprObjectSet(cast->getSubExpr()));
-        // points_to_map_.SetExprObjectSet(cast, points_to);
+        // ObjectSet points_to = PointsTo.GetPointerPointsToSet(
+        //     PointsTo.GetExprObjectSet(cast->getSubExpr()));
+        // PointsTo.SetExprObjectSet(cast, points_to);
       }
 
       for (const auto *child : cast->children()) {
         Visit(const_cast<clang::Stmt *>(child));
 
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-          points_to_map.InsertExprLifetimes(cast, child_expr);
+          PointsTo.InsertExprLifetimes(cast, child_expr);
         }
       }
       break;
@@ -136,7 +127,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // TODO
       debugLight("> Case NullToPointer");
 
-      // points_to_map_.SetExprObjectSet(cast, {});
+      // PointsTo.SetExprObjectSet(cast, {});
       break;
     }
     // These casts are just no-ops from a Object point of view.
@@ -154,8 +145,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
 
       // clang::QualType type = cast->getType().getCanonicalType();
       // if (type->isPointerType() || cast->isGLValue()) {
-      //   points_to_map_.SetExprObjectSet(
-      //       cast, points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+      //   PointsTo.SetExprObjectSet(
+      //       cast, PointsTo.GetExprObjectSet(cast->getSubExpr()));
       // }
       break;
     }
@@ -171,8 +162,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // we add more inheritance support.)
 
       // ObjectSet points_to =
-      // points_to_map_.GetExprObjectSet(cast->getSubExpr());
-      // points_to_map_.SetExprObjectSet(cast, points_to);
+      // PointsTo.GetExprObjectSet(cast->getSubExpr());
+      // PointsTo.SetExprObjectSet(cast, points_to);
       break;
     }
     case clang::CK_BitCast:
@@ -184,7 +175,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       debugLight("> Case Reinterpret cast");
 
       // diag_reporter_(
-      //     func_->getBeginLoc(),
+      //     Func->getBeginLoc(),
       //     "cannot infer lifetimes because function uses a type-unsafe cast",
       //     clang::DiagnosticIDs::Warning);
       // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
@@ -219,23 +210,17 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
 
   // clang::QualType type = decl->getType().getCanonicalType();
 
-  // if (type->isReferenceType()) {
-  //   debugLifetimes("It's reference type!");
-
-  // } else {
-  //   debugLifetimes("It's not reference type");
-  // }
 
   // TODO don't insert if it's not either reference or pointer type
 
-  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
+  PointsTo.InsertExprLifetimes(decl_ref, nullptr);
 
   // TODO
   // if (type->isReferenceType()) {
-  //   points_to_map_.SetExprObjectSet(
-  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
+  //   PointsTo.SetExprObjectSet(
+  //       decl_ref, PointsTo.GetPointerPointsToSet(object));
   // } else {
-  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
+  //   PointsTo.SetExprObjectSet(decl_ref, {object});
   // }
 
   return std::nullopt;
@@ -255,37 +240,17 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         continue;
       }
 
-      Lifetime lifetime = GetVarDeclLifetime(var_decl, factory);
-      // TODO delete this
-
-      // debugLifetimes("Lifetime has sucessfully been retrieved");
-      // state_.CreateVariable(var_decl, Lifetime());
-      state_.CreateVariable(var_decl, lifetime);
-
-      // const Object *var_object = object_repository_.GetDeclObject(var_decl);
+      Lifetime lifetime = GetVarDeclLifetime(var_decl, Factory);
+      State.CreateVariable(var_decl, lifetime);
 
       // Don't need to record initializers because initialization has already
       // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
       // VisitCallExpr().
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType() &&
-          state_.IsLifetimeNotset(var_decl)) {
-        // debugLifetimes("VarDecl has initializer!");
+          State.IsLifetimeNotset(var_decl)) {
         const clang::Expr *init = var_decl->getInit();
         Visit(const_cast<clang::Expr *>(init));
-        TransferRHS(var_decl, init, points_to_map, state_);
-        // const auto &points_to = points_to_map.GetExprPoints(init);
-
-        // debugLifetimes("This is the points to in the DeclStmt");
-        // for (const auto &expr : points_to) {
-        //   if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-        //     // DEBUG
-        //     // expr->dump();
-        //     const auto *rhs_ref_decl =
-        //         clang::dyn_cast<clang::DeclRefExpr>(expr);
-        //     // debugLifetimes("Yes it is a rhs_decl!");
-        //     state_.CreateDependency(var_decl, rhs_ref_decl);
-        //   }
-        // }
+        TransferRHS(var_decl, init, PointsTo, State);
       }
     }
   }

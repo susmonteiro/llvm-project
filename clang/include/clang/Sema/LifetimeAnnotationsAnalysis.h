@@ -8,10 +8,6 @@
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/PointeeType.h"
-// #include "llvm/ADT/Optional.h"
-// #include "llvm/ADT/SmallVector.h"
-// #include "llvm/ADT/StringRef.h"
-// #include "llvm/Support/Error.h"
 
 // DEBUG
 #include "clang/Sema/DebugLifetimes.h"

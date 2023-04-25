@@ -5,15 +5,14 @@
 #include "clang/Basic/DiagnosticIDs.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/DiagnosticSema.h"
-#include "clang/Sema/Sema.h"
 
 namespace clang {
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   debugLifetimes("[VisitBinAssign]");
-
   assert(op->getLHS()->isGLValue());
+
   const auto &lhs = op->getLHS();
 
   // Because of how we handle reference-like structs, a member access to a
@@ -26,74 +25,64 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   }
 
   Visit(lhs);
-  const auto &lhs_points_to = points_to_map.GetExprPoints(lhs);
-  points_to_map.InsertExprLifetimes(op, lhs);
+  const auto &lhs_points_to = PointsTo.GetExprPoints(lhs);
+  PointsTo.InsertExprLifetimes(op, lhs);
 
   const auto &rhs = op->getRHS();
   Visit(rhs);
 
-  const auto &rhs_points_to = points_to_map.GetExprPoints(rhs);
-  points_to_map.InsertExprLifetimes(op, rhs);
+  const auto &rhs_points_to = PointsTo.GetExprPoints(rhs);
+  PointsTo.InsertExprLifetimes(op, rhs);
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
   if (lhs_decl_ref_expr) {
     // Check that lhs_lifetime >= rhs_lifetime
-    Lifetime &lhs_lifetime = state_.GetLifetime(lhs_decl_ref_expr->getDecl());
-    
-    for (const auto &expr : rhs_points_to) {
-    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      const auto *rhs_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      clang::QualType rhs_var_type = rhs_var->getType();
-      if (!rhs_var_type->isPointerType() && !rhs_var_type->isReferenceType()) {
-        continue;
-      }
+    Lifetime &lhs_lifetime = State.GetLifetime(lhs_decl_ref_expr->getDecl());
 
-      // there can only be one pointer/reference variable
-      const auto *lhs_decl = lhs_decl_ref_expr->getDecl();
-      const auto *rhs_decl = rhs_var->getDecl();
-      Lifetime &rhs_lifetime = state_.GetLifetime(rhs_decl);
-      if (lhs_lifetime < rhs_lifetime) { 
-        if (rhs_lifetime.IsNotSet()) {
-          for (char l : rhs_lifetime.GetShortestLifetimes()) {
-            if (l == lhs_lifetime.GetId()) continue;
-            S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-              << lhs_lifetime.GetLifetimeName()
-              << rhs_lifetime.GetLifetimeName(l)
-              << op->getSourceRange();
-          }
-          // TODO implement the notes in this case
-        } else if (lhs_lifetime.IsNotSet()) {
-          for (char l : lhs_lifetime.GetShortestLifetimes()) {
-            if (l == rhs_lifetime.GetId()) continue;
-            S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-              << rhs_lifetime.GetLifetimeName()
-              << lhs_lifetime.GetLifetimeName(l)
-              << op->getSourceRange();
-          }
-          // TODO implement the notes in this case
-        } else {
-          S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-              << lhs_lifetime.GetLifetimeName()
-              << rhs_lifetime.GetLifetimeName()
-              << op->getSourceRange();
-          S.Diag(lhs_decl->getLocation(), diag::note_lifetime_declared_here)
-              << lhs_lifetime.GetLifetimeName() << lhs_decl->getSourceRange();
-          S.Diag(rhs_decl->getLocation(), diag::note_lifetime_declared_here)
-              << rhs_lifetime.GetLifetimeName() << rhs_decl->getSourceRange();
+    for (const auto &expr : rhs_points_to) {
+      if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+        const auto *rhs_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
+        clang::QualType rhs_var_type = rhs_var->getType();
+        if (!rhs_var_type->isPointerType() &&
+            !rhs_var_type->isReferenceType()) {
+          continue;
         }
+
+        // there can only be one pointer/reference variable
+        const auto *lhs_decl = lhs_decl_ref_expr->getDecl();
+        const auto *rhs_decl = rhs_var->getDecl();
+        Lifetime &rhs_lifetime = State.GetLifetime(rhs_decl);
+        if (lhs_lifetime < rhs_lifetime) {
+          if (rhs_lifetime.IsNotSet()) {
+            for (char l : rhs_lifetime.GetShortestLifetimes()) {
+              if (l == lhs_lifetime.GetId()) continue;
+              S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+                  << lhs_lifetime.GetLifetimeName()
+                  << rhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
+            }
+            // TODO implement the notes in this case
+          } else if (lhs_lifetime.IsNotSet()) {
+            for (char l : lhs_lifetime.GetShortestLifetimes()) {
+              if (l == rhs_lifetime.GetId()) continue;
+              S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+                  << rhs_lifetime.GetLifetimeName()
+                  << lhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
+            }
+            // TODO implement the notes in this case
+          } else {
+            S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+                << lhs_lifetime.GetLifetimeName()
+                << rhs_lifetime.GetLifetimeName() << op->getSourceRange();
+            S.Diag(lhs_decl->getLocation(), diag::note_lifetime_declared_here)
+                << lhs_lifetime.GetLifetimeName() << lhs_decl->getSourceRange();
+            S.Diag(rhs_decl->getLocation(), diag::note_lifetime_declared_here)
+                << rhs_lifetime.GetLifetimeName() << rhs_decl->getSourceRange();
+          }
+        }
+        break;
       }
-      break;
     }
   }
-
-  }
-
-  // if (lhs_decl_ref_expr &&
-  //     state_.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
-  //   TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, points_to_map, state_);
-  // } else {
-  //   // TODO
-  // }
 
   return std::nullopt;
 }
@@ -113,18 +102,18 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
         // - A prvalue is only associated with an object if the prvalue is of
         //   pointer type; the object it is associated with is the object the
         //   pointer points to.
-        // See also documentation for PointsToMap.
+        // See also documentation for PointsTo.
 
-        // ObjectSet points_to = points_to_map_.GetPointerPointsToSet(
-        //     points_to_map_.GetExprObjectSet(cast->getSubExpr()));
-        // points_to_map_.SetExprObjectSet(cast, points_to);
+        // ObjectSet points_to = PointsTo.GetPointerPointsToSet(
+        //     PointsTo.GetExprObjectSet(cast->getSubExpr()));
+        // PointsTo.SetExprObjectSet(cast, points_to);
       }
 
       for (const auto *child : cast->children()) {
         Visit(const_cast<clang::Stmt *>(child));
 
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-          points_to_map.InsertExprLifetimes(cast, child_expr);
+          PointsTo.InsertExprLifetimes(cast, child_expr);
         }
       }
       break;
@@ -133,7 +122,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
       // TODO
       debugLight("> Case NullToPointer");
 
-      // points_to_map_.SetExprObjectSet(cast, {});
+      // PointsTo.SetExprObjectSet(cast, {});
       break;
     }
     // These casts are just no-ops from a Object point of view.
@@ -151,8 +140,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
 
       // clang::QualType type = cast->getType().getCanonicalType();
       // if (type->isPointerType() || cast->isGLValue()) {
-      //   points_to_map_.SetExprObjectSet(
-      //       cast, points_to_map_.GetExprObjectSet(cast->getSubExpr()));
+      //   PointsTo.SetExprObjectSet(
+      //       cast, PointsTo.GetExprObjectSet(cast->getSubExpr()));
       // }
       break;
     }
@@ -168,8 +157,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
       // we add more inheritance support.)
 
       // ObjectSet points_to =
-      // points_to_map_.GetExprObjectSet(cast->getSubExpr());
-      // points_to_map_.SetExprObjectSet(cast, points_to);
+      // PointsTo.GetExprObjectSet(cast->getSubExpr());
+      // PointsTo.SetExprObjectSet(cast, points_to);
       break;
     }
     case clang::CK_BitCast:
@@ -181,7 +170,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
       debugLight("> Case Reinterpret cast");
 
       // diag_reporter_(
-      //     func_->getBeginLoc(),
+      //     Func->getBeginLoc(),
       //     "cannot infer lifetimes because function uses a type-unsafe cast",
       //     clang::DiagnosticIDs::Warning);
       // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
@@ -216,23 +205,17 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclRefExpr(
 
   // clang::QualType type = decl->getType().getCanonicalType();
 
-  // if (type->isReferenceType()) {
-  //   debugLifetimes("It's reference type!");
-
-  // } else {
-  //   debugLifetimes("It's not reference type");
-  // }
 
   // TODO don't insert if it's not either reference or pointer type
 
-  points_to_map.InsertExprLifetimes(decl_ref, nullptr);
+  PointsTo.InsertExprLifetimes(decl_ref, nullptr);
 
   // TODO
   // if (type->isReferenceType()) {
-  //   points_to_map_.SetExprObjectSet(
-  //       decl_ref, points_to_map_.GetPointerPointsToSet(object));
+  //   PointsTo.SetExprObjectSet(
+  //       decl_ref, PointsTo.GetPointerPointsToSet(object));
   // } else {
-  //   points_to_map_.SetExprObjectSet(decl_ref, {object});
+  //   PointsTo.SetExprObjectSet(decl_ref, {object});
   // }
 
   return std::nullopt;
@@ -248,10 +231,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitExpr(
 std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     const clang::ReturnStmt *return_stmt) {
   debugLifetimes("[VisitReturnStmt]");
-  debugLifetimes("This is the return lifetime",
-                 state_.GetReturnLifetime().DebugString());
 
-  clang::QualType return_type = func_->getReturnType();
+  clang::QualType return_type = Func->getReturnType();
 
   // We only need to handle pointers and references.
   // For record types, initialization of the return value has already been
@@ -261,7 +242,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     return std::nullopt;
   }
 
-  Lifetime &return_lifetime = state_.GetReturnLifetime();
+  Lifetime &return_lifetime = State.GetReturnLifetime();
   if (return_lifetime.IsNotSet()) {
     debugWarn("Return does not have a valid lifetime");
     // TODO error
@@ -269,7 +250,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
 
   Visit(const_cast<clang::Expr *>(return_stmt->getRetValue()));
   const auto &return_expr =
-      points_to_map.GetExprPoints(return_stmt->getRetValue());
+      PointsTo.GetExprPoints(return_stmt->getRetValue());
 
   for (const auto &expr : return_expr) {
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
@@ -281,15 +262,15 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
 
       // there can only be one pointer/reference variable
       const auto *var_decl = var->getDecl();
-      Lifetime &var_lifetime = state_.GetLifetime(var_decl);
-      if (return_lifetime < var_lifetime) { 
+      Lifetime &var_lifetime = State.GetLifetime(var_decl);
+      if (return_lifetime < var_lifetime) {
         if (var_lifetime.IsNotSet()) {
           for (char l : var_lifetime.GetShortestLifetimes()) {
             if (l == return_lifetime.GetId()) continue;
             S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
-              << return_lifetime.GetLifetimeName()
-              << var_lifetime.GetLifetimeName(l)
-              << return_stmt->getSourceRange();
+                << return_lifetime.GetLifetimeName()
+                << var_lifetime.GetLifetimeName(l)
+                << return_stmt->getSourceRange();
           }
           // TODO implement the notes in this case
         } else {
@@ -304,8 +285,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
       break;
     }
   }
-
-  // TODO
   return std::nullopt;
 }
 
