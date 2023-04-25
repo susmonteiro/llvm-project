@@ -2,6 +2,38 @@
 
 namespace clang {
 
+LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis() {}
+LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis(
+    FunctionLifetimes &function_info) {
+  const auto &params_lifetimes = function_info.GetParamsLifetimes();
+  for (auto &pair : params_lifetimes) {
+    VariableLifetimes.insert({pair.first, pair.second});
+  }
+  ReturnLifetime = Lifetime(function_info.GetReturnLifetime());
+}
+
+VariableLifetimesMap &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
+  return VariableLifetimes;
+}
+DependenciesMap &LifetimeAnnotationsAnalysis::GetDependencies() {
+  return Dependencies;
+}
+
+Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
+    const clang::NamedDecl *var_decl) {
+  VariableLifetimesMap::iterator it = VariableLifetimes.find(var_decl);
+  if (it == VariableLifetimes.end()) {
+    // TODO error
+    CreateVariable(var_decl);
+  }
+  Lifetime &l = VariableLifetimes[var_decl];
+  return l;
+}
+
+Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime() {
+  return ReturnLifetime;
+}
+
 void LifetimeAnnotationsAnalysis::CreateDependency(
     const clang::NamedDecl *from, const clang::DeclRefExpr *to) {
   // TODO implement
@@ -21,16 +53,15 @@ void LifetimeAnnotationsAnalysis::CreateDependency(
   //   // TODO implement
   // }
   const clang::NamedDecl *decl = to->getFoundDecl();
-  dependencies_[from].insert(decl);
+  Dependencies[from].insert(decl);
 }
 
-Dependencies LifetimeAnnotationsAnalysis::TransposeDependencies() const {
-  Dependencies result;
-  for (const auto &pair : dependencies_) {
+DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
+  DependenciesMap result;
+  for (const auto &pair : Dependencies) {
     for (const auto &child : pair.second) {
       // don't insert annotated variables into the parents graph
-      if (IsLifetimeNotset(child))
-        result[child].insert(pair.first);
+      if (IsLifetimeNotset(child)) result[child].insert(pair.first);
     }
   }
   return result;
@@ -39,7 +70,7 @@ Dependencies LifetimeAnnotationsAnalysis::TransposeDependencies() const {
 std::vector<const clang::NamedDecl *>
 LifetimeAnnotationsAnalysis::InitializeWorklist() const {
   std::vector<const clang::NamedDecl *> worklist;
-  for (const auto &pair : dependencies_) {
+  for (const auto &pair : Dependencies) {
     worklist.emplace_back(pair.first);
   }
   return worklist;
@@ -47,15 +78,30 @@ LifetimeAnnotationsAnalysis::InitializeWorklist() const {
 
 void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   // iterate over variables with no fixed lifetime
-  for (const auto &pair : dependencies_) {
+  for (const auto &pair : Dependencies) {
     auto &lifetime = GetLifetime(pair.first);
     if (lifetime.IsNotSet()) {
       lifetime.ProcessShortestLifetimes();
-    } else {
-      // TODO error
     }
   }
 }
 
+std::string LifetimeAnnotationsAnalysis::DebugString() {
+    std::string str = "[LifetimeAnnotationsAnalysis] - STATE\n\n";
+    str += ">> VariableLifetimes\n\n";
+    for (const auto &pair : VariableLifetimes) {
+      str += pair.first->getNameAsString() + ": " + pair.second.DebugString() +
+             '\n';
+    }
+    str += "\n>> Dependencies\n\n";
+    for (const auto &pair : Dependencies) {
+      str += pair.first->getNameAsString() + ": ";
+      for (const auto &var : pair.second) {
+        str += var->getNameAsString() + ' ';
+      }
+      str += '\n';
+    }
+    return str;
+  }
 
 }  // namespace clang

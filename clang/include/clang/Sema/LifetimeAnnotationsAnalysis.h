@@ -8,64 +8,34 @@
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/PointeeType.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Error.h"
+// #include "llvm/ADT/Optional.h"
+// #include "llvm/ADT/SmallVector.h"
+// #include "llvm/ADT/StringRef.h"
+// #include "llvm/Support/Error.h"
 
 // DEBUG
 #include "clang/Sema/DebugLifetimes.h"
 
 namespace clang {
 
-using VariableLifetimes = llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
-using Dependencies = llvm::DenseMap<const clang::NamedDecl *,
+using VariableLifetimesMap = llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
+using DependenciesMap = llvm::DenseMap<const clang::NamedDecl *,
                                     llvm::DenseSet<const clang::NamedDecl *>>;
-
-// TODO refactor this (copy from FunctionLifetimes)
 
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
  public:
-  LifetimeAnnotationsAnalysis() {}
-  LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info) {
-    const auto &params_lifetimes = function_info.GetParamsLifetimes();
-    for (auto &pair : params_lifetimes) {
-      variable_lifetimes_.insert({pair.first, pair.second});
-    }
+  LifetimeAnnotationsAnalysis();
+  LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info);
 
-    return_lifetime_ = Lifetime(function_info.GetReturnLifetime());
-  }
-
-  // TODO 2 options: remove or different structures for params and other vars
-  // * Returns lifetimes for the `i`-th parameter.
-  // * These are the same number and order as FunctionDecl::parameters()
-  // const ValueLifetimes &GetParamLifetimes(size_t i) const {
-  //   return param_lifetimes_[i];
-  // }
-
-  // Returns the number of function parameters (excluding the implicit `this).
-  // size_t GetNumParams() const { return param_lifetimes_.size(); }
-
-  VariableLifetimes GetVariableLifetimes() { return variable_lifetimes_; }
-
-  Dependencies &GetDependencies() { return dependencies_; }
-
-  Lifetime &GetLifetime(const clang::NamedDecl *var_decl) {
-    VariableLifetimes::iterator it = variable_lifetimes_.find(var_decl);
-    if (it == variable_lifetimes_.end()) {
-      // TODO error
-      CreateVariable(var_decl);
-    }
-    Lifetime &l = variable_lifetimes_[var_decl];
-    return l;
-  }
-
-  Lifetime &GetReturnLifetime() { return return_lifetime_; }
+  VariableLifetimesMap &GetVariableLifetimes();
+  DependenciesMap &GetDependencies();
+  Lifetime &GetLifetime(const clang::NamedDecl *var_decl);
+  Lifetime &GetReturnLifetime();
 
   bool IsLifetimeNotset(const clang::NamedDecl *var_decl) const {
-    auto it = variable_lifetimes_.find(var_decl);
-    if (it != variable_lifetimes_.end()) {
+    auto it = VariableLifetimes.find(var_decl);
+    if (it != VariableLifetimes.end()) {
       return it->second.IsNotSet();
     } else {
       // TODO error?
@@ -74,17 +44,17 @@ class LifetimeAnnotationsAnalysis {
   }
 
   llvm::DenseSet<char> GetShortestLifetimes(const clang::NamedDecl *var_decl) {
-    return variable_lifetimes_[var_decl].GetShortestLifetimes();
+    return VariableLifetimes[var_decl].GetShortestLifetimes();
   }
 
   void InsertShortestLifetimes(const clang::NamedDecl *var_decl, Lifetime *l) {
     char id = l->GetId();
-    variable_lifetimes_[var_decl].InsertShortestLifetimes(id);
+    VariableLifetimes[var_decl].InsertShortestLifetimes(id);
   }
 
   void PropagateShortestLifetimes(const clang::NamedDecl *target,
                                   llvm::DenseSet<char> shortest_lifetimes) {
-    variable_lifetimes_[target].InsertShortestLifetimes(shortest_lifetimes);
+    VariableLifetimes[target].InsertShortestLifetimes(shortest_lifetimes);
   }
 
   void PropagateShortestLifetimes(const clang::NamedDecl *to,
@@ -94,94 +64,35 @@ class LifetimeAnnotationsAnalysis {
   }
 
   void CreateVariable(const clang::NamedDecl *var_decl) {
-    variable_lifetimes_[var_decl] = Lifetime();
+    VariableLifetimes[var_decl] = Lifetime();
   }
 
   void CreateVariable(const clang::NamedDecl *var_decl, Lifetime lifetime) {
-    variable_lifetimes_[var_decl] = Lifetime(lifetime);
+    VariableLifetimes[var_decl] = Lifetime(lifetime);
   }
 
   void CreateDependency(const clang::NamedDecl *from,
                         const clang::DeclRefExpr *to);
-  void SetDependencies(Dependencies dependencies) {
-    dependencies_ = std::move(dependencies);
+  void SetDependencies(DependenciesMap dependencies) {
+    Dependencies = std::move(dependencies);
   }
 
   void ProcessShortestLifetimes();
 
-  // void ProcessVarLifetimes();
-
-  Dependencies TransposeDependencies() const;
+  DependenciesMap TransposeDependencies() const;
   std::vector<const clang::NamedDecl *> InitializeWorklist() const;
 
-  // llvm::DenseSet<char> GetDefinedLifetimes() { return lifetimes_id_set_; }
-
-  // Lifetime GetReturnLifetimes() { return return_lifetime_; }
-
-  // bool CheckIfLifetimeIsDefined(Lifetime l) {
-  //   return lifetimes_id_set_.find(l.Id()) != lifetimes_id_set_.end();
-  // }
-
-  // void InsertVariableLifetime(const clang::Decl *decl, Lifetime l) {
-  //   variable_lifetimes_[decl] = l;
-  //   lifetimes_id_set_.insert(l.Id());
-  // }
-
-  // void DumpReturn() const {
-  //   std::cout << "[FunctionLifetimes]: Return lifetimes\n";
-  //   if (return_lifetime_.IsUnset()) {
-  //     debugLifetimes("Return value has no lifetime");
-  //   } else {
-  //     debugLifetimes("Lifetime", return_lifetime_.GetLifetimeName());
-  //   }
-  // }
-
-  // static llvm::Expected<FunctionLifetimes> CreateForDecl(
-  //     const clang::FunctionDecl *function,
-  //     const FunctionLifetimeFactory &lifetime_factory);
-
-  std::string DebugString() {
-    std::string str = "[LifetimeAnnotationsAnalysis] - STATE\n\n";
-    str += ">> variable_lifetimes_\n\n";
-    for (const auto &pair : variable_lifetimes_) {
-      str += pair.first->getNameAsString() + ": " + pair.second.DebugString() +
-             '\n';
-    }
-    str += "\n>> dependencies_\n\n";
-    for (const auto &pair : dependencies_) {
-      str += pair.first->getNameAsString() + ": ";
-      for (const auto &var : pair.second) {
-        str += var->getNameAsString() + ' ';
-      }
-      str += '\n';
-    }
-    // TODO dependencies
-    return str;
-  }
+  std::string DebugString();
 
  private:
-  VariableLifetimes variable_lifetimes_;
-  // llvm::DenseSet<char> lifetimes_id_set_;
-  // ? needed or enough in FunctionLifetimes
-  // Lifetime return_lifetime_;
-  Dependencies dependencies_;
-  Lifetime return_lifetime_;
+  VariableLifetimesMap VariableLifetimes;
+  DependenciesMap Dependencies;
+  Lifetime ReturnLifetime;
 
   // TODO this
   // std::optional<ValueLifetimes> this_lifetimes_;
 
-  //   static llvm::Expected<FunctionLifetimes> Create(
-  //       const clang::FunctionProtoType *type, clang::TypeLoc type_loc,
-  //       const clang::QualType this_type,
-  //       const FunctionLifetimeFactory &lifetime_factory);
 };
-
-// friend std::ostream& operator<<(std::ostream& os, LifetimeAnnotationsAnalysis
-// analysis) {
-//   os << "[LifetimeAnnotationsAnalysis]\n";
-//   os << ""
-// }
-
 }  // namespace clang
 
 #endif  // LIFETIME_ANNOTATIONS_ANALYSIS_H_
