@@ -21,9 +21,6 @@ class LifetimesCheckerVisitor
       : Func(func), State(state), PointsTo(state.GetPointsTo()), S(sema) {}
 
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
-  std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
-  std::optional<std::string> VisitDeclRefExpr(
-      const clang::DeclRefExpr *decl_ref);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitReturnStmt(
       const clang::ReturnStmt *return_stmt);
