@@ -4,10 +4,6 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTDiagnostic.h"
-// #include "clang/AST/Stmt.h"
-// #include "clang/AST/StmtVisitor.h"
-// #include "clang/ASTMatchers/ASTMatchFinder.h"
-// #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticIDs.h"
 #include "clang/Basic/DiagnosticOptions.h"
@@ -15,16 +11,12 @@
 #include "clang/Basic/PartialDiagnostic.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/IdentifierResolver.h"
-#include "clang/Sema/PointsToMap.h"
-#include "clang/Sema/Sema.h"
-// #include "clang/Tooling/Tooling.h"
 #include "clang/Sema/LifetimesCheckerVisitor.h"
 #include "clang/Sema/LifetimesPropagationVisitor.h"
+#include "clang/Sema/PointsToMap.h"
 #include "llvm/Support/Error.h"
 
 namespace clang {
-
-// using namespace ast_matchers;
 
 // TODO change to not void
 void GetExprObjectSet(const clang::Expr *expr,
@@ -81,6 +73,8 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 
     FunctionInfo[func] = func_lifetimes;
     // TODO maybe keep track of analyzed functions
+    // TODO need to check if the lifetimes in the declaration and definition are
+    // the same?
   } else {
     // TODO error
     /* return llvm::createStringError(

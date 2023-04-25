@@ -10,6 +10,7 @@
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/LifetimeAnnotationsAnalysis.h"
 #include "clang/Sema/Sema.h"
+#include "clang/Sema/PointsToMap.h"
 #include "llvm/ADT/DenseMap.h"
 
 // DEBUG

@@ -8,7 +8,7 @@
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/PointeeType.h"
-
+#include "clang/Sema/PointsToMap.h"
 // DEBUG
 #include "clang/Sema/DebugLifetimes.h"
 
@@ -38,6 +38,8 @@ class LifetimeAnnotationsAnalysis {
       return false;
     }
   }
+
+  PointsToMap &GetPointsTo() { return PointsTo; }
 
   llvm::DenseSet<char> GetShortestLifetimes(const clang::NamedDecl *var_decl) {
     return VariableLifetimes[var_decl].GetShortestLifetimes();
@@ -83,6 +85,7 @@ class LifetimeAnnotationsAnalysis {
  private:
   VariableLifetimesMap VariableLifetimes;
   DependenciesMap Dependencies;
+  PointsToMap PointsTo;
   Lifetime ReturnLifetime;
 
   // TODO this

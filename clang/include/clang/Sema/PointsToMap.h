@@ -104,7 +104,7 @@ class PointsToMap {
   //   std::vector<const Object*> GetAllPointersWithLifetime(
   //       Lifetime lifetime) const;
 
-  llvm::SmallSet<const clang::Expr*, 2> GetExprPoints(const clang::Expr* expr) {
+  llvm::SmallSet<const clang::Expr*, 2> GetExprPointsTo(const clang::Expr* expr) {
     return ExprPointsTo[expr];
   }
 

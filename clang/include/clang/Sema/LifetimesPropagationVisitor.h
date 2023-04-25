@@ -16,7 +16,10 @@ class LifetimesPropagationVisitor
  public:
   LifetimesPropagationVisitor(const clang::FunctionDecl *func,
                               LifetimeAnnotationsAnalysis &state)
-      : Func(func), State(state), Factory(func) {}
+      : Func(func), State(state), PointsTo(state.GetPointsTo()), Factory(func) {}
+
+  // TODO remove this
+  // PointsToMap &GetPointsTo() { return PointsTo; }
 
   std::optional<std::string> VisitBinaryOperator(
       const clang::BinaryOperator *op);
@@ -32,7 +35,7 @@ class LifetimesPropagationVisitor
 private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;
-  PointsToMap PointsTo;
+  PointsToMap &PointsTo;
   FunctionLifetimeFactory Factory;
 };
 

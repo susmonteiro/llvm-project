@@ -18,7 +18,7 @@ class LifetimesCheckerVisitor
  public:
   LifetimesCheckerVisitor(const clang::FunctionDecl *func,
                           LifetimeAnnotationsAnalysis &state, Sema &sema)
-      : Func(func), State(state), S(sema) {}
+      : Func(func), State(state), PointsTo(state.GetPointsTo()), S(sema) {}
 
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
   std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
@@ -32,7 +32,7 @@ class LifetimesCheckerVisitor
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;
-  PointsToMap PointsTo;
+  PointsToMap &PointsTo;
   Sema &S;
 };
 

@@ -6,7 +6,7 @@ void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
                  PointsToMap &PointsTo,
                  LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("\t[TransferRHS]");
-  const auto &points_to = PointsTo.GetExprPoints(rhs);
+  const auto &points_to = PointsTo.GetExprPointsTo(rhs);
   for (const auto &expr : points_to) {
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
       const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
@@ -56,13 +56,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   }
 
   Visit(lhs);
-  const auto &lhs_points_to = PointsTo.GetExprPoints(lhs);
+  const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   PointsTo.InsertExprLifetimes(op, lhs);
 
   const auto &rhs = op->getRHS();
   Visit(rhs);
 
-  const auto &rhs_points_to = PointsTo.GetExprPoints(rhs);
+  const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   PointsTo.InsertExprLifetimes(op, rhs);
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);

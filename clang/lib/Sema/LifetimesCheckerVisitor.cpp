@@ -24,15 +24,24 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     return std::nullopt;
   }
 
-  Visit(lhs);
-  const auto &lhs_points_to = PointsTo.GetExprPoints(lhs);
-  PointsTo.InsertExprLifetimes(op, lhs);
+  const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
+  // TODO remove this
+  if (lhs_points_to.empty()) {
+    debugWarn("LHS is not in PointsToMap");
+    Visit(lhs);
+    PointsTo.InsertExprLifetimes(op, lhs);
+    const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
+  }
 
   const auto &rhs = op->getRHS();
-  Visit(rhs);
-
-  const auto &rhs_points_to = PointsTo.GetExprPoints(rhs);
-  PointsTo.InsertExprLifetimes(op, rhs);
+  const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
+  // TODO remove this
+  if (rhs_points_to.empty()) {
+    debugWarn("RHS is not in PointsToMap");
+    Visit(rhs);
+    PointsTo.InsertExprLifetimes(op, rhs);
+    const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
+  }
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
   if (lhs_decl_ref_expr) {
@@ -89,7 +98,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
     const clang::CastExpr *cast) {
-  debugLifetimes("[VisitCastExpr]");
+  // TODO remove this visit function
+  // FIXME This visitor should not visit expressions 
+  debugWarn("[VisitCastExpr]");
   switch (cast->getCastKind()) {
     case clang::CK_LValueToRValue: {
       // TODO
@@ -193,7 +204,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCastExpr(
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitDeclRefExpr(
     const clang::DeclRefExpr *decl_ref) {
-  debugLifetimes("[VisitDeclRefExpr]");
+  // TODO remove this visit function
+  // FIXME This visitor should not visit expressions 
+  debugWarn("[VisitDeclRefExpr]");
 
   auto *decl = decl_ref->getDecl();
   if (!clang::isa<clang::VarDecl>(decl) &&
@@ -204,7 +217,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclRefExpr(
   assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
 
   // clang::QualType type = decl->getType().getCanonicalType();
-
 
   // TODO don't insert if it's not either reference or pointer type
 
@@ -248,9 +260,15 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     // TODO error
   }
 
-  Visit(const_cast<clang::Expr *>(return_stmt->getRetValue()));
-  const auto &return_expr =
-      PointsTo.GetExprPoints(return_stmt->getRetValue());
+    const auto &return_expr =
+      PointsTo.GetExprPointsTo(return_stmt->getRetValue());
+    // TODO remove this
+  if (return_expr.empty()) {
+    debugWarn("Return expr is not in PointsToMap");
+    Visit(const_cast<clang::Expr *>(return_stmt->getRetValue()));
+    const auto &lhs_points_to = PointsTo.GetExprPointsTo(return_stmt->getRetValue());
+  }
+
 
   for (const auto &expr : return_expr) {
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
@@ -292,6 +310,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   debugLifetimes("[VisitStmt]");
   for (const auto &child : stmt->children()) {
+    // TODO instead of this check, implement the VisitExpr (and remove all other VisitExprs instances)
+    if (clang::isa<clang::Expr>(child)) continue;
     Visit(const_cast<clang::Stmt *>(child));
   }
   return std::nullopt;
