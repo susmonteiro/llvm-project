@@ -45,7 +45,7 @@ void GetExprObjectSet(const clang::Expr *expr,
 // Process functions' headers
 void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
                                               Sema &S) {
-  debugLifetimes("GetLifetimes of function", func->getNameAsString());
+  debugImportant("ANALYZING FUNCTION", func->getNameAsString());
   func = func->getCanonicalDecl();
 
   if (!func->isDefined()) {
@@ -115,7 +115,7 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
     const clang::FunctionDecl *func) {
-  LifetimesPropagationVisitor visitor(func, State);
+  LifetimesPropagationVisitor visitor(func, State, FunctionInfo);
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
 

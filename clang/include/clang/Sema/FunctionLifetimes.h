@@ -58,9 +58,16 @@ class FunctionLifetimes {
   // Returns the number of function parameters (excluding the implicit `this).
   size_t GetNumParams() const { return Params.size(); }
 
+  std::vector<const clang::ParmVarDecl*> GetParamsInOrder() const { return Params; }
+
   ParamsLifetimesMap GetParamsLifetimes() const { return ParamsLifetimes; }
 
-  Lifetime GetReturnLifetime() { return ReturnLifetime; }
+  std::optional<Lifetime> GetParamLifetime(const clang::ParmVarDecl *param) const { 
+    auto it = ParamsLifetimes.find(param);
+    return it != ParamsLifetimes.end() ? std::optional<Lifetime>(it->second) : std::nullopt;
+  }
+
+  Lifetime GetReturnLifetime() const { return ReturnLifetime; }
   void SetReturnLifetime(Lifetime l) { ReturnLifetime = l; }
 
   void InsertParamLifetime(const clang::ParmVarDecl *param, Lifetime l) {
@@ -81,7 +88,7 @@ class FunctionLifetimes {
   // lifetime
 
   // stores param lifetimes in order
-  std::vector<const clang::ParmVarDecl *> Params;
+  std::vector<const clang::ParmVarDecl*> Params;
   ParamsLifetimesMap ParamsLifetimes;
   Lifetime ReturnLifetime;
   int FuncId;
