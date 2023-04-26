@@ -59,6 +59,7 @@ class FunctionLifetimes {
   size_t GetNumParams() const { return Params.size(); }
 
   std::vector<const clang::ParmVarDecl*> GetParamsInOrder() const { return Params; }
+  const clang::ParmVarDecl *GetParam(unsigned int i) const { return Params[i]; }
 
   ParamsLifetimesMap GetParamsLifetimes() const { return ParamsLifetimes; }
 

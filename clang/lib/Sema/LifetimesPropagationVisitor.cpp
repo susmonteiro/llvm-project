@@ -79,14 +79,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
 std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     const clang::CallExpr *call) {
   debugLifetimes("[VisitCallExpr]");
-  // * no need to check the arguments lifetimes -> there is always a min
-  // lifetime between any set of lifetimes
-  // * we need to get the lifetimes of the parameters and return of the called
-  // function
-  // * get all parameters whose lifetime is the same as the return
-  // * get the corresponding arguments
-  // * assign to the points_to map all the above arguments
-  // * this way, the lhs will get these dependencies
+  // No need to check the arguments lifetimes because there is always a min lifetime between any set of lifetimes
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
@@ -97,6 +90,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       debugWarn("Return type is not pointer type");
       return std::nullopt;
     }
+    
     auto it = FuncInfo.find(direct_callee);
     if (it == FuncInfo.end()) {
       // TODO error
@@ -105,26 +99,22 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     }
 
     const auto &func_info = FuncInfo[direct_callee];
-    const auto &ordered_params = func_info.GetParamsInOrder();
     const Lifetime &return_lifetime = func_info.GetReturnLifetime();
 
     unsigned int i = -1;
     while (++i < func_info.GetNumParams()) {
-      const clang::ParmVarDecl *param = ordered_params[i];
+      const clang::ParmVarDecl *param = func_info.GetParam(i);
       const auto &param_lifetime = func_info.GetParamLifetime(param);
       if (param_lifetime.has_value() &&
           param_lifetime.value() == return_lifetime) {
-        debugLifetimes("Found a param with same lifetime as return");
         const Expr *arg = call->getArg(i);
-        Visit(const_cast<clang::Expr*>(arg));
+        Visit(const_cast<clang::Expr *>(arg));
         PointsTo.InsertExprLifetimes(call, arg);
       }
     }
   } else {
     debugWarn("No direct callee");
   }
-
-  // TODO
   return std::nullopt;
 }
 
@@ -151,7 +141,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       }
 
       for (const auto *child : cast->children()) {
-        Visit(const_cast<clang::Stmt*>(child));
+        Visit(const_cast<clang::Stmt *>(child));
 
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
           PointsTo.InsertExprLifetimes(cast, child_expr);
