@@ -33,14 +33,14 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinaryOperator(
     const clang::BinaryOperator *op) {
-  debugLifetimes("[VisitBinaryOperator]");
+  if (debugEnabled) debugLifetimes("[VisitBinaryOperator]");
   // TODO
   return std::nullopt;
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
-  debugLifetimes("[VisitBinAssign]");
+  if (debugEnabled) debugLifetimes("[VisitBinAssign]");
   assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS();
@@ -78,7 +78,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     const clang::CallExpr *call) {
-  debugLifetimes("[VisitCallExpr]");
+  if (debugEnabled) debugLifetimes("[VisitCallExpr]");
   // No need to check the arguments lifetimes because there is always a min lifetime between any set of lifetimes
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
@@ -120,7 +120,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     const clang::CastExpr *cast) {
-  debugLifetimes("[VisitCastExpr]");
+  if (debugEnabled) debugLifetimes("[VisitCastExpr]");
   switch (cast->getCastKind()) {
     case clang::CK_LValueToRValue: {
       // TODO
@@ -224,7 +224,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
     const clang::DeclRefExpr *decl_ref) {
-  debugLifetimes("[VisitDeclRefExpr]");
+  if (debugEnabled) debugLifetimes("[VisitDeclRefExpr]");
 
   auto *decl = decl_ref->getDecl();
   if (!clang::isa<clang::VarDecl>(decl) &&
@@ -253,7 +253,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
     const clang::DeclStmt *decl_stmt) {
-  debugLifetimes("[VisitDeclStmt]");
+  if (debugEnabled) debugLifetimes("[VisitDeclStmt]");
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
@@ -284,14 +284,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
     const clang::Expr *expr) {
-  debugLifetimes("[VisitExpr]");
+  if (debugEnabled) debugLifetimes("[VisitExpr]");
   // TODO
   return std::nullopt;
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
     const clang::Stmt *stmt) {
-  debugLifetimes("[VisitStmt]");
+  if (debugEnabled) debugLifetimes("[VisitStmt]");
   for (const auto &child : stmt->children()) {
     Visit(const_cast<clang::Stmt *>(child));
   }

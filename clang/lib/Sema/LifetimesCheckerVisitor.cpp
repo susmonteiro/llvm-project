@@ -10,7 +10,7 @@ namespace clang {
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
-  debugLifetimes("[VisitBinAssign]");
+  if (debugEnabled) debugLifetimes("[VisitBinAssign]");
   assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS();
@@ -99,14 +99,14 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitExpr(
     const clang::Expr *expr) {
-  debugLifetimes("[VisitExpr]");
+  if (debugEnabled) debugLifetimes("[VisitExpr]");
   // TODO
   return std::nullopt;
 }
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     const clang::ReturnStmt *return_stmt) {
-  debugLifetimes("[VisitReturnStmt]");
+  if (debugEnabled) debugLifetimes("[VisitReturnStmt]");
 
   clang::QualType return_type = Func->getReturnType();
 
@@ -172,7 +172,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitStmt(
     const clang::Stmt *stmt) {
-  debugLifetimes("[VisitStmt]");
+  if (debugEnabled) debugLifetimes("[VisitStmt]");
   for (const auto &child : stmt->children()) {
     Visit(const_cast<clang::Stmt *>(child));
   }
