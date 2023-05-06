@@ -20,8 +20,8 @@ class LifetimesCheckerVisitor
                           LifetimeAnnotationsAnalysis &state, Sema &sema)
       : Func(func), State(state), PointsTo(state.GetPointsTo()), S(sema) {}
 
-  // TODO VisitDeclStmt
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
+  std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitReturnStmt(
       const clang::ReturnStmt *return_stmt);

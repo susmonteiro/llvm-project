@@ -101,7 +101,11 @@ void var_decl_with_annot(int *$a x, int *$b y) {
           // expected-note@-2 {{declared with lifetime '$a' here}} \
           // expected-note@-3 {{declared with lifetime '$b' here}}
   int *$a q = x;  // no warn
-  int *$a r = y;  // TODO warn
+  int *$a r = y;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+                  // expected-note@-7 {{declared with lifetime '$b' here}}
+  int *t = x;
+  t = y;
+  int *$a s = t;  // expected-warning {{assignment requires that '$b' outlives '$a'}}
 }
 
 int *$a correct_dependencies_propagation(int *$a x, int *$a y) {

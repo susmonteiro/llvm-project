@@ -132,6 +132,7 @@ bool Lifetime::operator>=(const Lifetime &Other) const {
 
   if (!IsNotSet()) return Id == Other.GetId();
 
+  // TODO == or subset or shortest lifetimes?
   return Id == Other.GetId() &&
          ShortestLifetimes == Other.GetShortestLifetimes();
 }

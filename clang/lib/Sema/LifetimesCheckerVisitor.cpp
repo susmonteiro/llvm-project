@@ -61,7 +61,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
         const auto *lhs_decl = lhs_decl_ref_expr->getDecl();
         const auto *rhs_decl = rhs_var->getDecl();
         Lifetime &rhs_lifetime = State.GetLifetime(rhs_decl);
-        if (lhs_lifetime < rhs_lifetime) {
+        if (rhs_lifetime < lhs_lifetime) {
           if (rhs_lifetime.IsNotSet()) {
             for (char l : rhs_lifetime.GetShortestLifetimes()) {
               if (l == lhs_lifetime.GetId()) continue;
@@ -72,13 +72,14 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
             // TODO implement the notes in this case
           } else if (lhs_lifetime.IsNotSet()) {
             // TODO should this case exist?
-          //   for (char l : lhs_lifetime.GetShortestLifetimes()) {
-          //     if (l == rhs_lifetime.GetId()) continue;
-          //     S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-          //         << rhs_lifetime.GetLifetimeName()
-          //         << lhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
-          //   }
-          //   // TODO implement the notes in this case
+            //   for (char l : lhs_lifetime.GetShortestLifetimes()) {
+            //     if (l == rhs_lifetime.GetId()) continue;
+            //     S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+            //         << rhs_lifetime.GetLifetimeName()
+            //         << lhs_lifetime.GetLifetimeName(l) <<
+            //         op->getSourceRange();
+            //   }
+            //   // TODO implement the notes in this case
           } else {
             S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
                 << lhs_lifetime.GetLifetimeName()
@@ -90,6 +91,79 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
           }
         }
         break;
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
+    const clang::DeclStmt *decl_stmt) {
+  if (debugEnabled) debugLifetimes("[VisitDeclStmt]");
+
+  for (const clang::Decl *decl : decl_stmt->decls()) {
+    if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
+      if (!var_decl->getType()->isPointerType()) {
+        // TODO what happens when it's a reference? `isPointerType()` also
+        // catches this?
+        debugWarn("Var decl is not pointer type");
+        // return std::nullopt;
+        continue;
+      }
+      Lifetime &var_decl_lifetime = State.GetLifetime(var_decl);
+      // no initializer, nothing to check
+      if (!var_decl->hasInit() || var_decl_lifetime.IsNotSet())
+        return std::nullopt;
+
+      const auto &init_points_to =
+          PointsTo.GetExprPointsTo(var_decl->getInit());
+      // TODO remove this
+      if (init_points_to.empty()) {
+        debugWarn("Initializer is not in PointsToMap");
+      }
+
+      for (const auto &expr : init_points_to) {
+        if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+          const auto &init_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
+          clang::QualType init_var_type = init_var->getType();
+          if (!init_var_type->isPointerType() &&
+              !init_var_type->isReferenceType()) {
+            continue;
+          }
+
+          Lifetime &init_lifetime = State.GetLifetime(init_var->getDecl());
+          // TODO check this
+          // TODO maybe it's more correct to write ! >= 
+          if (init_lifetime < var_decl_lifetime) {
+            if (init_lifetime.IsNotSet()) {
+              for (char l : init_lifetime.GetShortestLifetimes()) {
+                if (l == var_decl_lifetime.GetId()) continue;
+                // TODO getLocation? -> also change for the "else" branch
+                S.Diag(var_decl->getInit()->getExprLoc(),
+                       diag::warn_assign_lifetimes_differ)
+                    << var_decl_lifetime.GetLifetimeName()
+                    << init_lifetime.GetLifetimeName(l)
+                    << var_decl->getInit()->getSourceRange();
+              }
+              // TODO implement the notes in this case
+            } else {
+              // TODO put loc in the '=' sign (also for above)
+              // TODO maybe change warning to "declaration" instead of "assign"
+              // (also above)
+              S.Diag(var_decl->getInitializingDeclaration()->getLocation(),
+                     diag::warn_assign_lifetimes_differ)
+                  << var_decl_lifetime.GetLifetimeName()
+                  << init_lifetime.GetLifetimeName()
+                  << var_decl->getInitializingDeclaration()->getSourceRange();
+              S.Diag(init_var->getDecl()->getLocation(),
+                     diag::note_lifetime_declared_here)
+                  << init_lifetime.GetLifetimeName()
+                  << init_var->getDecl()->getSourceRange();
+            }
+          }
+          break;
+        }
       }
     }
   }
@@ -124,15 +198,15 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     // TODO error
   }
 
-    const auto &return_expr =
+  const auto &return_expr =
       PointsTo.GetExprPointsTo(return_stmt->getRetValue());
-    // TODO remove this
+  // TODO remove this
   if (return_expr.empty()) {
     debugWarn("Return expr is not in PointsToMap");
     Visit(const_cast<clang::Expr *>(return_stmt->getRetValue()));
-    const auto &lhs_points_to = PointsTo.GetExprPointsTo(return_stmt->getRetValue());
+    const auto &lhs_points_to =
+        PointsTo.GetExprPointsTo(return_stmt->getRetValue());
   }
-
 
   for (const auto &expr : return_expr) {
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
@@ -145,7 +219,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
       // there can only be one pointer/reference variable
       const auto *var_decl = var->getDecl();
       Lifetime &var_lifetime = State.GetLifetime(var_decl);
-      if (return_lifetime < var_lifetime) {
+      if (var_lifetime < return_lifetime) {
         if (var_lifetime.IsNotSet()) {
           for (char l : var_lifetime.GetShortestLifetimes()) {
             if (l == return_lifetime.GetId()) continue;
