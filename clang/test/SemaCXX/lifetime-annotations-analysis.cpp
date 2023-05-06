@@ -29,6 +29,13 @@ int *$b incorrect_simple_return(int *$a x) {
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
+int *$a correct_simple_return(int *$a x, int *$b y) {
+  return x; // no warning
+}
+
+int *$a constraint_simple_return(int *$a x, int *$a y) {
+  return x; // no warning
+}
 
 int *$a correct_simple_return_and_assign(int *$a x, int *$a y) {
   x = y;     // no warning
@@ -90,12 +97,25 @@ int *$b incorrect_simple_control_flow_2(int *$a x, int *$b y, int num) {
 void var_decl_with_annot(int *$a x, int *$b y) {
   int *$a p;
   p = x;  // no warn
-  // TODO fix this warning -> message should be inverted
   p = y;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
-          // expected-note@-3 {{declared with lifetime '$a' here}} \
-          // expected-note@-4 {{declared with lifetime '$b' here}}
+          // expected-note@-2 {{declared with lifetime '$a' here}} \
+          // expected-note@-3 {{declared with lifetime '$b' here}}
   int *$a q = x;  // no warn
   int *$a r = y;  // TODO warn
+}
+
+int *$a correct_dependencies_propagation(int *$a x, int *$a y) {
+  int *p = x; 
+  int *q = p;
+  p = y;
+  return q;
+}
+
+int *$a incorrect_dependencies_propagation(int *$a x, int *$b y) {
+  int *p = x; // p -> $a
+  int *q = p; // q -> $a
+  p = y;      // p -> $a, $b | q -> $a, $b
+  return q;   // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}}
 }
 
 int *$a correct_dependencies_cycle(int *$a x, int *$a y) {
@@ -132,3 +152,31 @@ void simple_function_call(int* $a x, int *$b y) {
           // expected-note@-3 {{declared with lifetime '$a' here}} \
           // expected-note@-4 {{declared with lifetime '$b' here}}
 }
+
+int *$a correct_function_call_two_args_1(int *$a x, int *$b y) {
+  int *$a p;
+  p = correct_simple_return(x, y);
+  return p;
+}
+
+// TODO take care of this test
+// int *$a incorrect_function_call_two_args_1(int *$a x, int *$b y) {
+//   int *$a p;
+//   p = constraint_simple_return(x, y);
+//   return p;
+// }
+
+int *$a correct_function_call_two_args_2(int *$a x, int *$b y) {
+  return correct_simple_return(x, y);
+}
+
+// TODO take care of this test
+// int *$a incorrect_function_call_two_args_2(int *$a x, int *$b y) {
+//   return constraint_simple_return(x, y);
+// }
+
+int return_int(int* $a x, int* $b y) {
+	int *p = x;
+	p = y;
+	return *p;
+}	
