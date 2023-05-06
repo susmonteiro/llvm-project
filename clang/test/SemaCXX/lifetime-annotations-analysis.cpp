@@ -36,7 +36,7 @@ int *$a correct_simple_return_and_assign(int *$a x, int *$a y) {
 }
 
 int *$a incorrect_simple_return_and_assign(int *$a x, int *$b y) {
-  x = y;  // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+  x = y;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}} \
             // expected-note@-1 {{declared with lifetime '$b' here}}
 
@@ -91,7 +91,7 @@ void var_decl_with_annot(int *$a x, int *$b y) {
   int *$a p;
   p = x;  // no warn
   // TODO fix this warning -> message should be inverted
-  p = y;  // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+  p = y;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
           // expected-note@-3 {{declared with lifetime '$a' here}} \
           // expected-note@-4 {{declared with lifetime '$b' here}}
   int *$a q = x;  // no warn
@@ -128,7 +128,7 @@ void simple_function_call(int* $a x, int *$b y) {
   int *$a p;
   p = correct_simple_return(x); // no warning
   p = incorrect_simple_return(x); // no warning
-  p = correct_simple_return(y); // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+  p = correct_simple_return(y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
           // expected-note@-3 {{declared with lifetime '$a' here}} \
           // expected-note@-4 {{declared with lifetime '$b' here}}
 }

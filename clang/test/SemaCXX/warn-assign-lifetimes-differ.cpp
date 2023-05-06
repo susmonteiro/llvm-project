@@ -11,7 +11,7 @@ void simple_correct_assign(int *$a x, int *$a y) {
 
 void simple_incorrect_assign(int *$a x, int *$b y) {
   y = x;    
-  // expected-warning@-1 {{assignment requires that '$b' outlives '$a'}}
+  // expected-warning@-1 {{assignment requires that '$a' outlives '$b'}}
   // expected-note@-3 {{declared with lifetime '$a' here}}
   // expected-note@-4 {{declared with lifetime '$b' here}}
 
