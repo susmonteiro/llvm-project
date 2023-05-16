@@ -163,20 +163,26 @@ int *$a correct_function_call_two_args_1(int *$a x, int *$b y) {
   return p;
 }
 
-// TODO take care of this test
-// int *$a incorrect_function_call_two_args_1(int *$a x, int *$b y) {
-//   int *$a p;
-//   p = constraint_simple_return(x, y);
-//   return p;
-// }
+int *$a incorrect_function_call_two_args_1(int *$a x, int *$b y) {
+  int *p;
+  p = constraint_simple_return(x, y);
+  return p; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}}
+}
 
 int *$a correct_function_call_two_args_2(int *$a x, int *$b y) {
   return correct_simple_return(x, y);
 }
 
-// TODO take care of this test
+// TODO take care of this test -> sometimes works, but others doesnt
 // int *$a incorrect_function_call_two_args_2(int *$a x, int *$b y) {
-//   return constraint_simple_return(x, y);
+//   return constraint_simple_return(x, y);  
+// }
+
+// TODO take care of this test -> sometimes works, but others doesnt
+// void incorrect_function_call_two_args_3(int* $a x, int *$b y) {
+//         int *$a p;
+//         p = constraint_simple_return(x, y);
+//         int *$a q = constraint_simple_return(x, y);
 // }
 
 int return_int(int* $a x, int* $b y) {

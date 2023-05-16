@@ -48,6 +48,7 @@ class PointsToMap {
 
   // Returns a human-readable representation of this object.
   std::string DebugString() const;
+  size_t size() const { return ExprPointsTo.size(); }
 
   // TODO
   //   const llvm::DenseMap<const Object*, ObjectSet>& PointerPointsTos() const

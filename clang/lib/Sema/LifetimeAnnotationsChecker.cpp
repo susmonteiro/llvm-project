@@ -93,6 +93,8 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
   auto function_info = FunctionInfo[func];
   State = LifetimeAnnotationsAnalysis(function_info);
+  
+  debugLifetimes("Points to size", State.GetPointsTo().size());
 
   // step 1
   debugInfo("\n====== START STEP 1 ======\n");
@@ -111,6 +113,7 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   LifetimeAnnotationsChecker::CheckLifetimes(func, S);
   debugInfo("\n====== FINISH STEP 3 ======\n");
   debugLifetimes(State.DebugString());
+  debugLifetimes("Points to size", State.GetPointsTo().size());
 }
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
