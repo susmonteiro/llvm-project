@@ -161,7 +161,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
                   << init_var->getDecl()->getSourceRange();
             }
           }
-          break;
         }
       }
     }
@@ -237,7 +236,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
               << var_lifetime.GetLifetimeName() << var_decl->getSourceRange();
         }
       }
-      break;
     }
   }
   return std::nullopt;
