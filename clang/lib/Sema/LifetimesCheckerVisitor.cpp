@@ -90,7 +90,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
                 << rhs_lifetime.GetLifetimeName() << rhs_decl->getSourceRange();
           }
         }
-        break;
       }
     }
   }
