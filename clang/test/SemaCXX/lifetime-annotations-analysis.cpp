@@ -178,19 +178,21 @@ int *$a incorrect_function_call_two_args_2(int *$a x, int *$b y) {
           // expected-note@-1 {{declared with lifetime '$b' here}}
 }
 
-void correct_function_call_two_args_3(int* $a x, int *$b y) {
+int *$a correct_function_call_two_args_3(int* $a x, int *$b y) {
   int *$a p;
   p = correct_simple_return(x, y);
   int *$a q = correct_simple_return(x, y);
+  return p;
 }
 
-void incorrect_function_call_two_args_3(int* $a x, int *$b y) {
-        int *$a p;
-        p = constraint_simple_return(x, y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
-          // expected-note@-1 {{declared with lifetime '$a' here}} \
-          // expected-note@-2 {{declared with lifetime '$b' here}}
-        int *$a q = constraint_simple_return(x, y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
-          // expected-note@-5 {{declared with lifetime '$b' here}}
+int *$a incorrect_function_call_two_args_3(int* $a x, int *$b y) {
+  int *$a p;
+  p = constraint_simple_return(x, y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+    // expected-note@-1 {{declared with lifetime '$a' here}} \
+    // expected-note@-2 {{declared with lifetime '$b' here}}
+  int *$a q = constraint_simple_return(x, y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+    // expected-note@-5 {{declared with lifetime '$b' here}}
+  return p; // ? no warning
 }
 
 int return_int(int* $a x, int* $b y) {
