@@ -53,7 +53,9 @@ void LifetimeAnnotationsAnalysis::CreateDependency(
   //   // TODO implement
   // }
   const clang::NamedDecl *decl = to->getFoundDecl();
-  Dependencies[from].insert(decl);
+  if (from != decl) {
+    Dependencies[from].insert(decl);
+  }
 }
 
 DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
@@ -87,21 +89,21 @@ void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
 }
 
 std::string LifetimeAnnotationsAnalysis::DebugString() {
-    std::string str = "[LifetimeAnnotationsAnalysis] - STATE\n\n";
-    str += ">> VariableLifetimes\n\n";
-    for (const auto &pair : VariableLifetimes) {
-      str += pair.first->getNameAsString() + ": " + pair.second.DebugString() +
-             '\n';
-    }
-    str += "\n>> Dependencies\n\n";
-    for (const auto &pair : Dependencies) {
-      str += pair.first->getNameAsString() + ": ";
-      for (const auto &var : pair.second) {
-        str += var->getNameAsString() + ' ';
-      }
-      str += '\n';
-    }
-    return str;
+  std::string str = "[LifetimeAnnotationsAnalysis] - STATE\n\n";
+  str += ">> VariableLifetimes\n\n";
+  for (const auto &pair : VariableLifetimes) {
+    str +=
+        pair.first->getNameAsString() + ": " + pair.second.DebugString() + '\n';
   }
+  str += "\n>> Dependencies\n\n";
+  for (const auto &pair : Dependencies) {
+    str += pair.first->getNameAsString() + ": ";
+    for (const auto &var : pair.second) {
+      str += var->getNameAsString() + ' ';
+    }
+    str += '\n';
+  }
+  return str;
+}
 
 }  // namespace clang
