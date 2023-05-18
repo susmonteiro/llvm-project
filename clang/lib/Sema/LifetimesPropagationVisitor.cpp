@@ -48,8 +48,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   // Because of how we handle reference-like structs, a member access to a
   // non-reference-like field in a struct might still produce lifetimes. We
   // don't want to change points-to sets in those cases.
-  // TODO need to check for references?
-  if (!lhs->getType()->isPointerType()) {
+  if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
     debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
@@ -85,8 +84,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
   if (direct_callee) {
     clang::QualType func_type = direct_callee->getReturnType();
     // ignore if return type does not have a Lifetime
-    // TODO references also included?
-    if (!func_type->isPointerType()) {
+    if (!func_type->isPointerType() && !func_type->isReferenceType()) {
       debugWarn("Return type is not pointer type");
       return std::nullopt;
     }
@@ -257,11 +255,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      if (!var_decl->getType()->isPointerType()) {
-        // TODO what happens when it's a reference? `isPointerType()` also
-        // catches this?
+      if (!var_decl->getType()->isPointerType() && !var_decl->getType()->isReferenceType()) {
         debugWarn("Var decl is not pointer type");
-        // return std::nullopt;
         continue;
       }
 

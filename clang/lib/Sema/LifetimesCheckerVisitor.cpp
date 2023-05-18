@@ -19,7 +19,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   // non-reference-like field in a struct might still produce lifetimes. We
   // don't want to change points-to sets in those cases.
   // TODO need to check for references?
-  if (!lhs->getType()->isPointerType()) {
+  if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
     debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
@@ -103,11 +103,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      if (!var_decl->getType()->isPointerType()) {
-        // TODO what happens when it's a reference? `isPointerType()` also
-        // catches this?
+      if (!var_decl->getType()->isPointerType() && !var_decl->getType()->isReferenceType()) {
         debugWarn("Var decl is not pointer type");
-        // return std::nullopt;
         continue;
       }
       Lifetime &var_decl_lifetime = State.GetLifetime(var_decl);

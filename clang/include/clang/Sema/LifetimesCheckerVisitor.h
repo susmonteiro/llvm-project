@@ -32,7 +32,7 @@ class LifetimesCheckerVisitor
   LifetimeAnnotationsAnalysis &State;
   PointsToMap &PointsTo;
   Sema &S;
-  bool debugEnabled = false;  // TODO delete this
+  bool debugEnabled = true;  // TODO delete this
 };
 
 }  // namespace clang
