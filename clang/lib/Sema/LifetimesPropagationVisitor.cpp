@@ -2,14 +2,14 @@
 
 namespace clang {
 
-void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
+void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs, const clang::Stmt *loc, 
                  PointsToMap &PointsTo, LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("\t[TransferRHS]");
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
   for (const auto &expr : points_to) {
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
       const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      state.CreateDependency(lhs, rhs_ref_decl);
+      state.CreateDependency(lhs, rhs_ref_decl, loc);
     }
   }
 }
@@ -67,7 +67,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
 
   if (lhs_decl_ref_expr &&
       State.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
-    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, PointsTo, State);
+    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, op, PointsTo, State);
   } else {
     // TODO
   }
@@ -270,7 +270,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         const clang::Expr *init = var_decl->getInit();
         Visit(const_cast<clang::Expr *>(init));
         if (State.IsLifetimeNotset(var_decl))
-          TransferRHS(var_decl, init, PointsTo, State);
+          TransferRHS(var_decl, init, decl_stmt, PointsTo, State);
       }
     }
   }

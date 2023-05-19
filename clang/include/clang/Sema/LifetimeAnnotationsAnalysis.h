@@ -16,13 +16,18 @@ namespace clang {
 
 using VariableLifetimesMap = llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
 
-using StmtVarDependenciesMap = llvm::DenseMap<const clang::Stmt*, llvm::DenseSet<const clang::NamedDecl*>>;
+using StmtVarDependenciesMap =
+    llvm::DenseMap<const clang::Stmt *,
+                   llvm::DenseSet<const clang::NamedDecl *>>;
 
-using VarStmtDependenciesMap = llvm::DenseMap<const clang::NamedDecl*, llvm::DenseSet<const clang::Stmt*>>;
+using VarStmtDependenciesMap =
+    llvm::DenseMap<const clang::NamedDecl *,
+                   llvm::DenseSet<const clang::Stmt *>>;
 
 // TODO remove this
-using DependenciesMap = llvm::DenseMap<const clang::NamedDecl *,
-                                    llvm::DenseSet<const clang::NamedDecl *>>;
+using DependenciesMap =
+    llvm::DenseMap<const clang::NamedDecl *,
+                   llvm::DenseSet<const clang::NamedDecl *>>;
 
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
@@ -75,8 +80,17 @@ class LifetimeAnnotationsAnalysis {
     VariableLifetimes[var_decl] = Lifetime(lifetime);
   }
 
-  void CreateStmtDependency(const clang::NamedDecl *from,
-                        const clang::Stmt *to);
+  void CreateLifetimeDependency(const clang::NamedDecl *from,
+                                const clang::Stmt *to);
+
+  void CreateStmtDependency(const clang::Stmt *from,
+                            const clang::NamedDecl *to);
+
+  void CreateStmtDependency(const clang::Stmt *from,
+                            const clang::DeclRefExpr *to);
+
+  void CreateDependency(const clang::NamedDecl *from,
+                        const clang::DeclRefExpr *to, const clang::Stmt *loc);
 
   void CreateDependency(const clang::NamedDecl *from,
                         const clang::DeclRefExpr *to);
@@ -95,15 +109,14 @@ class LifetimeAnnotationsAnalysis {
  private:
   VariableLifetimesMap VariableLifetimes;
   // TODO remove this
-  DependenciesMap Dependencies; 
-  StmtVarDependenciesMap StmtDependencies;
+  DependenciesMap Dependencies;
   VarStmtDependenciesMap LifetimeDependencies;
+  StmtVarDependenciesMap StmtDependencies;
   PointsToMap PointsTo;
   Lifetime ReturnLifetime;
 
   // TODO this
   // std::optional<ValueLifetimes> this_lifetimes_;
-
 };
 }  // namespace clang
 

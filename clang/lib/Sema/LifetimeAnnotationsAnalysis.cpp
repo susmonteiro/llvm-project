@@ -34,6 +34,7 @@ Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime() {
   return ReturnLifetime;
 }
 
+// TODO remove
 void LifetimeAnnotationsAnalysis::CreateDependency(
     const clang::NamedDecl *from, const clang::DeclRefExpr *to) {
   // TODO implement
@@ -56,6 +57,50 @@ void LifetimeAnnotationsAnalysis::CreateDependency(
   if (from != decl) {
     Dependencies[from].insert(decl);
   }
+}
+
+void LifetimeAnnotationsAnalysis::CreateDependency(const clang::NamedDecl *from,
+                                                   const clang::DeclRefExpr *to,
+                                                   const clang::Stmt *loc) {
+  // TODO implement
+  // clang::QualType type = to->getType().getCanonicalType();
+  // // TODO necessary?
+  // if (type->isArrayType()) {
+  //   type = type->castAsArrayTypeUnsafe()->getElementType();
+  // }
+
+  // if (type->isRecordType()) {
+  //   // TODO implement
+  //   return;
+  // }
+
+  // if (type->isPointerType() || type->isReferenceType() ||
+  //     type->isStructureOrClassType()) {
+  //   // TODO implement
+  // }
+  const clang::NamedDecl *decl = to->getFoundDecl();
+  if (from != decl) {
+    // TODO remove
+    Dependencies[from].insert(decl);
+    CreateLifetimeDependency(from, loc);
+    CreateStmtDependency(loc, decl);
+  }
+}
+
+void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
+    const clang::NamedDecl *from, const clang::Stmt *to) {
+  LifetimeDependencies[from].insert(to);
+}
+
+void LifetimeAnnotationsAnalysis::CreateStmtDependency(
+    const clang::Stmt *from, const clang::NamedDecl *to) {
+  StmtDependencies[from].insert(to);
+}
+
+void LifetimeAnnotationsAnalysis::CreateStmtDependency(
+    const clang::Stmt *from, const clang::DeclRefExpr *to) {
+  const clang::NamedDecl *decl = to->getFoundDecl();
+  LifetimeAnnotationsAnalysis::CreateStmtDependency(from, decl);
 }
 
 DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
