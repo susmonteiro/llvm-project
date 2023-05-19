@@ -15,6 +15,12 @@
 namespace clang {
 
 using VariableLifetimesMap = llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
+
+using StmtVarDependenciesMap = llvm::DenseMap<const clang::Stmt*, llvm::DenseSet<const clang::NamedDecl*>>;
+
+using VarStmtDependenciesMap = llvm::DenseMap<const clang::NamedDecl*, llvm::DenseSet<const clang::Stmt*>>;
+
+// TODO remove this
 using DependenciesMap = llvm::DenseMap<const clang::NamedDecl *,
                                     llvm::DenseSet<const clang::NamedDecl *>>;
 
@@ -69,8 +75,12 @@ class LifetimeAnnotationsAnalysis {
     VariableLifetimes[var_decl] = Lifetime(lifetime);
   }
 
+  void CreateStmtDependency(const clang::NamedDecl *from,
+                        const clang::Stmt *to);
+
   void CreateDependency(const clang::NamedDecl *from,
                         const clang::DeclRefExpr *to);
+
   void SetDependencies(DependenciesMap dependencies) {
     Dependencies = std::move(dependencies);
   }
@@ -84,7 +94,10 @@ class LifetimeAnnotationsAnalysis {
 
  private:
   VariableLifetimesMap VariableLifetimes;
-  DependenciesMap Dependencies;
+  // TODO remove this
+  DependenciesMap Dependencies; 
+  StmtVarDependenciesMap StmtDependencies;
+  VarStmtDependenciesMap LifetimeDependencies;
   PointsToMap PointsTo;
   Lifetime ReturnLifetime;
 
