@@ -125,11 +125,11 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto children = State.GetDependencies();
   auto parents = std::move(State.TransposeDependencies());
 
-  debugLifetimes("=== dependencies_ ===");
-  debugLifetimes(children);
+  // debugLifetimes("=== dependencies_ ===");
+  // debugLifetimes(children);
 
-  debugLifetimes("=== parents (transposed) ===");
-  debugLifetimes(parents);
+  // debugLifetimes("=== parents (transposed) ===");
+  // debugLifetimes(parents);
 
   auto worklist = State.InitializeWorklist();
 
@@ -137,14 +137,14 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   int i = 1;
 
   while (!worklist.empty()) {
-    debugInfo("---> Iteration", i++);
-    debugLifetimes("=== worklist ===");
-    debugLifetimes(worklist);
+    // debugInfo("---> Iteration", i++);
+    // debugLifetimes("=== worklist ===");
+    // debugLifetimes(worklist);
 
     auto &el = worklist.back();
     worklist.pop_back();
 
-    debugLifetimes("\nPropagation of", el->getNameAsString());
+    // debugLifetimes("\nPropagation of", el->getNameAsString());
 
     llvm::DenseSet<const clang::NamedDecl *> result = {el};
     llvm::DenseSet<char> shortest_lifetimes;
@@ -167,17 +167,17 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         worklist.emplace_back(parent);
       }
     }
-    debugLifetimes("=== children ===");
-    debugLifetimes(children);
+    // debugLifetimes("=== children ===");
+    // debugLifetimes(children);
   }
 
   State.SetDependencies(children);
 
-  debugLifetimes("=== children ===");
-  debugLifetimes(children);
+  // debugLifetimes("=== children ===");
+  // debugLifetimes(children);
 
-  debugInfo2("\n====== BEFORE PROCESSING SHORTEST LIFETIMES ======\n");
-  debugLifetimes(State.DebugString());
+  // debugInfo2("\n====== BEFORE PROCESSING SHORTEST LIFETIMES ======\n");
+  // debugLifetimes(State.DebugString());
 
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable
