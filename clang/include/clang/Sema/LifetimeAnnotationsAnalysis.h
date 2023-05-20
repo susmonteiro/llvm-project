@@ -36,6 +36,7 @@ class LifetimeAnnotationsAnalysis {
   LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info);
 
   VariableLifetimesMap &GetVariableLifetimes();
+  // TODO remove
   DependenciesMap &GetDependencies();
   Lifetime &GetLifetime(const clang::NamedDecl *var_decl);
   Lifetime &GetReturnLifetime();
@@ -80,6 +81,9 @@ class LifetimeAnnotationsAnalysis {
     VariableLifetimes[var_decl] = Lifetime(lifetime);
   }
 
+  VarStmtDependenciesMap &GetLifetimeDependencies();
+  StmtVarDependenciesMap &GetStmtDependencies();
+
   void CreateLifetimeDependency(const clang::NamedDecl *from,
                                 const clang::Stmt *to);
 
@@ -95,13 +99,19 @@ class LifetimeAnnotationsAnalysis {
   void CreateDependency(const clang::NamedDecl *from,
                         const clang::DeclRefExpr *to);
 
+  void SetDependencies(VarStmtDependenciesMap dependencies) {
+    LifetimeDependencies = std::move(dependencies);
+  }
+
   void SetDependencies(DependenciesMap dependencies) {
     Dependencies = std::move(dependencies);
   }
 
   void ProcessShortestLifetimes();
 
-  DependenciesMap TransposeDependencies() const;
+  // TODO remove
+  // DependenciesMap TransposeDependencies() const;
+  DependenciesMap TransposeDependencies();
   std::vector<const clang::NamedDecl *> InitializeWorklist() const;
 
   std::string DebugString();
@@ -111,6 +121,7 @@ class LifetimeAnnotationsAnalysis {
   // TODO remove this
   DependenciesMap Dependencies;
   VarStmtDependenciesMap LifetimeDependencies;
+  // ? can one stmt point to more than one var_decl?
   StmtVarDependenciesMap StmtDependencies;
   PointsToMap PointsTo;
   Lifetime ReturnLifetime;

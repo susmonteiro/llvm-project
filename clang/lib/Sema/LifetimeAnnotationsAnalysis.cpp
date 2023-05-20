@@ -15,6 +15,8 @@ LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis(
 VariableLifetimesMap &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
   return VariableLifetimes;
 }
+
+// TODO remove
 DependenciesMap &LifetimeAnnotationsAnalysis::GetDependencies() {
   return Dependencies;
 }
@@ -87,6 +89,14 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::NamedDecl *from,
   }
 }
 
+VarStmtDependenciesMap &LifetimeAnnotationsAnalysis::GetLifetimeDependencies() {
+  return LifetimeDependencies;
+}
+
+StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
+  return StmtDependencies;
+}
+
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
     const clang::NamedDecl *from, const clang::Stmt *to) {
   LifetimeDependencies[from].insert(to);
@@ -103,12 +113,25 @@ void LifetimeAnnotationsAnalysis::CreateStmtDependency(
   LifetimeAnnotationsAnalysis::CreateStmtDependency(from, decl);
 }
 
-DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
+// TODO remove
+// DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
+//   DependenciesMap result;
+//   for (const auto &pair : Dependencies) {
+//     for (const auto &child : pair.second) {
+//       // don't insert annotated variables into the parents graph
+//       if (IsLifetimeNotset(child)) result[child].insert(pair.first);
+//     }
+//   }
+//   return result;
+// }
+
+DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() {
   DependenciesMap result;
-  for (const auto &pair : Dependencies) {
-    for (const auto &child : pair.second) {
-      // don't insert annotated variables into the parents graph
-      if (IsLifetimeNotset(child)) result[child].insert(pair.first);
+  for (const auto &pair : LifetimeDependencies) {
+    for (const auto &stmt : pair.second) {
+      for (const auto &child : StmtDependencies[stmt]) {
+        if (IsLifetimeNotset(child)) result[child].insert(pair.first);
+      }
     }
   }
   return result;
@@ -117,7 +140,7 @@ DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
 std::vector<const clang::NamedDecl *>
 LifetimeAnnotationsAnalysis::InitializeWorklist() const {
   std::vector<const clang::NamedDecl *> worklist;
-  for (const auto &pair : Dependencies) {
+  for (const auto &pair : LifetimeDependencies) {
     worklist.emplace_back(pair.first);
   }
   return worklist;
