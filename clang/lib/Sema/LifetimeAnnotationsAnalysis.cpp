@@ -16,11 +16,6 @@ VariableLifetimesMap &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
   return VariableLifetimes;
 }
 
-// TODO remove
-DependenciesMap &LifetimeAnnotationsAnalysis::GetDependencies() {
-  return Dependencies;
-}
-
 Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
     const clang::NamedDecl *var_decl) {
   VariableLifetimesMap::iterator it = VariableLifetimes.find(var_decl);
@@ -34,31 +29,6 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
 
 Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime() {
   return ReturnLifetime;
-}
-
-// TODO remove
-void LifetimeAnnotationsAnalysis::CreateDependency(
-    const clang::NamedDecl *from, const clang::DeclRefExpr *to) {
-  // TODO implement
-  // clang::QualType type = to->getType().getCanonicalType();
-  // // TODO necessary?
-  // if (type->isArrayType()) {
-  //   type = type->castAsArrayTypeUnsafe()->getElementType();
-  // }
-
-  // if (type->isRecordType()) {
-  //   // TODO implement
-  //   return;
-  // }
-
-  // if (type->isPointerType() || type->isReferenceType() ||
-  //     type->isStructureOrClassType()) {
-  //   // TODO implement
-  // }
-  const clang::NamedDecl *decl = to->getFoundDecl();
-  if (from != decl) {
-    Dependencies[from].insert(decl);
-  }
 }
 
 void LifetimeAnnotationsAnalysis::CreateDependency(const clang::NamedDecl *from,
@@ -83,7 +53,6 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::NamedDecl *from,
   const clang::NamedDecl *decl = to->getFoundDecl();
   if (from != decl) {
     // TODO remove
-    Dependencies[from].insert(decl);
     CreateLifetimeDependency(from, loc);
     CreateStmtDependency(loc, decl);
   }
@@ -113,20 +82,12 @@ void LifetimeAnnotationsAnalysis::CreateStmtDependency(
   LifetimeAnnotationsAnalysis::CreateStmtDependency(from, decl);
 }
 
-// TODO remove
-// DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
-//   DependenciesMap result;
-//   for (const auto &pair : Dependencies) {
-//     for (const auto &child : pair.second) {
-//       // don't insert annotated variables into the parents graph
-//       if (IsLifetimeNotset(child)) result[child].insert(pair.first);
-//     }
-//   }
-//   return result;
-// }
-
-DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() {
-  DependenciesMap result;
+llvm::DenseMap<const clang::NamedDecl *,
+               llvm::DenseSet<const clang::NamedDecl *>>
+LifetimeAnnotationsAnalysis::TransposeDependencies() {
+  llvm::DenseMap<const clang::NamedDecl *,
+                 llvm::DenseSet<const clang::NamedDecl *>>
+      result;
   for (const auto &pair : LifetimeDependencies) {
     for (const auto &stmt : pair.second) {
       for (const auto &child : StmtDependencies[stmt]) {
@@ -148,7 +109,7 @@ LifetimeAnnotationsAnalysis::InitializeWorklist() const {
 
 void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   // iterate over variables with no fixed lifetime
-  for (const auto &pair : Dependencies) {
+  for (const auto &pair : LifetimeDependencies) {
     auto &lifetime = GetLifetime(pair.first);
     if (lifetime.IsNotSet()) {
       lifetime.ProcessShortestLifetimes();
@@ -164,10 +125,11 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
         pair.first->getNameAsString() + ": " + pair.second.DebugString() + '\n';
   }
   str += "\n>> Dependencies\n\n";
-  for (const auto &pair : Dependencies) {
+  for (const auto &pair : LifetimeDependencies) {
     str += pair.first->getNameAsString() + ": ";
-    for (const auto &var : pair.second) {
-      str += var->getNameAsString() + ' ';
+    for (const auto &stmt : pair.second) {
+      for (const auto &var : StmtDependencies[stmt])
+        str += var->getNameAsString() + ' ';
     }
     str += '\n';
   }

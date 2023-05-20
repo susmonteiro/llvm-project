@@ -24,11 +24,6 @@ using VarStmtDependenciesMap =
     llvm::DenseMap<const clang::NamedDecl *,
                    llvm::DenseSet<const clang::Stmt *>>;
 
-// TODO remove this
-using DependenciesMap =
-    llvm::DenseMap<const clang::NamedDecl *,
-                   llvm::DenseSet<const clang::NamedDecl *>>;
-
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
  public:
@@ -36,8 +31,6 @@ class LifetimeAnnotationsAnalysis {
   LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info);
 
   VariableLifetimesMap &GetVariableLifetimes();
-  // TODO remove
-  DependenciesMap &GetDependencies();
   Lifetime &GetLifetime(const clang::NamedDecl *var_decl);
   Lifetime &GetReturnLifetime();
 
@@ -103,23 +96,17 @@ class LifetimeAnnotationsAnalysis {
     LifetimeDependencies = std::move(dependencies);
   }
 
-  void SetDependencies(DependenciesMap dependencies) {
-    Dependencies = std::move(dependencies);
-  }
-
   void ProcessShortestLifetimes();
 
-  // TODO remove
-  // DependenciesMap TransposeDependencies() const;
-  DependenciesMap TransposeDependencies();
+  llvm::DenseMap<const clang::NamedDecl *,
+                 llvm::DenseSet<const clang::NamedDecl *>>
+  TransposeDependencies();
   std::vector<const clang::NamedDecl *> InitializeWorklist() const;
 
   std::string DebugString();
 
  private:
   VariableLifetimesMap VariableLifetimes;
-  // TODO remove this
-  DependenciesMap Dependencies;
   VarStmtDependenciesMap LifetimeDependencies;
   // ? can one stmt point to more than one var_decl?
   StmtVarDependenciesMap StmtDependencies;

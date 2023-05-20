@@ -119,74 +119,6 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
 
-// TODO remove
-// After capturing lifetimes from the function, apply the fixed point
-// algorithm
-// void LifetimeAnnotationsChecker::PropagateLifetimes() {
-//   auto children = State.GetDependencies();
-//   auto parents = std::move(State.TransposeDependencies());
-
-//   debugLifetimes("=== dependencies_ ===");
-//   debugLifetimes(children);
-
-//   debugLifetimes("=== parents (transposed) ===");
-//   debugLifetimes(parents);
-
-//   auto worklist = State.InitializeWorklist();
-
-//   // DEBUG
-//   int i = 1;
-
-//   while (!worklist.empty()) {
-//     // debugInfo("---> Iteration", i++);
-//     // debugLifetimes("=== worklist ===");
-//     // debugLifetimes(worklist);
-
-//     auto &el = worklist.back();
-//     worklist.pop_back();
-
-//     // debugLifetimes("\nPropagation of", el->getNameAsString());
-
-//     llvm::DenseSet<const clang::NamedDecl *> result = {el};
-//     llvm::DenseSet<char> shortest_lifetimes;
-//     for (const auto &child : children[el]) {
-//       if (child == el) continue;
-//       result.insert(children[child].begin(), children[child].end());
-//       auto tmp_lifetimes = State.GetShortestLifetimes(child);
-//       if (State.IsLifetimeNotset(child)) {
-//         shortest_lifetimes.insert(tmp_lifetimes.begin(),
-//         tmp_lifetimes.end());
-//       } else {
-//         shortest_lifetimes.insert(State.GetLifetime(child).GetId());
-//       }
-//     }
-//     if (children[el] != result ||
-//         State.GetShortestLifetimes(el) != shortest_lifetimes) {
-//       children[el].insert(result.begin(), result.end());
-//       State.PropagateShortestLifetimes(el, shortest_lifetimes);
-
-//       for (const auto &parent : parents[el]) {
-//         worklist.emplace_back(parent);
-//       }
-//     }
-//     debugLifetimes("=== children ===");
-//     debugLifetimes(children);
-//   }
-
-//   State.SetDependencies(children);
-
-//   debugLifetimes("=== children ===");
-//   debugLifetimes(children);
-
-//   debugInfo2("\n====== BEFORE PROCESSING SHORTEST LIFETIMES ======\n");
-//   debugLifetimes(State.DebugString());
-
-//   // finally, process the lifetimes dependencies to attribute the correct set
-//   of
-//   // lifetimes to each variable
-//   State.ProcessShortestLifetimes();
-// }
-
 void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
@@ -216,7 +148,9 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     llvm::DenseSet<const clang::NamedDecl *> result = {el};
     llvm::DenseSet<char> shortest_lifetimes;
     llvm::DenseSet<const clang::Stmt *> stmts;
-
+    
+    // TODO try this
+    // for (const auto &stmt : State.GetLifetimeDependencies[el]) {
     for (const auto &stmt : children[el]) {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
