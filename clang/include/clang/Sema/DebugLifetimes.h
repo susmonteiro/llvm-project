@@ -34,8 +34,8 @@ void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *,
 void debugImportant(std::string txt);
 void debugImportant(std::string txt1, std::string txt2);
 void debugInfo(std::string txt);
-void debugInfo2(std::string txt);
 void debugInfo(std::string txt, int i);
+void debugInfo2(std::string txt);
 void debugWarn(std::string txt);
 void debugWarn2(std::string txt);
 void debugLight(std::string txt);
