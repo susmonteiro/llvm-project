@@ -62,15 +62,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
         const auto *rhs_decl = rhs_var->getDecl();
         Lifetime &rhs_lifetime = State.GetLifetime(rhs_decl);
         if (rhs_lifetime < lhs_lifetime) {
-          if (rhs_lifetime.IsNotSet()) {
-            for (char l : rhs_lifetime.GetShortestLifetimes()) {
-              if (l == lhs_lifetime.GetId()) continue;
-              S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-                  << lhs_lifetime.GetLifetimeName()
-                  << rhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
-            }
-            // TODO implement the notes in this case
-          } else if (lhs_lifetime.IsNotSet()) {
+          if (lhs_lifetime.IsNotSet()) {
             // TODO should this case exist?
             //   for (char l : lhs_lifetime.GetShortestLifetimes()) {
             //     if (l == rhs_lifetime.GetId()) continue;
@@ -80,6 +72,14 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
             //         op->getSourceRange();
             //   }
             //   // TODO implement the notes in this case
+          } else if (rhs_lifetime.IsNotSet()) {
+            for (char l : rhs_lifetime.GetShortestLifetimes()) {
+              if (l == lhs_lifetime.GetId()) continue;
+              S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+                  << lhs_lifetime.GetLifetimeName()
+                  << rhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
+            }
+            // TODO implement the notes in this case
           } else {
             S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
                 << lhs_lifetime.GetLifetimeName()
@@ -103,7 +103,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      if (!var_decl->getType()->isPointerType() && !var_decl->getType()->isReferenceType()) {
+      if (!var_decl->getType()->isPointerType() &&
+          !var_decl->getType()->isReferenceType()) {
         debugWarn("Var decl is not pointer type");
         continue;
       }
@@ -130,7 +131,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
 
           Lifetime &init_lifetime = State.GetLifetime(init_var->getDecl());
           // TODO check this
-          // TODO maybe it's more correct to write ! >= 
+          // TODO maybe it's more correct to write ! >=
           if (init_lifetime < var_decl_lifetime) {
             if (init_lifetime.IsNotSet()) {
               for (char l : init_lifetime.GetShortestLifetimes()) {
