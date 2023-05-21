@@ -203,3 +203,17 @@ int return_int(int* $a x, int* $b y) {
 	p = y;
 	return *p;
 }	
+
+int *$b multiple_notes_incorrect(int *$a x, int *$b y) {
+	int *p;
+	int *q = x;
+	int *$a r;
+	r = y;			// expected-warning {{assignment requires that '$b' outlives '$a'}} \
+              // expected-note@-1 {{declared with lifetime '$a' here}} \
+              // expected-note@-4 {{declared with lifetime '$b' here}}
+	p = x;
+	p = q;
+	return p;		// expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
+          // expected-note@-2 {{declared with lifetime '$a' here}} \
+          // expected-note@-1 {{declared with lifetime '$a' here}}
+}
