@@ -108,7 +108,7 @@ void Lifetime::ProcessShortestLifetimes() {
 }
 
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
-  assert(Id != NOTSET);
+  assert(id != NOTSET);
   auto it = ShortestLifetimes.find(id);
   if (it != ShortestLifetimes.end()) {
     return ShortestLifetimes[id];
