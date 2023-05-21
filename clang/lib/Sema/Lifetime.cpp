@@ -107,6 +107,16 @@ void Lifetime::ProcessShortestLifetimes() {
   // outlives which, then all of them are considered the shortest
 }
 
+std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
+  assert(Id != NOTSET);
+  auto it = ShortestLifetimes.find(id);
+  if (it != ShortestLifetimes.end()) {
+    return ShortestLifetimes[id];
+  } else {
+    return std::nullopt;
+  }
+}
+
 bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
   const auto &OtherShortestLifetimes = Other.GetShortestLifetimes();
   for (const auto &pair : ShortestLifetimes) {

@@ -8,6 +8,30 @@
 
 namespace clang {
 
+void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
+                                         const clang::NamedDecl *var_decl,
+                                         int msg) const {
+  char id = lifetime.GetId();
+  PrintNotes(lifetime, var_decl, msg, id);
+}
+
+void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
+                                         const clang::NamedDecl *var_decl,
+                                         int msg, int id) const {
+  const auto &maybe_stmts = lifetime.GetStmts(id);
+  if (maybe_stmts.has_value()) {
+    const auto &stmts = maybe_stmts.value();
+    for (const auto &stmt : stmts) {
+      // TODO try to print in a better place
+      S.Diag(stmt->getBeginLoc(), msg)
+          << lifetime.GetLifetimeName() << stmt->getSourceRange();
+    }
+  } else {
+    S.Diag(var_decl->getLocation(), msg)
+        << lifetime.GetLifetimeName() << var_decl->getSourceRange();
+  }
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
@@ -67,7 +91,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
               if (pair.first == lhs_lifetime.GetId()) continue;
               S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
                   << lhs_lifetime.GetLifetimeName()
-                  << rhs_lifetime.GetLifetimeName(pair.first) << op->getSourceRange();
+                  << rhs_lifetime.GetLifetimeName(pair.first)
+                  << op->getSourceRange();
             }
             // TODO implement the notes in this case
           } else if (lhs_lifetime.IsNotSet()) {
@@ -84,10 +109,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
             S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
                 << lhs_lifetime.GetLifetimeName()
                 << rhs_lifetime.GetLifetimeName() << op->getSourceRange();
-            S.Diag(lhs_decl->getLocation(), diag::note_lifetime_declared_here)
-                << lhs_lifetime.GetLifetimeName() << lhs_decl->getSourceRange();
-            S.Diag(rhs_decl->getLocation(), diag::note_lifetime_declared_here)
-                << rhs_lifetime.GetLifetimeName() << rhs_decl->getSourceRange();
+            PrintNotes(lhs_lifetime, lhs_decl,
+                       diag::note_lifetime_declared_here);
+            PrintNotes(rhs_lifetime, rhs_decl,
+                       diag::note_lifetime_declared_here);
           }
         }
       }
@@ -103,7 +128,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      if (!var_decl->getType()->isPointerType() && !var_decl->getType()->isReferenceType()) {
+      if (!var_decl->getType()->isPointerType() &&
+          !var_decl->getType()->isReferenceType()) {
         debugWarn("Var decl is not pointer type");
         continue;
       }
@@ -130,7 +156,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
 
           Lifetime &init_lifetime = State.GetLifetime(init_var->getDecl());
           // TODO check this
-          // TODO maybe it's more correct to write ! >= 
+          // TODO maybe it's more correct to write ! >=
           if (init_lifetime < var_decl_lifetime) {
             if (init_lifetime.IsNotSet()) {
               for (const auto &pair : init_lifetime.GetShortestLifetimes()) {
@@ -229,8 +255,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
               << return_lifetime.GetLifetimeName()
               << var_lifetime.GetLifetimeName()
               << return_stmt->getSourceRange();
-          S.Diag(var_decl->getLocation(), diag::note_lifetime_declared_here)
-              << var_lifetime.GetLifetimeName() << var_decl->getSourceRange();
+          PrintNotes(var_lifetime, var_decl, diag::note_lifetime_declared_here);
+          // TODO remove
+          // S.Diag(var_decl->getLocation(), diag::note_lifetime_declared_here)
+          //     << var_lifetime.GetLifetimeName() << var_decl->getSourceRange();
         }
       }
     }

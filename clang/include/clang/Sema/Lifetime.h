@@ -8,7 +8,8 @@
 
 namespace clang {
 
-using LifetimesMap = llvm::DenseMap<char, llvm::DenseSet<const clang::Stmt *>>;
+using StmtDenseSet = llvm::DenseSet<const clang::Stmt *>;
+using LifetimesMap = llvm::DenseMap<char, StmtDenseSet>;
 
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
@@ -47,6 +48,7 @@ class Lifetime {
   std::string GetLifetimeName() const { return GetLifetimeName(Id); }
 
   LifetimesMap GetShortestLifetimes() const { return ShortestLifetimes; }
+  std::optional<StmtDenseSet> GetStmts(char id);
 
   // TODO remove first
   void InsertShortestLifetimes(char id) {
