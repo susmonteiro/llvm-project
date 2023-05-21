@@ -63,11 +63,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
         Lifetime &rhs_lifetime = State.GetLifetime(rhs_decl);
         if (rhs_lifetime < lhs_lifetime) {
           if (rhs_lifetime.IsNotSet()) {
-            for (char l : rhs_lifetime.GetShortestLifetimes()) {
-              if (l == lhs_lifetime.GetId()) continue;
+            for (const auto &pair : rhs_lifetime.GetShortestLifetimes()) {
+              if (pair.first == lhs_lifetime.GetId()) continue;
               S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
                   << lhs_lifetime.GetLifetimeName()
-                  << rhs_lifetime.GetLifetimeName(l) << op->getSourceRange();
+                  << rhs_lifetime.GetLifetimeName(pair.first) << op->getSourceRange();
             }
             // TODO implement the notes in this case
           } else if (lhs_lifetime.IsNotSet()) {
@@ -133,13 +133,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
           // TODO maybe it's more correct to write ! >= 
           if (init_lifetime < var_decl_lifetime) {
             if (init_lifetime.IsNotSet()) {
-              for (char l : init_lifetime.GetShortestLifetimes()) {
-                if (l == var_decl_lifetime.GetId()) continue;
+              for (const auto &pair : init_lifetime.GetShortestLifetimes()) {
+                if (pair.first == var_decl_lifetime.GetId()) continue;
                 // TODO getLocation? -> also change for the "else" branch
                 S.Diag(var_decl->getInit()->getExprLoc(),
                        diag::warn_assign_lifetimes_differ)
                     << var_decl_lifetime.GetLifetimeName()
-                    << init_lifetime.GetLifetimeName(l)
+                    << init_lifetime.GetLifetimeName(pair.first)
                     << var_decl->getInit()->getSourceRange();
               }
               // TODO implement the notes in this case
@@ -216,11 +216,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
       Lifetime &var_lifetime = State.GetLifetime(var_decl);
       if (var_lifetime < return_lifetime) {
         if (var_lifetime.IsNotSet()) {
-          for (char l : var_lifetime.GetShortestLifetimes()) {
-            if (l == return_lifetime.GetId()) continue;
+          for (const auto &pair : var_lifetime.GetShortestLifetimes()) {
+            if (pair.first == return_lifetime.GetId()) continue;
             S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
                 << return_lifetime.GetLifetimeName()
-                << var_lifetime.GetLifetimeName(l)
+                << var_lifetime.GetLifetimeName(pair.first)
                 << return_stmt->getSourceRange();
           }
           // TODO implement the notes in this case

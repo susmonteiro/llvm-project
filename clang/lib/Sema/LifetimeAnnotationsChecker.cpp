@@ -121,11 +121,12 @@ void LifetimeAnnotationsChecker::GetLifetimeDependencies(
 
 void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto children = State.GetLifetimeDependencies();
+  auto new_children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
   auto parents = std::move(State.TransposeDependencies());
 
-  // debugLifetimes("=== dependencies_ ===");
-  // debugLifetimes(children);
+  debugLifetimes("=== dependencies_ ===");
+  debugLifetimes(children, stmt_dependencies);
 
   // debugLifetimes("=== parents (transposed) ===");
   // debugLifetimes(parents);
@@ -133,60 +134,70 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto worklist = State.InitializeWorklist();
 
   // DEBUG
-  // int i = 1;
+  int i = 1;
 
   while (!worklist.empty()) {
-    // debugInfo("---> Iteration", i++);
-    // debugLifetimes("=== worklist ===");
-    // debugLifetimes(worklist);
+    debugInfo("---> Iteration", i++);
+    debugLifetimes("=== worklist ===");
+    debugLifetimes(worklist);
 
     auto &el = worklist.back();
     worklist.pop_back();
 
-    // debugLifetimes("\nPropagation of", el->getNameAsString());
+    debugLifetimes("\nPropagation of", el->getNameAsString());
 
-    llvm::DenseSet<const clang::NamedDecl *> result = {el};
-    llvm::DenseSet<char> shortest_lifetimes;
+    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<char>>
+        shortest_lifetimes_1;
+    llvm::DenseMap<char, llvm::DenseSet<const clang::Stmt *>>
+        shortest_lifetimes_2;
+
     llvm::DenseSet<const clang::Stmt *> stmts;
-    
-    // TODO try this
-    // for (const auto &stmt : State.GetLifetimeDependencies[el]) {
+
     for (const auto &stmt : children[el]) {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
         if (var_decl == el) continue;
-        stmts.insert(children[var_decl].begin(), children[var_decl].end());
+        // TODO check if needed
+        stmts.insert(new_children[var_decl].begin(),
+                     new_children[var_decl].end());
         auto tmp_lifetimes = State.GetShortestLifetimes(var_decl);
         // TODO relation between lifetimes and stmts
         if (State.IsLifetimeNotset(var_decl)) {
-          shortest_lifetimes.insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
+          // shortest_lifetimes_1[stmt].insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
+          // ! don't want to propagate stmts
+          // ! we want to propagate lifetimes that come from this stmt
+          for (const auto &pair : tmp_lifetimes) {
+            shortest_lifetimes_2[pair.first].insert(stmt);
+          }
         } else {
-          shortest_lifetimes.insert(State.GetLifetime(var_decl).GetId());
+          // shortest_lifetimes_1[stmt].insert(State.GetLifetime(var_decl).GetId());
+          shortest_lifetimes_2[State.GetLifetime(var_decl).GetId()].insert(stmt);
         }
       }
     }
 
-    if (children[el] != stmts ||
-        State.GetShortestLifetimes(el) != shortest_lifetimes) {
-      children[el].insert(stmts.begin(), stmts.end());
-      State.PropagateShortestLifetimes(el, shortest_lifetimes);
+    // TODO this is not perfect
+    if (new_children[el] != stmts ||
+        State.GetShortestLifetimes(el) != shortest_lifetimes_2) {
+      new_children[el].insert(stmts.begin(), stmts.end());
+      State.PropagateShortestLifetimes(el, shortest_lifetimes_2);
 
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);
       }
     }
 
-    // debugLifetimes("=== children ===");
-    // debugLifetimes(children);
+    debugLifetimes("=== children ===");
+    debugLifetimes(new_children, stmt_dependencies);
   }
 
-  State.SetDependencies(children);
+  State.SetDependencies(new_children);
 
-  // debugLifetimes("=== children ===");
-  // debugLifetimes(children);
+  debugLifetimes("=== children ===");
+  debugLifetimes(State.GetLifetimeDependencies(), State.GetStmtDependencies());
 
-  // debugInfo2("\n====== BEFORE PROCESSING SHORTEST LIFETIMES ======\n");
-  // debugLifetimes(State.DebugString());
+  debugInfo2("\n====== BEFORE PROCESSING SHORTEST LIFETIMES ======\n");
+  debugLifetimes(State.DebugString());
 
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable

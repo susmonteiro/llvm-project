@@ -8,6 +8,8 @@
 
 namespace clang {
 
+using LifetimesMap = llvm::DenseMap<char, llvm::DenseSet<const clang::Stmt *>>;
+
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
  public:
@@ -44,18 +46,27 @@ class Lifetime {
   std::string GetLifetimeName(char id) const;
   std::string GetLifetimeName() const { return GetLifetimeName(Id); }
 
-  llvm::DenseSet<char> GetShortestLifetimes() const {
-    return ShortestLifetimes;
-  }
-  void InsertShortestLifetimes(char id) { ShortestLifetimes.insert(id); }
+  LifetimesMap GetShortestLifetimes() const { return ShortestLifetimes; }
 
-  void SetShortestLifetimes(llvm::DenseSet<char> shortest_lifetimes) {
+  // TODO remove first
+  void InsertShortestLifetimes(char id) {
+    ShortestLifetimes[id] = llvm::DenseSet<const clang::Stmt *>();
+  }
+  void InsertShortestLifetimes(char id, const clang::Stmt *stmt) {
+    ShortestLifetimes[id].insert(stmt);
+  }
+  void InsertShortestLifetimes(char id,
+                               llvm::DenseSet<const clang::Stmt *> stmts) {
+    ShortestLifetimes[id].insert(stmts.begin(), stmts.end());
+  }
+  void InsertShortestLifetimes(LifetimesMap shortest_lifetimes) {
+    for (const auto &pair : shortest_lifetimes)
+      ShortestLifetimes[pair.first].insert(pair.second.begin(),
+                                           pair.second.end());
+  }
+
+  void SetShortestLifetimes(LifetimesMap shortest_lifetimes) {
     ShortestLifetimes = shortest_lifetimes;
-  }
-
-  void InsertShortestLifetimes(llvm::DenseSet<char> shortest_lifetimes) {
-    ShortestLifetimes.insert(shortest_lifetimes.begin(),
-                             shortest_lifetimes.end());
   }
 
   void RemoveFromShortestLifetimes(char id) {
@@ -64,6 +75,8 @@ class Lifetime {
       ShortestLifetimes.erase(it);
     }
   }
+
+  bool CompareShortestLifetimes(const Lifetime &other) const;
 
   Lifetime &operator=(const Lifetime &other);
   bool operator==(const Lifetime &Other) const;
@@ -79,8 +92,7 @@ class Lifetime {
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
-  // TODO maybe store clang::Decl in this class
-  llvm::DenseSet<char> ShortestLifetimes;
+  LifetimesMap ShortestLifetimes;
   char Id;
 };
 }  // namespace clang

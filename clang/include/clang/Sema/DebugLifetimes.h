@@ -22,6 +22,7 @@ void debugLifetimes(std::vector<const clang::NamedDecl*> vec);
 void debugLifetimes(llvm::DenseSet<const clang::NamedDecl*> vec);
 void debugLifetimes(llvm::DenseSet<char> vec);
 void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::NamedDecl *>> m);
+void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *, llvm::DenseSet<const clang::Stmt *>> var_stmt, llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::NamedDecl *>> stmt_var);
 
 void debugImportant(std::string txt);
 void debugImportant(std::string txt1, std::string txt2);

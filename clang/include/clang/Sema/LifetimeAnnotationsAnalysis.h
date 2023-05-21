@@ -46,7 +46,7 @@ class LifetimeAnnotationsAnalysis {
 
   PointsToMap &GetPointsTo() { return PointsTo; }
 
-  llvm::DenseSet<char> GetShortestLifetimes(const clang::NamedDecl *var_decl) {
+  LifetimesMap GetShortestLifetimes(const clang::NamedDecl *var_decl) {
     return VariableLifetimes[var_decl].GetShortestLifetimes();
   }
 
@@ -56,7 +56,7 @@ class LifetimeAnnotationsAnalysis {
   }
 
   void PropagateShortestLifetimes(const clang::NamedDecl *target,
-                                  llvm::DenseSet<char> shortest_lifetimes) {
+                                  LifetimesMap shortest_lifetimes) {
     VariableLifetimes[target].InsertShortestLifetimes(shortest_lifetimes);
   }
 

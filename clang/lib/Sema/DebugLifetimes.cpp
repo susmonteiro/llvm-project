@@ -69,11 +69,31 @@ void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *,
   debugLifetimes(res);
 }
 
+void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *,
+                                   llvm::DenseSet<const clang::Stmt *>>
+                        var_stmt,
+                    llvm::DenseMap<const clang::Stmt *,
+                                   llvm::DenseSet<const clang::NamedDecl *>>
+                        stmt_var) {
+  std::string res;
+  for (const auto &pair : var_stmt) {
+    res += "Dependencies of " + pair.first->getNameAsString() + ": ";
+    for (const auto &stmt : pair.second) {
+      for (const auto &var : stmt_var[stmt]) {
+        res += var->getNameAsString() + ' ';
+      }
+    }
+    res += '\n';
+  }
+  debugLifetimes(res);
+}
+
 void debugImportant(std::string txt) {
   std::cout << "\033[1;96m======== " << txt << " ========\033[0m\n";
 }
 void debugImportant(std::string txt1, std::string txt2) {
-  std::cout << "\033[1;96m======== " << txt1 << ": " << txt2 << " ========\033[0m\n";
+  std::cout << "\033[1;96m======== " << txt1 << ": " << txt2
+            << " ========\033[0m\n";
 }
 void debugInfo(std::string txt) {
   std::cout << "\033[1;34m" << txt << "\033[0m\n";
