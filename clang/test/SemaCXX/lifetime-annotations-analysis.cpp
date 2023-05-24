@@ -217,3 +217,12 @@ int *$b multiple_notes_incorrect(int *$a x, int *$b y) {
           // expected-note@-2 {{declared with lifetime '$a' here}} \
           // expected-note@-1 {{declared with lifetime '$a' here}}
 }
+
+int *$a warn_on_assignment(int *$a x, int *$b y) {
+	int *p;
+	int *q = y;
+	p = q;
+	p = x;
+	return p;		// expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
+          // expected-note@-2 {{declared with lifetime '$b' here}}
+}
