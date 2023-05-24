@@ -15,9 +15,6 @@ LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis(
 VariableLifetimesMap &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
   return VariableLifetimes;
 }
-DependenciesMap &LifetimeAnnotationsAnalysis::GetDependencies() {
-  return Dependencies;
-}
 
 Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
     const clang::NamedDecl *var_decl) {
@@ -34,8 +31,9 @@ Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime() {
   return ReturnLifetime;
 }
 
-void LifetimeAnnotationsAnalysis::CreateDependency(
-    const clang::NamedDecl *from, const clang::DeclRefExpr *to) {
+void LifetimeAnnotationsAnalysis::CreateDependency(const clang::NamedDecl *from,
+                                                   const clang::DeclRefExpr *to,
+                                                   const clang::Stmt *loc) {
   // TODO implement
   // clang::QualType type = to->getType().getCanonicalType();
   // // TODO necessary?
@@ -54,16 +52,47 @@ void LifetimeAnnotationsAnalysis::CreateDependency(
   // }
   const clang::NamedDecl *decl = to->getFoundDecl();
   if (from != decl) {
-    Dependencies[from].insert(decl);
+    // TODO remove
+    CreateLifetimeDependency(from, loc);
+    CreateStmtDependency(loc, decl);
   }
 }
 
-DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
-  DependenciesMap result;
-  for (const auto &pair : Dependencies) {
-    for (const auto &child : pair.second) {
-      // don't insert annotated variables into the parents graph
-      if (IsLifetimeNotset(child)) result[child].insert(pair.first);
+VarStmtDependenciesMap &LifetimeAnnotationsAnalysis::GetLifetimeDependencies() {
+  return LifetimeDependencies;
+}
+
+StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
+  return StmtDependencies;
+}
+
+void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
+    const clang::NamedDecl *from, const clang::Stmt *to) {
+  LifetimeDependencies[from].insert(to);
+}
+
+void LifetimeAnnotationsAnalysis::CreateStmtDependency(
+    const clang::Stmt *from, const clang::NamedDecl *to) {
+  StmtDependencies[from].insert(to);
+}
+
+void LifetimeAnnotationsAnalysis::CreateStmtDependency(
+    const clang::Stmt *from, const clang::DeclRefExpr *to) {
+  const clang::NamedDecl *decl = to->getFoundDecl();
+  LifetimeAnnotationsAnalysis::CreateStmtDependency(from, decl);
+}
+
+llvm::DenseMap<const clang::NamedDecl *,
+               llvm::DenseSet<const clang::NamedDecl *>>
+LifetimeAnnotationsAnalysis::TransposeDependencies() {
+  llvm::DenseMap<const clang::NamedDecl *,
+                 llvm::DenseSet<const clang::NamedDecl *>>
+      result;
+  for (const auto &pair : LifetimeDependencies) {
+    for (const auto &stmt : pair.second) {
+      for (const auto &child : StmtDependencies[stmt]) {
+        if (IsLifetimeNotset(child)) result[child].insert(pair.first);
+      }
     }
   }
   return result;
@@ -72,7 +101,7 @@ DependenciesMap LifetimeAnnotationsAnalysis::TransposeDependencies() const {
 std::vector<const clang::NamedDecl *>
 LifetimeAnnotationsAnalysis::InitializeWorklist() const {
   std::vector<const clang::NamedDecl *> worklist;
-  for (const auto &pair : Dependencies) {
+  for (const auto &pair : LifetimeDependencies) {
     worklist.emplace_back(pair.first);
   }
   return worklist;
@@ -80,7 +109,7 @@ LifetimeAnnotationsAnalysis::InitializeWorklist() const {
 
 void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   // iterate over variables with no fixed lifetime
-  for (const auto &pair : Dependencies) {
+  for (const auto &pair : LifetimeDependencies) {
     auto &lifetime = GetLifetime(pair.first);
     if (lifetime.IsNotSet()) {
       lifetime.ProcessShortestLifetimes();
@@ -96,10 +125,11 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
         pair.first->getNameAsString() + ": " + pair.second.DebugString() + '\n';
   }
   str += "\n>> Dependencies\n\n";
-  for (const auto &pair : Dependencies) {
+  for (const auto &pair : LifetimeDependencies) {
     str += pair.first->getNameAsString() + ": ";
-    for (const auto &var : pair.second) {
-      str += var->getNameAsString() + ' ';
+    for (const auto &stmt : pair.second) {
+      for (const auto &var : StmtDependencies[stmt])
+        str += var->getNameAsString() + ' ';
     }
     str += '\n';
   }

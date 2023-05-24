@@ -70,8 +70,8 @@ std::string Lifetime::DebugString() const {
   res += "[Lifetime] -> " + GetLifetimeName() + "; ";
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
-    for (char l : ShortestLifetimes) {
-      res += GetLifetimeName(l) + ' ';
+    for (auto &pair : ShortestLifetimes) {
+      res += GetLifetimeName(pair.first) + ' ';
     }
     res += "}";
   }
@@ -95,7 +95,7 @@ void Lifetime::ProcessShortestLifetimes() {
   }
 
   if (ShortestLifetimes.size() == 1) {
-    SetId(*ShortestLifetimes.begin());
+    SetId((*ShortestLifetimes.begin()).first);
     return;
   }
 
@@ -107,8 +107,28 @@ void Lifetime::ProcessShortestLifetimes() {
   // outlives which, then all of them are considered the shortest
 }
 
-Lifetime &Lifetime::operator=(const Lifetime &other) {
-  Id = other.GetId();
+std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
+  assert(id != NOTSET);
+  auto it = ShortestLifetimes.find(id);
+  if (it != ShortestLifetimes.end()) {
+    return ShortestLifetimes[id];
+  } else {
+    return std::nullopt;
+  }
+}
+
+bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
+  const auto &OtherShortestLifetimes = Other.GetShortestLifetimes();
+  for (const auto &pair : ShortestLifetimes) {
+    if (!OtherShortestLifetimes.count(pair.first)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Lifetime &Lifetime::operator=(const Lifetime &Other) {
+  Id = Other.GetId();
   return *this;
 }
 
@@ -133,8 +153,7 @@ bool Lifetime::operator>=(const Lifetime &Other) const {
   if (!IsNotSet()) return Id == Other.GetId();
 
   // TODO == or subset or shortest lifetimes?
-  return Id == Other.GetId() &&
-         ShortestLifetimes == Other.GetShortestLifetimes();
+  return Id == Other.GetId() && CompareShortestLifetimes(Other);
 }
 
 bool Lifetime::operator<(const Lifetime &Other) const {

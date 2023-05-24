@@ -79,8 +79,8 @@ int *$a incorrect_simple_control_flow(int *$a x, int *$b y, int num) {
   } else {
     p = y;
   }
-  return p;  // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}}
-  // TODO "expected-note"
+  return p;  // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
+            // expected-note@-2 {{declared with lifetime '$b' here}}
 }
 
 int *$b incorrect_simple_control_flow_2(int *$a x, int *$b y, int num) {
@@ -90,8 +90,8 @@ int *$b incorrect_simple_control_flow_2(int *$a x, int *$b y, int num) {
   } else {
     p = y;
   }
-  return p;  // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}}
-  // TODO "expected-note"
+  return p;  // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
+            // expected-note@-4 {{declared with lifetime '$a' here}}
 }
 
 void var_decl_with_annot(int *$a x, int *$b y) {
@@ -105,7 +105,8 @@ void var_decl_with_annot(int *$a x, int *$b y) {
                   // expected-note@-7 {{declared with lifetime '$b' here}}
   int *t = x;
   t = y;
-  int *$a s = t;  // expected-warning {{assignment requires that '$b' outlives '$a'}}
+  int *$a s = t;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+                  // expected-note@-1 {{declared with lifetime '$b' here}}
 }
 
 int *$a correct_dependencies_propagation(int *$a x, int *$a y) {
@@ -119,7 +120,8 @@ int *$a incorrect_dependencies_propagation(int *$a x, int *$b y) {
   int *p = x; // p -> $a
   int *q = p; // q -> $a
   p = y;      // p -> $a, $b | q -> $a, $b
-  return q;   // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}}
+  return q;   // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
+             // expected-note@-2 {{declared with lifetime '$b' here}}
 }
 
 int *$a correct_dependencies_cycle(int *$a x, int *$a y) {
@@ -144,8 +146,8 @@ int *$b incorrect_dependencies_cycle(int *$a x, int *$b y) {
   p = x;
   q = y;
   return r;               // error -> what is shortest($a, $b) ?
-  // expected-warning@-1 {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}}
-  // TODO "expected-note"
+  // expected-warning@-1 {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
+                  // expected-note@-4 {{declared with lifetime '$a' here}}
 }
 
 void simple_function_call(int* $a x, int *$b y) {
@@ -166,7 +168,8 @@ int *$a correct_function_call_two_args_1(int *$a x, int *$b y) {
 int *$a incorrect_function_call_two_args_1(int *$a x, int *$b y) {
   int *p;
   p = constraint_simple_return(x, y);
-  return p; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}}
+  return p; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
+                  // expected-note@-1 {{declared with lifetime '$b' here}}
 }
 
 int *$a correct_function_call_two_args_2(int *$a x, int *$b y) {
@@ -200,3 +203,26 @@ int return_int(int* $a x, int* $b y) {
 	p = y;
 	return *p;
 }	
+
+int *$b multiple_notes_incorrect(int *$a x, int *$b y) {
+	int *p;
+	int *q = x;
+	int *$a r;
+	r = y;			// expected-warning {{assignment requires that '$b' outlives '$a'}} \
+              // expected-note@-1 {{declared with lifetime '$a' here}} \
+              // expected-note@-4 {{declared with lifetime '$b' here}}
+	p = x;
+	p = q;
+	return p;		// expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
+          // expected-note@-2 {{declared with lifetime '$a' here}} \
+          // expected-note@-1 {{declared with lifetime '$a' here}}
+}
+
+int *$a warn_on_assignment(int *$a x, int *$b y) {
+	int *p;
+	int *q = y;
+	p = q;
+	p = x;
+	return p;		// expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
+          // expected-note@-2 {{declared with lifetime '$b' here}}
+}

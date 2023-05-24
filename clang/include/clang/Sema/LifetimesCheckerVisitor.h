@@ -27,6 +27,9 @@ class LifetimesCheckerVisitor
       const clang::ReturnStmt *return_stmt);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
 
+  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl* var_decl, int msg) const;
+  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl* var_decl, int msg, int id) const;
+
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;

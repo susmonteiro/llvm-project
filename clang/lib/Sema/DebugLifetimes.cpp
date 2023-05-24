@@ -4,7 +4,7 @@
 
 // TODO remove this file
 
-bool stop_debug = true;
+bool stop_debug = false;
 
 void debugLifetimes(std::string txt) {
   if (stop_debug) return;
@@ -104,15 +104,16 @@ void debugInfo(std::string txt) {
   std::cout << "\033[1;34m" << txt << "\033[0m\n";
 }
 
+void debugInfo(std::string txt, int i) {
+  if (stop_debug) return;
+  std::cout << "\033[1;92m" << txt << ' ' << i << "\033[0m\n\n";
+}
+
 void debugInfo2(std::string txt) {
   if (stop_debug) return;
   std::cout << "\033[1;35m" << txt << "\033[0m\n";
 }
 
-void debugInfo(std::string txt, int i) {
-  if (stop_debug) return;
-  std::cout << "\033[1;92m" << txt << ' ' << i << "\033[0m\n\n";
-}
 
 void debugWarn(std::string txt) {
   if (stop_debug) return;
