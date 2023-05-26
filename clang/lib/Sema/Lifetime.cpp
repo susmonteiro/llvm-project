@@ -32,10 +32,13 @@ Lifetime::Lifetime(llvm::StringRef name) {
 bool Lifetime::IsNotSet() const { return Id == NOTSET; }
 bool Lifetime::IsStatic() const { return Id == STATIC; }
 bool Lifetime::ContainsStatic() const {
-  return ShortestLifetimes.count(STATIC);
+  return !ShortestLifetimes[STATIC].empty();
 }
+
 bool Lifetime::IsLocal() const { return Id == LOCAL; }
-bool Lifetime::ContainsLocal() const { return ShortestLifetimes.count(LOCAL); }
+bool Lifetime::ContainsLocal() const {
+  return !ShortestLifetimes[LOCAL].empty();
+}
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
 
@@ -70,8 +73,10 @@ std::string Lifetime::DebugString() const {
   res += "[Lifetime] -> " + GetLifetimeName() + "; ";
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
-    for (auto &pair : ShortestLifetimes) {
-      res += GetLifetimeName(pair.first) + ' ';
+    for (char i = 0; i < ShortestLifetimes.size(); i++) {
+      if (!ShortestLifetimes[i].empty()) {
+        res += GetLifetimeName(i) + ' ';
+      }
     }
     res += "}";
   }
@@ -109,20 +114,15 @@ void Lifetime::ProcessShortestLifetimes() {
 
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
   assert(id != NOTSET);
-  auto it = ShortestLifetimes.find(id);
-  if (it != ShortestLifetimes.end()) {
-    return ShortestLifetimes[id];
-  } else {
-    return std::nullopt;
-  }
+  const auto shortest_lifetimes_id = ShortestLifetimes[id];
+  return shortest_lifetimes_id.empty() ? std::nullopt
+                                       : std::optional(shortest_lifetimes_id);
 }
 
 bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
   const auto &OtherShortestLifetimes = Other.GetShortestLifetimes();
-  for (const auto &pair : ShortestLifetimes) {
-    if (!OtherShortestLifetimes.count(pair.first)) {
-      return false;
-    }
+  for (char i = 0; i < ShortestLifetimes.size(); i++) {
+    if (ShortestLifetimes[i].empty()) return false;
   }
   return true;
 }
@@ -150,8 +150,7 @@ bool Lifetime::operator>=(const Lifetime &Other) const {
   if (IsStatic() || Other.IsLocal()) return true;
   if (IsLocal() || Other.IsStatic()) return false;
 
-  if (!IsNotSet())
-    return Id == Other.GetId();
+  if (!IsNotSet()) return Id == Other.GetId();
 
   // TODO == or subset or shortest lifetimes?
   return Id == Other.GetId() && CompareShortestLifetimes(Other);

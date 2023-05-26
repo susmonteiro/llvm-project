@@ -144,9 +144,8 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
     debugLifetimes("\nPropagation of", el->getNameAsString());
 
-    // TODO small vector
-    llvm::DenseMap<char, llvm::DenseSet<const clang::Stmt *>>
-        shortest_lifetimes;
+    // each entry of the vector corresponds to a lifetime char
+    llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> shortest_lifetimes;
 
     llvm::DenseSet<const clang::Stmt *> stmts;
 
@@ -160,10 +159,10 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         auto tmp_lifetimes = State.GetShortestLifetimes(var_decl);
         // TODO relation between lifetimes and stmts
         if (State.IsLifetimeNotset(var_decl)) {
-          // ! don't want to propagate stmts
-          // ! we want to propagate lifetimes that come from this stmt
-          for (const auto &pair : tmp_lifetimes) {
-            shortest_lifetimes[pair.first].insert(stmt);
+          for (char i = 0; i < tmp_lifetimes.size(); i++) {
+            if (!tmp_lifetimes[i].empty()) {
+              shortest_lifetimes[i].insert(stmt);
+            }
           }
         } else {
           shortest_lifetimes[State.GetLifetime(var_decl).GetId()].insert(stmt);

@@ -9,7 +9,7 @@
 namespace clang {
 
 using StmtDenseSet = llvm::DenseSet<const clang::Stmt *>;
-using LifetimesMap = llvm::DenseMap<char, StmtDenseSet>;
+using LifetimesMap = llvm::SmallVector<StmtDenseSet>;
 
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
@@ -54,17 +54,21 @@ class Lifetime {
   void InsertShortestLifetimes(char id) {
     ShortestLifetimes[id] = llvm::DenseSet<const clang::Stmt *>();
   }
+  
   void InsertShortestLifetimes(char id, const clang::Stmt *stmt) {
     ShortestLifetimes[id].insert(stmt);
   }
+
   void InsertShortestLifetimes(char id,
                                llvm::DenseSet<const clang::Stmt *> stmts) {
     ShortestLifetimes[id].insert(stmts.begin(), stmts.end());
   }
+
   void InsertShortestLifetimes(LifetimesMap shortest_lifetimes) {
-    for (const auto &pair : shortest_lifetimes)
-      ShortestLifetimes[pair.first].insert(pair.second.begin(),
-                                           pair.second.end());
+    for (char i = 0; i < shortest_lifetimes.size(); i++) {
+      ShortestLifetimes[i].insert(shortest_lifetimes[i].begin(),
+                                  shortest_lifetimes[i].end());
+    }
   }
 
   void SetShortestLifetimes(LifetimesMap shortest_lifetimes) {
@@ -72,10 +76,7 @@ class Lifetime {
   }
 
   void RemoveFromShortestLifetimes(char id) {
-    auto it = ShortestLifetimes.find(id);
-    if (it != ShortestLifetimes.end()) {
-      ShortestLifetimes.erase(it);
-    }
+    ShortestLifetimes.erase(ShortestLifetimes.begin() + id);
   }
 
   bool CompareShortestLifetimes(const Lifetime &other) const;
@@ -94,6 +95,7 @@ class Lifetime {
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
+  // TODO also store a vector with the lifetime ids that it depends on
   LifetimesMap ShortestLifetimes;
   char Id;
 };
