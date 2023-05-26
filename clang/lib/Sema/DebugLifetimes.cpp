@@ -4,7 +4,7 @@
 
 // TODO remove this file
 
-bool stop_debug = false;
+bool stop_debug = true;
 
 void debugLifetimes(std::string txt) {
   if (stop_debug) return;

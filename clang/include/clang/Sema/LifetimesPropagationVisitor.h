@@ -26,8 +26,6 @@ class LifetimesPropagationVisitor
         PointsTo(state.GetPointsTo()),
         Factory(func) {}
 
-  std::optional<std::string> VisitBinaryOperator(
-      const clang::BinaryOperator *op);
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
   std::optional<std::string> VisitCallExpr(const clang::CallExpr *call);
   std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);

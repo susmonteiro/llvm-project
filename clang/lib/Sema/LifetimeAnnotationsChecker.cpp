@@ -146,10 +146,9 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
     debugLifetimes("\nPropagation of", el->getNameAsString());
 
-    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<char>>
-        shortest_lifetimes_1;
+    // TODO small vector
     llvm::DenseMap<char, llvm::DenseSet<const clang::Stmt *>>
-        shortest_lifetimes_2;
+        shortest_lifetimes;
 
     llvm::DenseSet<const clang::Stmt *> stmts;
 
@@ -163,24 +162,22 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         auto tmp_lifetimes = State.GetShortestLifetimes(var_decl);
         // TODO relation between lifetimes and stmts
         if (State.IsLifetimeNotset(var_decl)) {
-          // shortest_lifetimes_1[stmt].insert(tmp_lifetimes.begin(), tmp_lifetimes.end());
           // ! don't want to propagate stmts
           // ! we want to propagate lifetimes that come from this stmt
           for (const auto &pair : tmp_lifetimes) {
-            shortest_lifetimes_2[pair.first].insert(stmt);
+            shortest_lifetimes[pair.first].insert(stmt);
           }
         } else {
-          // shortest_lifetimes_1[stmt].insert(State.GetLifetime(var_decl).GetId());
-          shortest_lifetimes_2[State.GetLifetime(var_decl).GetId()].insert(stmt);
+          shortest_lifetimes[State.GetLifetime(var_decl).GetId()].insert(stmt);
         }
       }
     }
 
     // TODO this is not perfect
     if (new_children[el] != stmts ||
-        State.GetShortestLifetimes(el) != shortest_lifetimes_2) {
+        State.GetShortestLifetimes(el) != shortest_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
-      State.PropagateShortestLifetimes(el, shortest_lifetimes_2);
+      State.PropagateShortestLifetimes(el, shortest_lifetimes);
 
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);

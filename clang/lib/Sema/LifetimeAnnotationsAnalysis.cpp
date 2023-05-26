@@ -91,7 +91,8 @@ LifetimeAnnotationsAnalysis::TransposeDependencies() {
   for (const auto &pair : LifetimeDependencies) {
     for (const auto &stmt : pair.second) {
       for (const auto &child : StmtDependencies[stmt]) {
-        if (IsLifetimeNotset(child)) result[child].insert(pair.first);
+        if (IsLifetimeNotset(child))
+          result[child].insert(pair.first);
       }
     }
   }

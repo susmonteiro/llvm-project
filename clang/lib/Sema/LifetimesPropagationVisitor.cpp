@@ -31,19 +31,12 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
   return lifetime;
 }
 
-std::optional<std::string> LifetimesPropagationVisitor::VisitBinaryOperator(
-    const clang::BinaryOperator *op) {
-  if (debugEnabled) debugLifetimes("[VisitBinaryOperator]");
-  // TODO
-  return std::nullopt;
-}
-
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
   assert(op->getLHS()->isGLValue());
 
-  const auto &lhs = op->getLHS();
+  const auto &lhs = op->getLHS()->IgnoreParens();
 
   // Because of how we handle reference-like structs, a member access to a
   // non-reference-like field in a struct might still produce lifetimes. We
@@ -57,7 +50,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   PointsTo.InsertExprLifetimes(op, lhs);
 
-  const auto &rhs = op->getRHS();
+  const auto &rhs = op->getRHS()->IgnoreParens();
   Visit(rhs);
 
   const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
@@ -267,7 +260,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
       // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
       // VisitCallExpr().
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
-        const clang::Expr *init = var_decl->getInit();
+        const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
         if (State.IsLifetimeNotset(var_decl))
           TransferRHS(var_decl, init, decl_stmt, PointsTo, State);

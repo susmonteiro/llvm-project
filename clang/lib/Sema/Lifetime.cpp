@@ -150,7 +150,8 @@ bool Lifetime::operator>=(const Lifetime &Other) const {
   if (IsStatic() || Other.IsLocal()) return true;
   if (IsLocal() || Other.IsStatic()) return false;
 
-  if (!IsNotSet()) return Id == Other.GetId();
+  if (!IsNotSet())
+    return Id == Other.GetId();
 
   // TODO == or subset or shortest lifetimes?
   return Id == Other.GetId() && CompareShortestLifetimes(Other);

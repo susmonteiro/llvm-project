@@ -37,7 +37,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
   assert(op->getLHS()->isGLValue());
 
-  const auto &lhs = op->getLHS();
+  const auto &lhs = op->getLHS()->IgnoreParens();
 
   // Because of how we handle reference-like structs, a member access to a
   // non-reference-like field in a struct might still produce lifetimes. We
@@ -57,7 +57,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   }
 
-  const auto &rhs = op->getRHS();
+  const auto &rhs = op->getRHS()->IgnoreParens();
   const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   // TODO remove this
   if (rhs_points_to.empty()) {
@@ -145,7 +145,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
         return std::nullopt;
 
       const auto &init_points_to =
-          PointsTo.GetExprPointsTo(var_decl->getInit());
+          PointsTo.GetExprPointsTo(var_decl->getInit()->IgnoreParens());
       // TODO remove this
       if (init_points_to.empty()) {
         debugWarn("Initializer is not in PointsToMap");
@@ -208,7 +208,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     const clang::ReturnStmt *return_stmt) {
   if (debugEnabled) debugLifetimes("[VisitReturnStmt]");
 
-  clang::QualType return_type = Func->getReturnType();
+  clang::QualType return_type = Func->getReturnType().IgnoreParens();
 
   // We only need to handle pointers and references.
   // For record types, initialization of the return value has already been
@@ -224,20 +224,22 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     // TODO error
   }
 
+  const auto &return_value = return_stmt->getRetValue()->IgnoreParens();
+
   const auto &return_expr =
-      PointsTo.GetExprPointsTo(return_stmt->getRetValue());
+      PointsTo.GetExprPointsTo(return_value);
   // TODO remove this
   if (return_expr.empty()) {
     debugWarn("Return expr is not in PointsToMap");
-    Visit(const_cast<clang::Expr *>(return_stmt->getRetValue()));
+    Visit(const_cast<clang::Expr *>(return_value));
     const auto &lhs_points_to =
-        PointsTo.GetExprPointsTo(return_stmt->getRetValue());
+        PointsTo.GetExprPointsTo(return_value);
   }
 
   for (const auto &expr : return_expr) {
-    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      const auto *var = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      clang::QualType var_type = var->getType();
+    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr->IgnoreParens())) {
+      const auto *var = clang::dyn_cast<clang::DeclRefExpr>(expr->IgnoreParens());
+      clang::QualType var_type = var->getType().IgnoreParens();
       if (!var_type->isPointerType() && !var_type->isReferenceType()) {
         continue;
       }
