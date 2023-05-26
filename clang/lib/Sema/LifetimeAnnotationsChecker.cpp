@@ -24,9 +24,7 @@ void GetExprObjectSet(const clang::Expr *expr,
   // We can't handle `ParenExpr`s like other `Expr`s because the CFG doesn't
   // contain `CFGStmt`s for them. Instead, if we encounter a `ParenExpr` here,
   // we simply return the object set for its subexpression.
-  if (auto paren = clang::dyn_cast<clang::ParenExpr>(expr)) {
-    expr = paren->getSubExpr();
-  }
+  expr = expr->IgnoreParens();
 
   assert(expr->isGLValue() || expr->getType()->isPointerType() ||
          expr->getType()->isArrayType() || expr->getType()->isFunctionType() ||

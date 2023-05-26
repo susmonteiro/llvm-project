@@ -16,7 +16,7 @@ void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs, const clan
 
 Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
                             FunctionLifetimeFactory &lifetime_factory) {
-  clang::QualType type = var_decl->getType();
+  clang::QualType type = var_decl->getType().IgnoreParens();
   clang::TypeLoc type_loc;
   if (var_decl->getTypeSourceInfo()) {
     type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
@@ -47,13 +47,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   }
 
   Visit(lhs);
-  const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   PointsTo.InsertExprLifetimes(op, lhs);
 
   const auto &rhs = op->getRHS()->IgnoreParens();
   Visit(rhs);
-
-  const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   PointsTo.InsertExprLifetimes(op, rhs);
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
@@ -75,7 +72,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
-    clang::QualType func_type = direct_callee->getReturnType();
+    clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
     // ignore if return type does not have a Lifetime
     if (!func_type->isPointerType() && !func_type->isReferenceType()) {
       debugWarn("Return type is not pointer type");
@@ -98,7 +95,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       const auto &param_lifetime = func_info.GetParamLifetime(param);
       if (param_lifetime.has_value() &&
           param_lifetime.value() == return_lifetime) {
-        const Expr *arg = call->getArg(i);
+        const Expr *arg = call->getArg(i)->IgnoreParens();
         Visit(const_cast<clang::Expr *>(arg));
         PointsTo.InsertExprLifetimes(call, arg);
       }
@@ -224,10 +221,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
   }
 
   assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
-
-  // clang::QualType type = decl->getType().getCanonicalType();
-
-  // TODO don't insert if it's not either reference or pointer type
 
   PointsTo.InsertExprLifetimes(decl_ref, nullptr);
 
