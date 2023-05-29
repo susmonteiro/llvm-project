@@ -12,13 +12,13 @@ LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis(
   ReturnLifetime = Lifetime(function_info.GetReturnLifetime());
 }
 
-VariableLifetimesMap &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
+VariableLifetimesVector &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
   return VariableLifetimes;
 }
 
 Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
     const clang::NamedDecl *var_decl) {
-  VariableLifetimesMap::iterator it = VariableLifetimes.find(var_decl);
+  VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
     // TODO error
     CreateVariable(var_decl);

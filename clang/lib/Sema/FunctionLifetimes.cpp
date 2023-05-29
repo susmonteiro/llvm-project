@@ -458,6 +458,9 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
     clang::TypeLoc param_type_loc;
     if (type_loc) {
       const clang::ParmVarDecl* param = func_type_loc.getParam(i);
+      if (!param->getType()->isPointerType() &&
+          !param->getType()->isReferenceType())
+        continue;
       if (param && param->getTypeSourceInfo()) {
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }

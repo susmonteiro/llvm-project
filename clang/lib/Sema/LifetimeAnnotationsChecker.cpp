@@ -149,6 +149,8 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
     llvm::DenseSet<const clang::Stmt *> stmts;
 
+    debugLifetimes("BEFORE FOR");
+
     for (const auto &stmt : children[el]) {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
@@ -156,19 +158,30 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         // TODO check if needed
         stmts.insert(new_children[var_decl].begin(),
                      new_children[var_decl].end());
+        debugLifetimes("BEFORE TMP LIFETIMES");
         auto tmp_lifetimes = State.GetShortestLifetimes(var_decl);
         // TODO relation between lifetimes and stmts
+        debugLifetimes("BEFORE IF");
         if (State.IsLifetimeNotset(var_decl)) {
-          for (char i = 0; i < tmp_lifetimes.size(); i++) {
+          debugLifetimes("BEFORE SECOND FOR");
+          for (unsigned int i = 0; i < tmp_lifetimes.size(); i++) {
             if (!tmp_lifetimes[i].empty()) {
-              shortest_lifetimes[i].insert(stmt);
+              debugLifetimes("BEFORE INSERT");
+              Lifetime::InsertShortestLifetimes(i, stmt, shortest_lifetimes);
+              debugLifetimes("AFTER INSERT");
             }
           }
         } else {
-          shortest_lifetimes[State.GetLifetime(var_decl).GetId()].insert(stmt);
+          debugLifetimes("INSIDE ELSE");
+          const char vardecl_lifetime_id = State.GetLifetime(var_decl).GetId();
+          debugLifetimes("ID IS: ", vardecl_lifetime_id);
+          Lifetime::InsertShortestLifetimes(vardecl_lifetime_id, stmt,
+                                            shortest_lifetimes);
         }
       }
     }
+
+    debugLifetimes("AFTER FOR");
 
     // TODO this is not perfect
     if (new_children[el] != stmts ||

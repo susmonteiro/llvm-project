@@ -14,7 +14,8 @@
 
 namespace clang {
 
-using VariableLifetimesMap = llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
+using VariableLifetimesVector =
+    llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
 
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *,
@@ -30,7 +31,7 @@ class LifetimeAnnotationsAnalysis {
   LifetimeAnnotationsAnalysis();
   LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info);
 
-  VariableLifetimesMap &GetVariableLifetimes();
+  VariableLifetimesVector &GetVariableLifetimes();
   Lifetime &GetLifetime(const clang::NamedDecl *var_decl);
   Lifetime &GetReturnLifetime();
 
@@ -46,7 +47,7 @@ class LifetimeAnnotationsAnalysis {
 
   PointsToMap &GetPointsTo() { return PointsTo; }
 
-  LifetimesMap GetShortestLifetimes(const clang::NamedDecl *var_decl) {
+  LifetimesVector GetShortestLifetimes(const clang::NamedDecl *var_decl) {
     return VariableLifetimes[var_decl].GetShortestLifetimes();
   }
 
@@ -56,7 +57,8 @@ class LifetimeAnnotationsAnalysis {
   }
 
   void PropagateShortestLifetimes(const clang::NamedDecl *target,
-                                  LifetimesMap shortest_lifetimes) {
+                                  LifetimesVector shortest_lifetimes) {
+    debugLifetimes("INSIDE PROPAGATE SHORTEST LIFETIMES");
     VariableLifetimes[target].InsertShortestLifetimes(shortest_lifetimes);
   }
 
@@ -106,7 +108,7 @@ class LifetimeAnnotationsAnalysis {
   std::string DebugString();
 
  private:
-  VariableLifetimesMap VariableLifetimes;
+  VariableLifetimesVector VariableLifetimes;
   VarStmtDependenciesMap LifetimeDependencies;
   // ? can one stmt point to more than one var_decl?
   StmtVarDependenciesMap StmtDependencies;

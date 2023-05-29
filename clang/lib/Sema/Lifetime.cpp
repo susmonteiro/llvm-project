@@ -32,12 +32,12 @@ Lifetime::Lifetime(llvm::StringRef name) {
 bool Lifetime::IsNotSet() const { return Id == NOTSET; }
 bool Lifetime::IsStatic() const { return Id == STATIC; }
 bool Lifetime::ContainsStatic() const {
-  return !ShortestLifetimes[STATIC].empty();
+  return (unsigned int)STATIC < ShortestLifetimes.size() && !ShortestLifetimes[STATIC].empty();
 }
 
 bool Lifetime::IsLocal() const { return Id == LOCAL; }
 bool Lifetime::ContainsLocal() const {
-  return !ShortestLifetimes[LOCAL].empty();
+  return (unsigned int)LOCAL < ShortestLifetimes.size() && !ShortestLifetimes[LOCAL].empty();
 }
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
@@ -73,7 +73,7 @@ std::string Lifetime::DebugString() const {
   res += "[Lifetime] -> " + GetLifetimeName() + "; ";
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
-    for (char i = 0; i < ShortestLifetimes.size(); i++) {
+    for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
       if (!ShortestLifetimes[i].empty()) {
         res += GetLifetimeName(i) + ' ';
       }
@@ -100,8 +100,12 @@ void Lifetime::ProcessShortestLifetimes() {
   }
 
   if (ShortestLifetimes.size() == 1) {
-    SetId((*ShortestLifetimes.begin()).first);
-    return;
+    for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
+      if (!ShortestLifetimes[i].empty()) {
+        SetId(i);
+        return;
+      }
+    }
   }
 
   // in all other cases, the Id of the lifetime remains NOTSET
@@ -114,14 +118,14 @@ void Lifetime::ProcessShortestLifetimes() {
 
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
   assert(id != NOTSET);
-  const auto shortest_lifetimes_id = ShortestLifetimes[id];
-  return shortest_lifetimes_id.empty() ? std::nullopt
-                                       : std::optional(shortest_lifetimes_id);
+  return (unsigned int)id >= ShortestLifetimes.size() || ShortestLifetimes[id].empty()
+             ? std::nullopt
+             : std::optional(ShortestLifetimes[id]);
 }
 
 bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
   const auto &OtherShortestLifetimes = Other.GetShortestLifetimes();
-  for (char i = 0; i < ShortestLifetimes.size(); i++) {
+  for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
     if (ShortestLifetimes[i].empty()) return false;
   }
   return true;
