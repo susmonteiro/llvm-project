@@ -15,7 +15,7 @@ Lifetime::Lifetime(llvm::StringRef name) {
   } else if (name.equals(LOCAL_NAME)) {
     *this = Lifetime(LOCAL);
   } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
-    *this = Lifetime(name.front());
+    *this = Lifetime(CharToId(name.front()));
   } else {
     // TODO error
     // TODO change this
@@ -43,6 +43,7 @@ Lifetime Lifetime::InvalidEmpty() { return Lifetime(INVALID_EMPTY); }
 Lifetime Lifetime::InvalidTombstone() { return Lifetime(INVALID_ID_TOMBSTONE); }
 
 std::string Lifetime::GetLifetimeName(char id) const {
+  id = IdToChar(id);
   switch (id) {
     case NOTSET:
     case INVALID_ID_TOMBSTONE:
