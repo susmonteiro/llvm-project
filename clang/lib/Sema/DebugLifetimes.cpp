@@ -82,8 +82,8 @@ void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *,
       for (const auto &var : stmt_var[stmt]) {
         res += var->getNameAsString() + ' ';
       }
-      res += '\n';
     }
+    res += '\n';
     debugLifetimes(res);
   }
 }
@@ -113,7 +113,6 @@ void debugInfo2(std::string txt) {
   if (stop_debug) return;
   std::cout << "\033[1;35m" << txt << "\033[0m\n";
 }
-
 
 void debugWarn(std::string txt) {
   if (stop_debug) return;

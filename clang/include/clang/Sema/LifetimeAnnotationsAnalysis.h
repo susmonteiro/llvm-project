@@ -58,7 +58,6 @@ class LifetimeAnnotationsAnalysis {
 
   void PropagateShortestLifetimes(const clang::NamedDecl *target,
                                   LifetimesVector shortest_lifetimes) {
-    debugLifetimes("INSIDE PROPAGATE SHORTEST LIFETIMES");
     VariableLifetimes[target].InsertShortestLifetimes(shortest_lifetimes);
   }
 

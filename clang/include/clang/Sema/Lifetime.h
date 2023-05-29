@@ -64,7 +64,6 @@ class Lifetime {
   static StmtDenseSet *GetAndResizeShortestLifetime(
       char id, LifetimesVector &shortest_lifetimes) {
     ResizeShortestLifetimes(id, shortest_lifetimes);
-    debugLifetimes("BEFORE RETURN IN GET AND RESIZE");
     return &shortest_lifetimes[id];
   }
 
@@ -92,11 +91,8 @@ class Lifetime {
 
   static void InsertShortestLifetimes(char id, const clang::Stmt *stmt,
                                       LifetimesVector &shortest_lifetimes) {
-        debugLifetimes("BEGIN OF INSERT SHORTEST LIFETIME");
-
     Lifetime::GetAndResizeShortestLifetime(id, shortest_lifetimes)
         ->insert(stmt);
-    debugLifetimes("END OF INSERT SHORTEST LIFETIME");
   }
 
   static void InsertShortestLifetimes(char id,
