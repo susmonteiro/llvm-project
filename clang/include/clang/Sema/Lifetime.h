@@ -11,6 +11,13 @@ namespace clang {
 using StmtDenseSet = llvm::DenseSet<const clang::Stmt *>;
 using LifetimesVector = llvm::SmallVector<StmtDenseSet>;
 
+constexpr char NOTSET = 1;
+constexpr char LOCAL = 2;
+constexpr char STATIC = 3;
+constexpr char INVALID_ID_TOMBSTONE = 4;
+constexpr char INVALID_EMPTY = 5;
+constexpr char OFFSET = 6;
+
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
  public:
@@ -35,6 +42,13 @@ class Lifetime {
   // Sets the Id to $local
   void SetLocal();
 
+  static char CharToId(char id) {
+    return id < OFFSET ? id : id - 'a' + OFFSET;
+  }
+  static char IdToChar(char id) {
+    return id < OFFSET ? id : id + 'a' - OFFSET;
+  }
+
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }
   void SetId(char id) { Id = id; }
@@ -47,32 +61,54 @@ class Lifetime {
   std::string GetLifetimeName(char id) const;
   std::string GetLifetimeName() const { return GetLifetimeName(Id); }
 
+  static StmtDenseSet *GetAndResizeShortestLifetime(
+      char id, LifetimesVector &shortest_lifetimes) {
+    ResizeShortestLifetimes(id, shortest_lifetimes);
+    debugLifetimes("BEFORE RETURN IN GET AND RESIZE");
+    return &shortest_lifetimes[id];
+  }
+
+  StmtDenseSet *GetShortestLifetime(char id) {
+    return GetShortestLifetime(id, ShortestLifetimes);
+  }
+
+  static StmtDenseSet *GetShortestLifetime(
+      char id, LifetimesVector &shortest_lifetimes) {
+    return &shortest_lifetimes[id];
+  }
+
+  StmtDenseSet *GetAndResizeShortestLifetime(char id) {
+    return GetShortestLifetime(id, ShortestLifetimes);
+  }
+
   LifetimesVector GetShortestLifetimes() const { return ShortestLifetimes; }
   std::optional<StmtDenseSet> GetStmts(char id);
 
   static void ResizeShortestLifetimes(char id,
                                       LifetimesVector &shortest_lifetimes) {
     if ((unsigned int)id >= shortest_lifetimes.size())
-      shortest_lifetimes.resize(id + 5);
+      shortest_lifetimes.resize(id + 1);
   }
 
   static void InsertShortestLifetimes(char id, const clang::Stmt *stmt,
                                       LifetimesVector &shortest_lifetimes) {
-    ResizeShortestLifetimes(id, shortest_lifetimes);
-    shortest_lifetimes[id].insert(stmt);
+        debugLifetimes("BEGIN OF INSERT SHORTEST LIFETIME");
+
+    Lifetime::GetAndResizeShortestLifetime(id, shortest_lifetimes)
+        ->insert(stmt);
+    debugLifetimes("END OF INSERT SHORTEST LIFETIME");
   }
 
   static void InsertShortestLifetimes(char id,
                                       llvm::DenseSet<const clang::Stmt *> stmts,
                                       LifetimesVector &shortest_lifetimes) {
-    ResizeShortestLifetimes(id, shortest_lifetimes);
-    shortest_lifetimes[id].insert(stmts.begin(), stmts.end());
+    Lifetime::GetAndResizeShortestLifetime(id, shortest_lifetimes)
+        ->insert(stmts.begin(), stmts.end());
   }
 
   // TODO remove first
   void InsertShortestLifetimes(char id) {
-    ResizeShortestLifetimes(id, ShortestLifetimes);
-    ShortestLifetimes[id] = llvm::DenseSet<const clang::Stmt *>();
+    *GetAndResizeShortestLifetime(id) = llvm::DenseSet<const clang::Stmt *>();
   }
 
   void InsertShortestLifetimes(char id, const clang::Stmt *stmt) {
@@ -88,8 +124,9 @@ class Lifetime {
     if (shortest_lifetimes.size() > ShortestLifetimes.size())
       ShortestLifetimes.resize(shortest_lifetimes.size());
     for (unsigned int i = 0; i < shortest_lifetimes.size(); i++) {
-      ShortestLifetimes[i].insert(shortest_lifetimes[i].begin(),
-                                  shortest_lifetimes[i].end());
+      GetShortestLifetime(i)->insert(
+          GetShortestLifetime(i, shortest_lifetimes)->begin(),
+          GetShortestLifetime(i, shortest_lifetimes)->end());
     }
   }
 

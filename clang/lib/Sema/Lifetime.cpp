@@ -2,12 +2,6 @@
 
 namespace clang {
 
-constexpr char NOTSET = 1;
-constexpr char LOCAL = 2;
-constexpr char STATIC = 3;
-constexpr char INVALID_ID_TOMBSTONE = 4;
-constexpr char INVALID_EMPTY = 5;
-
 constexpr llvm::StringRef STATIC_NAME = "static";
 constexpr llvm::StringRef LOCAL_NAME = "local";
 
@@ -32,12 +26,14 @@ Lifetime::Lifetime(llvm::StringRef name) {
 bool Lifetime::IsNotSet() const { return Id == NOTSET; }
 bool Lifetime::IsStatic() const { return Id == STATIC; }
 bool Lifetime::ContainsStatic() const {
-  return (unsigned int)STATIC < ShortestLifetimes.size() && !ShortestLifetimes[STATIC].empty();
+  return (unsigned int)STATIC < ShortestLifetimes.size() &&
+         !ShortestLifetimes[STATIC].empty();
 }
 
 bool Lifetime::IsLocal() const { return Id == LOCAL; }
 bool Lifetime::ContainsLocal() const {
-  return (unsigned int)LOCAL < ShortestLifetimes.size() && !ShortestLifetimes[LOCAL].empty();
+  return (unsigned int)LOCAL < ShortestLifetimes.size() &&
+         !ShortestLifetimes[LOCAL].empty();
 }
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
@@ -118,7 +114,8 @@ void Lifetime::ProcessShortestLifetimes() {
 
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
   assert(id != NOTSET);
-  return (unsigned int)id >= ShortestLifetimes.size() || ShortestLifetimes[id].empty()
+  return (unsigned int)id >= ShortestLifetimes.size() ||
+                 ShortestLifetimes[id].empty()
              ? std::nullopt
              : std::optional(ShortestLifetimes[id]);
 }
