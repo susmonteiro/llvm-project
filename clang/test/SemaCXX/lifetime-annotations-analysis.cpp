@@ -20,6 +20,8 @@
 #define $a $(a)
 #define $b $(b)
 
+#define $static $(static)
+
 int *$a correct_simple_return(int *$a x) {
   return x; // no warning
 }
@@ -226,3 +228,50 @@ int *$a warn_on_assignment(int *$a x, int *$b y) {
 	return p;		// expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
           // expected-note@-2 {{declared with lifetime '$b' here}}
 }
+
+
+// === Static and Local lifetimes ===
+
+int *$a static_lifetime_return(int *$static x) {
+  return x; // correct because $a <= $static
+}
+
+void static_lifetime_assign(int *$static x) {
+  int *$a p = x; // correct because $a <= $static
+  x = p;        // expected-warning {{assignment requires that '$a' outlives '$static'}} \
+                // expected-note@-2 {{declared with lifetime '$static' here}} \
+                // expected-note@-1 {{declared with lifetime '$a' here}}
+}
+
+int *$a static_dependencies_correct(int *$a x, int *$a y, int *$static s) {
+  int *p = x; 
+  p = s;  // $(p) = min($(x), $(z)) = min($a, $static) = $a
+  y = p;  // correct
+  return p; // correct
+}
+
+int *$static static_dependencies_incorrect(int *$a x, int *$a y, int *$static s) {
+  int *p = x; 
+  p = s;  // $(p) = min($(x), $(z)) = min($a, $static) = $a
+  y = p;  // correct
+  return p; // expected-warning {{function should return data with lifetime '$static' but it is returning data with lifetime '$a'}} \
+            // expected-note@-3 {{declared with lifetime '$a' here}}
+}
+
+void static_lifetime_function_call(int *$static x, int *$a y, int *$b z) {
+  static_lifetime_return(x);  // correct
+  static_lifetime_return(y);  // TODO should be incorrect
+  y = static_lifetime_return(x); // correct
+  x = static_lifetime_return(x); // TODO should be incorrect
+  z = static_lifetime_return(x); // TODO should be incorrect
+}
+
+// TODO uncomment after implementing '&' operator
+// void local_lifetime_assign_and_return(int *$a x) {
+//   int i = 1;
+//   x = &i;       // TODO should be incorrect
+//   int *p = &i;  // p has local lifetime
+//   x = p;        // 'expected-warning {{assignment requires that '$local' outlives '$a'}} \
+//                 // 'expected-note@-3 {{declared with lifetime '$a' here}} \
+//                 // 'expected-note@-1 {{declared with lifetime '$local' here}}
+// }
