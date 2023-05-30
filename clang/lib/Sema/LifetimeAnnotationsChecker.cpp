@@ -189,12 +189,6 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
   State.SetDependencies(new_children);
 
-  debugLifetimes("=== children ===");
-  debugLifetimes(State.GetLifetimeDependencies(), State.GetStmtDependencies());
-
-  // debugInfo2("\n====== BEFORE PROCESSING SHORTEST LIFETIMES ======\n");
-  // debugLifetimes(State.DebugString());
-
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable
   State.ProcessShortestLifetimes();

@@ -131,7 +131,7 @@ class Lifetime {
   }
 
   void RemoveFromShortestLifetimes(char id) {
-    ShortestLifetimes.erase(ShortestLifetimes.begin() + id);
+    GetShortestLifetime(id)->clear();
   }
 
   bool CompareShortestLifetimes(const Lifetime &other) const;
