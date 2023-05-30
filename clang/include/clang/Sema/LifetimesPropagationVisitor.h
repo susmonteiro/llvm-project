@@ -34,7 +34,11 @@ class LifetimesPropagationVisitor
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
-
+  std::optional<std::string> VisitUnaryAddrOf(const clang::UnaryOperator *op);
+  std::optional<std::string> VisitUnaryDeref(const clang::UnaryOperator *op);
+  // TODO delete this
+  std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
+  
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;

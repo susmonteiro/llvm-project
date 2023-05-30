@@ -2,8 +2,9 @@
 
 namespace clang {
 
-void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs, const clang::Stmt *loc, 
-                 PointsToMap &PointsTo, LifetimeAnnotationsAnalysis &state) {
+void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
+                 const clang::Stmt *loc, PointsToMap &PointsTo,
+                 LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("\t[TransferRHS]");
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
   for (const auto &expr : points_to) {
@@ -68,7 +69,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
 std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     const clang::CallExpr *call) {
   if (debugEnabled) debugLifetimes("[VisitCallExpr]");
-  // No need to check the arguments lifetimes because there is always a min lifetime between any set of lifetimes
+  // No need to check the arguments lifetimes because there is always a min
+  // lifetime between any set of lifetimes
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
@@ -78,7 +80,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       debugWarn("Return type is not pointer type");
       return std::nullopt;
     }
-    
+
     auto it = FuncInfo.find(direct_callee);
     if (it == FuncInfo.end()) {
       // TODO error
@@ -241,7 +243,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      if (!var_decl->getType()->isPointerType() && !var_decl->getType()->isReferenceType()) {
+      if (!var_decl->getType()->isPointerType() &&
+          !var_decl->getType()->isReferenceType()) {
         debugWarn("Var decl is not pointer type");
         continue;
       }
@@ -274,6 +277,38 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   if (debugEnabled) debugLifetimes("[VisitStmt]");
   for (const auto &child : stmt->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
+    const clang::UnaryOperator *op) {
+  // TODO implement
+  if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
+  for (const auto &child : op->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
+// TODO sometimes this is not being visited
+std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryDeref(
+    const clang::UnaryOperator *op) {
+  // TODO implement
+  if (debugEnabled) debugLifetimes("[VisitUnaryDeref]");
+  for (const auto &child : op->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
+// TODO delete this
+std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryOperator(
+    const clang::UnaryOperator *op) {
+  // TODO implement
+  if (debugEnabled) debugLifetimes("[VisitUnaryOperator]");
+  for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
   }
   return std::nullopt;

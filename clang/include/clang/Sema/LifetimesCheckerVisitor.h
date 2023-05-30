@@ -26,9 +26,15 @@ class LifetimesCheckerVisitor
   std::optional<std::string> VisitReturnStmt(
       const clang::ReturnStmt *return_stmt);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
+  std::optional<std::string> VisitUnaryAddrOf(const clang::UnaryOperator *op);
+  std::optional<std::string> VisitUnaryDeref(const clang::UnaryOperator *op);
+  // TODO delete this
+  std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
-  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl* var_decl, int msg) const;
-  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl* var_decl, int msg, char id) const;
+  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl *var_decl,
+                  int msg) const;
+  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl *var_decl, int msg,
+                  char id) const;
 
  private:
   const clang::FunctionDecl *Func;

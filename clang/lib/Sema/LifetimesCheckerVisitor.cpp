@@ -290,4 +290,36 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitStmt(
   return std::nullopt;
 }
 
+std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryAddrOf(
+    const clang::UnaryOperator *op) {
+  // TODO implement
+  if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
+  for (const auto &child : op->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
+// TODO sometimes this is not being visited
+std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryDeref(
+    const clang::UnaryOperator *op) {
+  // TODO implement
+  if (debugEnabled) debugLifetimes("[VisitUnaryDeref]");
+  for (const auto &child : op->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
+// TODO delete this
+std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryOperator(
+    const clang::UnaryOperator *op) {
+  // TODO implement
+  if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
+  for (const auto &child : op->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+  }
+  return std::nullopt;
+}
+
 }  // namespace clang
