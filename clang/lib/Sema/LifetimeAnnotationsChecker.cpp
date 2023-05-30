@@ -152,9 +152,6 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
         if (var_decl == el) continue;
-        // TODO check if needed
-        stmts.insert(new_children[var_decl].begin(),
-                     new_children[var_decl].end());
         auto tmp_lifetimes = State.GetShortestLifetimes(var_decl);
         // TODO relation between lifetimes and stmts
         if (State.IsLifetimeNotset(var_decl)) {
