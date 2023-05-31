@@ -51,11 +51,6 @@ class LifetimeAnnotationsAnalysis {
     return VariableLifetimes[var_decl].GetShortestLifetimes();
   }
 
-  void InsertShortestLifetimes(const clang::NamedDecl *var_decl, Lifetime *l) {
-    char id = l->GetId();
-    VariableLifetimes[var_decl].InsertShortestLifetimes(id);
-  }
-
   void PropagateShortestLifetimes(const clang::NamedDecl *target,
                                   LifetimesVector shortest_lifetimes) {
     VariableLifetimes[target].InsertShortestLifetimes(shortest_lifetimes);

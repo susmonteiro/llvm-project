@@ -102,11 +102,6 @@ class Lifetime {
         ->insert(stmts.begin(), stmts.end());
   }
 
-  // TODO remove first
-  void InsertShortestLifetimes(char id) {
-    *GetAndResizeShortestLifetime(id) = llvm::DenseSet<const clang::Stmt *>();
-  }
-
   void InsertShortestLifetimes(char id, const clang::Stmt *stmt) {
     InsertShortestLifetimes(id, stmt, ShortestLifetimes);
   }
