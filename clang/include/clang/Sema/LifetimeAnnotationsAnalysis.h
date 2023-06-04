@@ -17,6 +17,9 @@ namespace clang {
 using VariableLifetimesVector =
     llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
 
+using DerefLifetimesVector =
+    llvm::DenseMap<const clang::UnaryOperator *, Lifetime>;
+
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *,
                    llvm::DenseSet<const clang::NamedDecl *>>;
@@ -103,6 +106,8 @@ class LifetimeAnnotationsAnalysis {
 
  private:
   VariableLifetimesVector VariableLifetimes;
+  // AddrOf -> $local (no need to store anything)
+  DerefLifetimesVector DerefLifetimes;
   VarStmtDependenciesMap LifetimeDependencies;
   // ? can one stmt point to more than one var_decl?
   StmtVarDependenciesMap StmtDependencies;

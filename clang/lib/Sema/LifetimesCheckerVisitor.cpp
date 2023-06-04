@@ -32,6 +32,33 @@ void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
   }
 }
 
+void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
+    Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
+    const clang::VarDecl *lhs_var_decl, const clang::ValueDecl *rhs_var_decl,
+    int warn, int note) const {
+  if (rhs_lifetime < lhs_lifetime) {
+    if (rhs_lifetime.IsNotSet()) {
+      const auto &init_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
+      for (unsigned int i = 0; i < init_shortest_lifetimes.size(); i++) {
+        if (init_shortest_lifetimes[i].empty() ||
+            (char)i == lhs_lifetime.GetId())
+          continue;
+        S.Diag(lhs_var_decl->getInit()->getExprLoc(), warn)
+            << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName(i)
+            << lhs_var_decl->getInit()->getSourceRange();
+        PrintNotes(rhs_lifetime, rhs_var_decl, note, i);
+      }
+    } else {
+      // TODO maybe change warning to "declaration" instead of "assign"
+      // (also above)
+      S.Diag(lhs_var_decl->getInitializingDeclaration()->getLocation(), warn)
+          << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
+          << lhs_var_decl->getInitializingDeclaration()->getSourceRange();
+      PrintNotes(rhs_lifetime, rhs_var_decl, note);
+    }
+  }
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
@@ -154,7 +181,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
       }
 
       for (const auto &expr : init_points_to) {
+        debugWarn("Inside loop");
+        expr->dump();
         if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+          debugWarn("It is a DeclRefExpr");
           const auto &init_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
           clang::QualType init_var_type = init_var->getType();
           if (!init_var_type->isPointerType() &&
@@ -163,38 +193,19 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
           }
 
           Lifetime &init_lifetime = State.GetLifetime(init_var->getDecl());
+
           // TODO check this
-          // TODO maybe it's more correct to write ! >=
-          if (init_lifetime < var_decl_lifetime) {
-            if (init_lifetime.IsNotSet()) {
-              const auto &init_shortest_lifetimes =
-                  init_lifetime.GetShortestLifetimes();
-              for (unsigned int i = 0; i < init_shortest_lifetimes.size();
-                   i++) {
-                if (init_shortest_lifetimes[i].empty() ||
-                    (char)i == var_decl_lifetime.GetId())
-                  continue;
-                S.Diag(var_decl->getInit()->getExprLoc(),
-                       diag::warn_assign_lifetimes_differ)
-                    << var_decl_lifetime.GetLifetimeName()
-                    << init_lifetime.GetLifetimeName(i)
-                    << var_decl->getInit()->getSourceRange();
-                PrintNotes(init_lifetime, init_var->getDecl(),
-                           diag::note_lifetime_declared_here, i);
-              }
-            } else {
-              // TODO put loc in the '=' sign (also for above)
-              // TODO maybe change warning to "declaration" instead of "assign"
-              // (also above)
-              S.Diag(var_decl->getInitializingDeclaration()->getLocation(),
-                     diag::warn_assign_lifetimes_differ)
-                  << var_decl_lifetime.GetLifetimeName()
-                  << init_lifetime.GetLifetimeName()
-                  << var_decl->getInitializingDeclaration()->getSourceRange();
-              PrintNotes(init_lifetime, init_var->getDecl(),
-                         diag::note_lifetime_declared_here);
-            }
-          }
+          CompareAndCheckLifetimes(var_decl_lifetime, init_lifetime, var_decl,
+                                   init_var->getDecl(),
+                                   diag::warn_assign_lifetimes_differ,
+                                   diag::note_lifetime_declared_here);
+        } else if (expr != nullptr && clang::isa<clang::UnaryOperator>(expr)) {
+          debugLifetimes("Is the unary operator pointer type?",
+                         expr->getType()->isPointerType() ||
+                             expr->getType()->isReferenceType());
+          Lifetime init_lifetime = Lifetime(LOCAL);
+        } else {
+          debugWarn("No option was good");
         }
       }
     }

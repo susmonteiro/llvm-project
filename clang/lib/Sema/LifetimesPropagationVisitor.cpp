@@ -286,8 +286,20 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     const clang::UnaryOperator *op) {
   // TODO implement
   if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
+
+  if (!op->isGLValue() && !op->getType()->isPointerType() &&
+      !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
+    debugWarn("Skipped...");
+    return std::nullopt;
+  }
+
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
+    debugInfo("Visited addrof child");
+    if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+      debugInfo("Insert addrof in PointsTo because it is expr");
+      PointsTo.InsertExprLifetimes(op, child_expr);
+    }
   }
   return std::nullopt;
 }
