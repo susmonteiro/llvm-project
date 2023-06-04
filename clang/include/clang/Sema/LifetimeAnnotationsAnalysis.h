@@ -15,10 +15,12 @@
 namespace clang {
 
 using VariableLifetimesVector =
-    llvm::DenseMap<const clang::NamedDecl *, Lifetime>;
+    llvm::DenseMap<const clang::NamedDecl *, Lifetime>;  
 
+// expr -> DeclRefExpr or UnaryOperator
+// somehow merge the one above and this one
 using DerefLifetimesVector =
-    llvm::DenseMap<const clang::UnaryOperator *, Lifetime>;
+    llvm::DenseMap<const clang::Expr *, Lifetime>;
 
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *,

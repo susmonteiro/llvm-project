@@ -309,19 +309,19 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryDeref(
     const clang::UnaryOperator *op) {
   // TODO implement
   if (debugEnabled) debugLifetimes("[VisitUnaryDeref]");
-  for (const auto &child : op->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-  }
-  return std::nullopt;
-}
 
-// TODO delete this
-std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryOperator(
-    const clang::UnaryOperator *op) {
-  // TODO implement
-  if (debugEnabled) debugLifetimes("[VisitUnaryOperator]");
+  if (!op->isGLValue() && !op->getType()->isPointerType() &&
+      !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
+    debugWarn("Skipped...");
+    return std::nullopt;
+  }
+
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
+    if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+      debugInfo("Insert deref in PointsTo because it is expr");
+      PointsTo.InsertExprLifetimes(op, child_expr);
+    }
   }
   return std::nullopt;
 }

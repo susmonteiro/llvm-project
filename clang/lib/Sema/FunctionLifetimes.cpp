@@ -79,7 +79,7 @@ clang::TypeLoc StripAttributes(clang::TypeLoc type_loc,
 llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
     llvm::ArrayRef<const clang::Attr*> attrs) {
   llvm::SmallVector<const clang::Expr*> result;
-
+  
   bool saw_annotate_type = false;
 
   for (const clang::Attr* attr : attrs) {
@@ -223,8 +223,8 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
   if (!type_loc.isNull()) {
     type_loc = StripAttributes(type_loc, attrs);
     // DEBUG
-    // debugLifetimes("Attributes");
-    // debugLifetimes(attrs);
+    debugLifetimes("Attributes");
+    debugLifetimes(attrs);
   }
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
@@ -233,16 +233,16 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
   }
 
   // DEBUG
-  // debugLifetimes("Lifetime names");
-  // debugLifetimes(lifetime_names);
+  debugLifetimes("Lifetime names");
+  debugLifetimes(lifetime_names);
 
   Lifetime ret;
 
   llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
 
   // DEBUG
-  // debugLifetimes("Lifetime parameters");
-  // debugLifetimes(lifetime_params);
+  debugLifetimes("Lifetime parameters");
+  debugLifetimes(lifetime_params);
 
   if (!lifetime_params.empty() && !lifetime_names.empty() &&
       lifetime_names.size() != lifetime_params.size()) {
@@ -255,7 +255,7 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
                      " lifetime arguments were given") */);
   }
 
-  // debugLifetimes("Size of lifetime_params", lifetime_params.size());
+  debugLifetimes("Size of lifetime_params", lifetime_params.size());
 
   for (size_t i = 0; i < lifetime_params.size(); ++i) {
     Lifetime l;
