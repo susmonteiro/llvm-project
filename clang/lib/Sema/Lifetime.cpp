@@ -7,7 +7,17 @@ constexpr llvm::StringRef LOCAL_NAME = "local";
 
 Lifetime::Lifetime() : Id(NOTSET) {}
 
-Lifetime::Lifetime(char id) : Id(id) {}
+Lifetime::Lifetime(char id) {
+  if (id == NOTSET || id == LOCAL || id == STATIC) {
+    Id = id;
+  } else if (id >= 'a' && id <= 'z') {
+    Id = CharToId(id);
+  } else {
+    // TODO error
+    // TODO change this
+    Id = NOTSET;
+  }
+}
 
 Lifetime::Lifetime(llvm::StringRef name) {
   if (name.equals(STATIC_NAME)) {
@@ -15,7 +25,7 @@ Lifetime::Lifetime(llvm::StringRef name) {
   } else if (name.equals(LOCAL_NAME)) {
     *this = Lifetime(LOCAL);
   } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
-    *this = Lifetime(CharToId(name.front()));
+    *this = Lifetime(name.front());
   } else {
     // TODO error
     // TODO change this

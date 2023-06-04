@@ -24,6 +24,8 @@ class Lifetime {
   Lifetime();
   Lifetime(const Lifetime &other) : Id(other.GetId()) {}
   Lifetime(llvm::StringRef name);
+  Lifetime(char id);
+
 
   // Returns whether this lifetime is valid
   bool IsNotSet() const;
@@ -138,8 +140,6 @@ class Lifetime {
   bool operator<(const Lifetime &Other) const;
 
  private:
-  explicit Lifetime(char id);
-
   static Lifetime InvalidEmpty();
   static Lifetime InvalidTombstone();
 
