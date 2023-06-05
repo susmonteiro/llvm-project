@@ -16,8 +16,24 @@ void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
 }
 
 void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
+                                         clang::SourceLocation loc,
+                                         clang::SourceRange range,
+                                         int msg) const {
+  char id = lifetime.GetId();
+  PrintNotes(lifetime, loc, range, msg, id);
+}
+
+void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
                                          const clang::NamedDecl *var_decl,
                                          int msg, char id) const {
+  PrintNotes(lifetime, var_decl->getLocation(), var_decl->getSourceRange(), msg,
+             id);
+}
+
+void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
+                                         clang::SourceLocation loc,
+                                         clang::SourceRange range, int msg,
+                                         char id) const {
   const auto &maybe_stmts = lifetime.GetStmts(id);
   if (maybe_stmts.has_value()) {
     const auto &stmts = maybe_stmts.value();
@@ -27,8 +43,7 @@ void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
           << lifetime.GetLifetimeName(id) << stmt->getSourceRange();
     }
   } else {
-    S.Diag(var_decl->getLocation(), msg)
-        << lifetime.GetLifetimeName() << var_decl->getSourceRange();
+    S.Diag(loc, msg) << lifetime.GetLifetimeName() << range;
   }
 }
 
@@ -55,6 +70,33 @@ void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
           << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
           << lhs_var_decl->getInitializingDeclaration()->getSourceRange();
       PrintNotes(rhs_lifetime, rhs_var_decl, note);
+    }
+  }
+}
+
+void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
+    Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
+    const clang::VarDecl *lhs_var_decl, clang::SourceLocation loc,
+    clang::SourceRange range, int warn, int note) const {
+  if (rhs_lifetime < lhs_lifetime) {
+    if (rhs_lifetime.IsNotSet()) {
+      const auto &init_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
+      for (unsigned int i = 0; i < init_shortest_lifetimes.size(); i++) {
+        if (init_shortest_lifetimes[i].empty() ||
+            (char)i == lhs_lifetime.GetId())
+          continue;
+        S.Diag(lhs_var_decl->getInit()->getExprLoc(), warn)
+            << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName(i)
+            << lhs_var_decl->getInit()->getSourceRange();
+        PrintNotes(rhs_lifetime, loc, range, note, i);
+      }
+    } else {
+      // TODO maybe change warning to "declaration" instead of "assign"
+      // (also above)
+      S.Diag(lhs_var_decl->getInitializingDeclaration()->getLocation(), warn)
+          << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
+          << lhs_var_decl->getInitializingDeclaration()->getSourceRange();
+      PrintNotes(rhs_lifetime, loc, range, note);
     }
   }
 }
@@ -173,8 +215,21 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
       if (!var_decl->hasInit() || var_decl_lifetime.IsNotSet())
         return std::nullopt;
 
-      const auto &init_points_to =
-          PointsTo.GetExprPointsTo(var_decl->getInit()->IgnoreParens());
+      const auto *init = var_decl->getInit()->IgnoreParens();
+
+      if (const auto *unary_op =
+              dyn_cast<clang::UnaryOperator>(var_decl->getInit())) {
+        if (unary_op->getOpcode() == UO_AddrOf) {
+          debugInfo("The rhs is unary operator &");
+          Lifetime init_lifetime = Lifetime(LOCAL);
+          CompareAndCheckLifetimes(var_decl_lifetime, init_lifetime, var_decl,
+                                   init->getExprLoc(), init->getSourceRange(),
+                                   diag::warn_assign_lifetimes_differ,
+                                   diag::note_lifetime_declared_here);
+        }
+      }
+
+      const auto &init_points_to = PointsTo.GetExprPointsTo(init);
       // TODO remove this
       if (init_points_to.empty()) {
         debugWarn("Initializer is not in PointsToMap");
@@ -183,7 +238,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
       for (const auto &expr : init_points_to) {
         debugWarn("Inside loop");
         expr->dump();
-        if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+        if (expr == nullptr) continue;
+        if (clang::isa<clang::DeclRefExpr>(expr)) {
           debugWarn("It is a DeclRefExpr");
           const auto &init_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
           clang::QualType init_var_type = init_var->getType();
@@ -199,7 +255,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
                                    init_var->getDecl(),
                                    diag::warn_assign_lifetimes_differ,
                                    diag::note_lifetime_declared_here);
-        } else if (expr != nullptr && clang::isa<clang::UnaryOperator>(expr)) {
+        } else if (clang::isa<clang::UnaryOperator>(expr)) {
           debugLifetimes("Is the unary operator pointer type?",
                          expr->getType()->isPointerType() ||
                              expr->getType()->isReferenceType());
