@@ -2,16 +2,30 @@
 
 namespace clang {
 
+void CreateDependency(const clang::Expr *expr, const clang::NamedDecl *lhs,
+                      const clang::Stmt *loc,
+                      LifetimeAnnotationsAnalysis &state) {
+  if (clang::isa<clang::DeclRefExpr>(expr)) {
+    const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
+    state.CreateDependency(lhs, rhs_ref_decl, loc);
+  } else if (clang::isa<clang::UnaryOperator>(expr)) {
+    debugInfo("Create dependency between var_decl and unary_operator");
+    const auto *rhs_unary_op = clang::dyn_cast<clang::UnaryOperator>(expr);
+    state.CreateDependency(lhs, rhs_unary_op, loc);
+  }
+}
+
 void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
                  const clang::Stmt *loc, PointsToMap &PointsTo,
                  LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("\t[TransferRHS]");
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
+  CreateDependency(rhs, lhs, loc, state);
   for (const auto &expr : points_to) {
-    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      state.CreateDependency(lhs, rhs_ref_decl, loc);
-    }
+    debugInfo("Found expr in points_to");
+    expr->dump();
+    if (expr == nullptr) continue;
+    CreateDependency(expr, lhs, loc, state);
   }
 }
 
@@ -258,8 +272,12 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
-        if (State.IsLifetimeNotset(var_decl))
+        debugInfo("The vardecl has init");
+        if (State.IsLifetimeNotset(var_decl)) {
+          debugInfo(
+              "The lifetime of vardecl is not set, thus we call TransferRHS");
           TransferRHS(var_decl, init, decl_stmt, PointsTo, State);
+        }
       }
     }
   }
@@ -293,14 +311,18 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     return std::nullopt;
   }
 
-  for (const auto &child : op->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-    debugInfo("Visited addrof child");
-    if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-      debugInfo("Insert addrof in PointsTo because it is expr");
-      PointsTo.InsertExprLifetimes(op, child_expr);
-    }
-  }
+  // TODO needed?
+  // for (const auto &child : op->children()) {
+  //   Visit(const_cast<clang::Stmt *>(child));
+  //   debugInfo("Visited addrof child");
+  //   if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+  //     debugInfo("Insert addrof in PointsTo because it is expr");
+  //     PointsTo.InsertExprLifetimes(op, child_expr);
+  //   }
+  // }
+
+  PointsTo.InsertExprLifetimes(op, nullptr);
+  State.CreateDeclRef(op, Lifetime(LOCAL));
   return std::nullopt;
 }
 

@@ -121,10 +121,12 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto children = State.GetLifetimeDependencies();
   auto new_children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
+  auto expr_stmt_dependencies = State.GetStmtExprDependencies();
   auto parents = std::move(State.TransposeDependencies());
 
   debugLifetimes("=== dependencies_ ===");
   debugLifetimes(children, stmt_dependencies);
+  debugLifetimes(children, expr_stmt_dependencies);
 
   // debugLifetimes("=== parents (transposed) ===");
   // debugLifetimes(parents);
@@ -166,6 +168,23 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
                                             shortest_lifetimes);
         }
       }
+      // TODO only one loop
+      for (const auto &expr : expr_stmt_dependencies[stmt]) {
+        // if (var_decl == el) continue;
+        auto tmp_lifetimes = State.GetShortestLifetimes(expr);
+        // TODO relation between lifetimes and stmts
+        if (State.IsLifetimeNotset(expr)) {
+          for (unsigned int i = 0; i < tmp_lifetimes.size(); i++) {
+            if (!tmp_lifetimes[i].empty()) {
+              Lifetime::InsertShortestLifetimes(i, stmt, shortest_lifetimes);
+            }
+          }
+        } else {
+          const char vardecl_lifetime_id = State.GetLifetime(expr).GetId();
+          Lifetime::InsertShortestLifetimes(vardecl_lifetime_id, stmt,
+                                            shortest_lifetimes);
+        }
+      }
     }
 
 
@@ -182,6 +201,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
     debugLifetimes("=== children ===");
     debugLifetimes(new_children, stmt_dependencies);
+    debugLifetimes(new_children, expr_stmt_dependencies);
   }
 
   State.SetDependencies(new_children);

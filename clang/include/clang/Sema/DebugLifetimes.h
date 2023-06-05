@@ -30,6 +30,12 @@ void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *,
                     llvm::DenseMap<const clang::Stmt *,
                                    llvm::DenseSet<const clang::NamedDecl *>>
                         stmt_var);
+void debugLifetimes(
+    llvm::DenseMap<const clang::NamedDecl *,
+                   llvm::DenseSet<const clang::Stmt *>>
+        var_stmt,
+    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::Expr *>>
+        stmt_expr);
 
 void debugImportant(std::string txt);
 void debugImportant(std::string txt1, std::string txt2);

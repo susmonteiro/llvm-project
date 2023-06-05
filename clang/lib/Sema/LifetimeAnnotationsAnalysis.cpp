@@ -27,6 +27,17 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
   return l;
 }
 
+Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
+    const clang::Expr *expr) {
+  ExprLifetimesVector::iterator it = ExprLifetimes.find(expr);
+  if (it == ExprLifetimes.end()) {
+    // TODO error
+    CreateDeclRef(expr);
+  }
+  Lifetime &l = ExprLifetimes[expr];
+  return l;
+}
+
 Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime() {
   return ReturnLifetime;
 }
@@ -58,12 +69,42 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::NamedDecl *from,
   }
 }
 
+void LifetimeAnnotationsAnalysis::CreateDependency(const clang::NamedDecl *from,
+                                                   const clang::Expr *to,
+                                                   const clang::Stmt *loc) {
+  // TODO implement
+  // clang::QualType type = to->getType().getCanonicalType();
+  // // TODO necessary?
+  // if (type->isArrayType()) {
+  //   type = type->castAsArrayTypeUnsafe()->getElementType();
+  // }
+
+  // if (type->isRecordType()) {
+  //   // TODO implement
+  //   return;
+  // }
+
+  // if (type->isPointerType() || type->isReferenceType() ||
+  //     type->isStructureOrClassType()) {
+  //   // TODO implement
+  // }
+  // if (from != to) {
+  // TODO
+  CreateLifetimeDependency(from, loc);
+  CreateStmtDependency(loc, to);
+  // }
+}
+
 VarStmtDependenciesMap &LifetimeAnnotationsAnalysis::GetLifetimeDependencies() {
   return LifetimeDependencies;
 }
 
 StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
   return StmtDependencies;
+}
+
+StmtExprDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtExprDependencies() {
+  return StmtExprDependencies;
 }
 
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
@@ -79,7 +120,12 @@ void LifetimeAnnotationsAnalysis::CreateStmtDependency(
 void LifetimeAnnotationsAnalysis::CreateStmtDependency(
     const clang::Stmt *from, const clang::DeclRefExpr *to) {
   const clang::NamedDecl *decl = to->getFoundDecl();
-  LifetimeAnnotationsAnalysis::CreateStmtDependency(from, decl);
+  CreateStmtDependency(from, decl);
+}
+
+void LifetimeAnnotationsAnalysis::CreateStmtDependency(const clang::Stmt *from,
+                                                       const clang::Expr *to) {
+  StmtExprDependencies[from].insert(to);
 }
 
 llvm::DenseMap<const clang::NamedDecl *,
@@ -91,8 +137,7 @@ LifetimeAnnotationsAnalysis::TransposeDependencies() {
   for (const auto &pair : LifetimeDependencies) {
     for (const auto &stmt : pair.second) {
       for (const auto &child : StmtDependencies[stmt]) {
-        if (IsLifetimeNotset(child))
-          result[child].insert(pair.first);
+        if (IsLifetimeNotset(child)) result[child].insert(pair.first);
       }
     }
   }
@@ -125,6 +170,22 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
     str +=
         pair.first->getNameAsString() + ": " + pair.second.DebugString() + '\n';
   }
+
+  str += "\n>> ExprLifetimes\n\n";
+  for (const auto &pair : ExprLifetimes) {
+    if (const auto *unary_op = dyn_cast<clang::UnaryOperator>(pair.first)) {
+      if (unary_op->getOpcode() == clang::UO_AddrOf) {
+        str += "& : ";
+      } else if (unary_op->getOpcode() == clang::UO_Deref) {
+        str += "* : ";
+      } else {
+        debugWarn("UnaryOperator not supported");
+        continue;
+      }
+      str += pair.second.DebugString() + '\n';
+    }
+  }
+  
   str += "\n>> Dependencies\n\n";
   for (const auto &pair : LifetimeDependencies) {
     str += pair.first->getNameAsString() + ": ";
