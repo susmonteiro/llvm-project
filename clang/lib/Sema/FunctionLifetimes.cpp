@@ -313,7 +313,7 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
     return std::move(err);
   }
 
-  const clang::QualType type = qualtype.getCanonicalType();
+  clang::QualType type = qualtype.getCanonicalType();
   retObjectLifetimes.InsertPointeeObject(lifetime, type);
   retObjectLifetimes.SetLifetime(lifetime, type);
 

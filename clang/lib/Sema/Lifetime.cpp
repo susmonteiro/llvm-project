@@ -124,7 +124,11 @@ void Lifetime::ProcessShortestLifetimes() {
 }
 
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
-  assert(id != NOTSET);
+  // TODO change back to assert
+  // assert(id != NOTSET);
+  if (id == NOTSET) {
+    return std::nullopt;
+  }
   return (unsigned int)id >= ShortestLifetimes.size() ||
                  ShortestLifetimes[id].empty()
              ? std::nullopt

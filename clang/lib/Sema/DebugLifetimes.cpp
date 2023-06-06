@@ -42,7 +42,7 @@ void debugLifetimes(llvm::SmallVector<std::string> vec) {
   }
 }
 
-void debugLifetimes(std::vector<const clang::NamedDecl *> vec) {
+void debugLifetimes(std::vector<const clang::VarDecl *> vec) {
   if (stop_debug) return;
   std::string res;
   for (const auto &el : vec) {
@@ -52,7 +52,7 @@ void debugLifetimes(std::vector<const clang::NamedDecl *> vec) {
   debugLifetimes(res);
 }
 
-void debugLifetimes(llvm::DenseSet<const clang::NamedDecl *> vec) {
+void debugLifetimes(llvm::DenseSet<const clang::VarDecl *> vec) {
   if (stop_debug) return;
   for (const auto &el : vec) {
     debugLifetimes(el->getNameAsString());
@@ -68,11 +68,11 @@ void debugLifetimes(llvm::DenseSet<char> vec) {
   debugLifetimes(res);
 }
 
-void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *,
+void debugLifetimes(llvm::DenseMap<const clang::VarDecl *,
                                    llvm::DenseSet<const clang::Stmt *>>
                         var_stmt,
                     llvm::DenseMap<const clang::Stmt *,
-                                   llvm::DenseSet<const clang::NamedDecl *>>
+                                   llvm::DenseSet<const clang::VarDecl *>>
                         stmt_var) {
   if (stop_debug) return;
   std::string res;
@@ -89,7 +89,7 @@ void debugLifetimes(llvm::DenseMap<const clang::NamedDecl *,
 }
 
 void debugLifetimes(
-    llvm::DenseMap<const clang::NamedDecl *,
+    llvm::DenseMap<const clang::VarDecl *,
                    llvm::DenseSet<const clang::Stmt *>>
         var_stmt,
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::Expr *>>

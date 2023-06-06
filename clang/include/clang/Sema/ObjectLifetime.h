@@ -6,6 +6,7 @@
 #include "clang/Sema/DebugLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/Support/Error.h"
 
 namespace clang {
 
@@ -18,7 +19,7 @@ class ObjectLifetime {
       : ThisLifetime(),
         ThisType(std::optional<clang::QualType>(type)),
         PointeeObject(nullptr) {}
-  ObjectLifetime(Lifetime& lifetime, const clang::QualType& type)
+  ObjectLifetime(Lifetime& lifetime, clang::QualType& type)
       : ThisLifetime(lifetime),
         ThisType(std::optional<clang::QualType>(type)),
         PointeeObject(nullptr) {}
@@ -80,7 +81,8 @@ class ObjectsLifetimes {
 
   Lifetime& GetLifetime() { return ThisLifetime.GetLifetime(); }
 
-  Lifetime GetLifetime(clang::QualType &type) {
+  Lifetime& GetLifetime(clang::QualType &type) {
+    type = type.getCanonicalType();
     debugLifetimes("The type we want is " + type.getAsString() + '\n');
     for (auto& pointee : PointeeObjects) {
       auto tmp = pointee.GetType();
@@ -95,16 +97,24 @@ class ObjectsLifetimes {
         return pointee.GetLifetime();
       }
     }
-    // TODO error
-    return Lifetime();
+    // TODO error?
+    return InsertPointeeObject(type);
   }
 
-  void SetLifetime(Lifetime& lifetime, const clang::QualType& type) {
+  llvm::SmallVector<ObjectLifetime>& GetLifetimes() { return PointeeObjects; }
+
+
+  void SetLifetime(Lifetime& lifetime, clang::QualType& type) {
     ThisLifetime = ObjectLifetime(lifetime, type);
   }
 
-  void InsertPointeeObject(Lifetime& lifetime, const clang::QualType& type) {
+  void InsertPointeeObject(Lifetime& lifetime, clang::QualType& type) {
     PointeeObjects.emplace_back(lifetime, type);
+  }
+
+  Lifetime& InsertPointeeObject(clang::QualType& type) {
+    PointeeObjects.emplace_back(type);
+    return GetLifetime(type);
   }
 
   std::string DebugString() const {
@@ -116,6 +126,15 @@ class ObjectsLifetimes {
       res += pointee.DebugString();
     }
     return res;
+  }
+
+  bool IsLifetimeNotSet() {
+    for (auto &pointee : PointeeObjects) {
+      if (pointee.GetLifetime().IsNotSet()) {
+        return true;
+      }
+    }
+    return false;
   }
 
  private:

@@ -15,25 +15,13 @@
 namespace clang {
 
 using VariableLifetimesVector =
-    llvm::DenseMap<const clang::NamedDecl *, ObjectsLifetimes>;
-
-// expr -> DeclRefExpr or UnaryOperator
-// somehow merge the one above and this one
-using ExprLifetimesVector = llvm::DenseMap<const clang::Expr *, Lifetime>;
+    llvm::DenseMap<const clang::VarDecl *, ObjectsLifetimes>;
 
 using StmtVarDependenciesMap =
-    llvm::DenseMap<const clang::Stmt *,
-                   llvm::DenseSet<const clang::NamedDecl *>>;
+    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>;
 
 using VarStmtDependenciesMap =
-    llvm::DenseMap<const clang::NamedDecl *,
-                   llvm::DenseSet<const clang::Stmt *>>;
-
-using StmtExprDependenciesMap =
-    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::Expr *>>;
-
-using ExprStmtDependenciesMap =
-    llvm::DenseMap<const clang::Expr *, llvm::DenseSet<const clang::Stmt *>>;
+    llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::Stmt *>>;
 
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
@@ -42,93 +30,60 @@ class LifetimeAnnotationsAnalysis {
   LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info);
 
   VariableLifetimesVector &GetVariableLifetimes();
-  Lifetime &GetLifetime(const clang::NamedDecl *var_decl, clang::QualType type);
-  Lifetime &GetLifetime(const clang::Expr *expr);
-  Lifetime &GetReturnLifetime();
+  ObjectsLifetimes &GetObjectsLifetimes(const clang::VarDecl *var_decl);
+  Lifetime& GetLifetime(const clang::VarDecl *var_decl,
+                                         clang::QualType type);
+  Lifetime& GetReturnLifetime(clang::QualType &type);
 
-  bool IsLifetimeNotset(const clang::NamedDecl *var_decl, clang::QualType &type) const {
-    auto it = VariableLifetimes.find(var_decl);
-    if (it != VariableLifetimes.end()) {
-      ObjectsLifetimes ol = std::move(it->second);
-      return ol.GetLifetime(type).IsNotSet();
-    } else {
-      // TODO error?
-      return false;
-    }
-  }
-
-  bool IsLifetimeNotset(const clang::Expr *expr) const {
-    auto it = ExprLifetimes.find(expr);
-    if (it != ExprLifetimes.end()) {
-      return it->second.IsNotSet();
-    } else {
-      // TODO error?
-      return false;
-    }
-  }
+  bool IsLifetimeNotset(const clang::VarDecl *var_decl,
+                        clang::QualType &type) const;
+  bool IsLifetimeNotset(const clang::VarDecl *var_decl) const;
 
   PointsToMap &GetPointsTo() { return PointsTo; }
 
-  LifetimesVector GetShortestLifetimes(const clang::NamedDecl *var_decl, clang::QualType &type) {
-    return VariableLifetimes[var_decl].GetLifetime(type).GetShortestLifetimes();
+  LifetimesVector GetShortestLifetimes(const clang::VarDecl *var_decl,
+                                       clang::QualType &type) {
+    llvm::Expected<Lifetime &> maybe_lifetime = GetLifetime(var_decl, type);
+    return maybe_lifetime ? maybe_lifetime.get().GetShortestLifetimes()
+                          : LifetimesVector();
   }
 
-  LifetimesVector GetShortestLifetimes(const clang::Expr *expr) {
-    return ExprLifetimes[expr].GetShortestLifetimes();
+  void PropagateShortestLifetimes(const clang::VarDecl *target,
+                                  LifetimesVector shortest_lifetimes,
+                                  clang::QualType &type) {
+    llvm::Expected<Lifetime &> maybe_lifetime = GetLifetime(target, type);
+    if (maybe_lifetime)
+      maybe_lifetime.get().InsertShortestLifetimes(shortest_lifetimes);
   }
 
-  void PropagateShortestLifetimes(const clang::NamedDecl *target,
-                                  LifetimesVector shortest_lifetimes, clang::QualType &type) {
-    VariableLifetimes[target].GetLifetime(type).InsertShortestLifetimes(shortest_lifetimes);
-  }
-
-  void PropagateShortestLifetimes(const clang::NamedDecl *to,
+  void PropagateShortestLifetimes(const clang::VarDecl *to,
                                   clang::QualType &to_type,
-                                  const clang::NamedDecl *from,
+                                  const clang::VarDecl *from,
                                   clang::QualType &from_type) {
-                                    // TODO maybe same type is enough
+    // TODO maybe same type is enough
     const auto from_lifetimes = GetShortestLifetimes(from, from_type);
     PropagateShortestLifetimes(to, from_lifetimes, to_type);
   }
 
-  void CreateVariable(const clang::NamedDecl *var_decl, clang::QualType &type) {
-  
+  void CreateVariable(const clang::VarDecl *var_decl, clang::QualType &type) {
     VariableLifetimes[var_decl] = ObjectsLifetimes(Lifetime(), type);
   }
 
-  void CreateVariable(const clang::NamedDecl *var_decl, Lifetime lifetime, clang::QualType &type) {
+  void CreateVariable(const clang::VarDecl *var_decl, Lifetime lifetime,
+                      clang::QualType &type) {
     VariableLifetimes[var_decl] = ObjectsLifetimes(lifetime, type);
-  }
-
-  void CreateDeclRef(const clang::Expr *expr) {
-    ExprLifetimes[expr] = Lifetime();
-  }
-
-  void CreateDeclRef(const clang::Expr *expr, Lifetime lifetime) {
-    ExprLifetimes[expr] = Lifetime(lifetime);
   }
 
   VarStmtDependenciesMap &GetLifetimeDependencies();
   StmtVarDependenciesMap &GetStmtDependencies();
-  StmtExprDependenciesMap &GetStmtExprDependencies();
 
-  void CreateLifetimeDependency(const clang::NamedDecl *from,
+  void CreateLifetimeDependency(const clang::VarDecl *from,
                                 const clang::Stmt *to);
 
-  void CreateStmtDependency(const clang::Stmt *from,
-                            const clang::NamedDecl *to);
+  void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
 
-  void CreateStmtDependency(const clang::Stmt *from,
-                            const clang::DeclRefExpr *to);
-
-  void CreateStmtDependency(const clang::Stmt *from,
-                            const clang::Expr *to);
-
-  void CreateDependency(const clang::NamedDecl *from,
-                        const clang::DeclRefExpr *to, const clang::Stmt *loc);
-
-  void CreateDependency(const clang::NamedDecl *from, const clang::Expr *to,
-                        const clang::Stmt *loc);
+  void CreateDependency(const clang::VarDecl *from,
+                        const clang::VarDecl *to, const clang::Stmt *loc);
 
   void SetDependencies(VarStmtDependenciesMap dependencies) {
     LifetimeDependencies = std::move(dependencies);
@@ -136,22 +91,17 @@ class LifetimeAnnotationsAnalysis {
 
   void ProcessShortestLifetimes();
 
-  llvm::DenseMap<const clang::NamedDecl *,
-                 llvm::DenseSet<const clang::NamedDecl *>>
+  llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::VarDecl *>>
   TransposeDependencies();
-  std::vector<const clang::NamedDecl *> InitializeWorklist() const;
+  std::vector<const clang::VarDecl *> InitializeWorklist() const;
 
   std::string DebugString();
 
  private:
   VariableLifetimesVector VariableLifetimes;
-  // AddrOf -> $local (no need to store anything)
-  ExprLifetimesVector ExprLifetimes;
   VarStmtDependenciesMap LifetimeDependencies;
-  ExprStmtDependenciesMap ExprLifetimeDependencies;
   // ? can one stmt point to more than one var_decl?
   StmtVarDependenciesMap StmtDependencies;
-  StmtExprDependenciesMap StmtExprDependencies;
   PointsToMap PointsTo;
   ObjectsLifetimes ReturnLifetime;
 

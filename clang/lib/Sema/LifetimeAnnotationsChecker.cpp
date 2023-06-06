@@ -121,12 +121,10 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto children = State.GetLifetimeDependencies();
   auto new_children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
-  auto expr_stmt_dependencies = State.GetStmtExprDependencies();
   auto parents = std::move(State.TransposeDependencies());
 
   debugLifetimes("=== dependencies_ ===");
   debugLifetimes(children, stmt_dependencies);
-  debugLifetimes(children, expr_stmt_dependencies);
 
   // debugLifetimes("=== parents (transposed) ===");
   // debugLifetimes(parents);
@@ -150,11 +148,15 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> shortest_lifetimes;
     llvm::DenseSet<const clang::Stmt *> stmts;
 
+    clang::QualType el_type = el->getType();
+
     for (const auto &stmt : children[el]) {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
         if (var_decl == el) continue;
-        auto tmp_lifetimes = State.GetShortestLifetimes(var_decl);
+        // TODO change to type?
+        clang::QualType var_decl_type = var_decl->getType();
+        auto tmp_lifetimes = State.GetShortestLifetimes(var_decl, var_decl_type);
         // TODO relation between lifetimes and stmts
         if (State.IsLifetimeNotset(var_decl)) {
           for (unsigned int i = 0; i < tmp_lifetimes.size(); i++) {
@@ -163,24 +165,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
             }
           }
         } else {
-          const char vardecl_lifetime_id = State.GetLifetime(var_decl).GetId();
-          Lifetime::InsertShortestLifetimes(vardecl_lifetime_id, stmt,
-                                            shortest_lifetimes);
-        }
-      }
-      // TODO only one loop
-      for (const auto &expr : expr_stmt_dependencies[stmt]) {
-        // if (var_decl == el) continue;
-        auto tmp_lifetimes = State.GetShortestLifetimes(expr);
-        // TODO relation between lifetimes and stmts
-        if (State.IsLifetimeNotset(expr)) {
-          for (unsigned int i = 0; i < tmp_lifetimes.size(); i++) {
-            if (!tmp_lifetimes[i].empty()) {
-              Lifetime::InsertShortestLifetimes(i, stmt, shortest_lifetimes);
-            }
-          }
-        } else {
-          const char vardecl_lifetime_id = State.GetLifetime(expr).GetId();
+          const char vardecl_lifetime_id = State.GetLifetime(var_decl, var_decl_type).GetId();
           Lifetime::InsertShortestLifetimes(vardecl_lifetime_id, stmt,
                                             shortest_lifetimes);
         }
@@ -190,9 +175,9 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
     // TODO this is not perfect
     if (new_children[el] != stmts ||
-        State.GetShortestLifetimes(el) != shortest_lifetimes) {
+        State.GetShortestLifetimes(el, el_type) != shortest_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
-      State.PropagateShortestLifetimes(el, shortest_lifetimes);
+      State.PropagateShortestLifetimes(el, shortest_lifetimes, el_type);
 
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);
@@ -201,7 +186,6 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
     debugLifetimes("=== children ===");
     debugLifetimes(new_children, stmt_dependencies);
-    debugLifetimes(new_children, expr_stmt_dependencies);
   }
 
   State.SetDependencies(new_children);

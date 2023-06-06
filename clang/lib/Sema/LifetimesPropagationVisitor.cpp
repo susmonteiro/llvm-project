@@ -2,20 +2,25 @@
 
 namespace clang {
 
-void CreateDependency(const clang::Expr *expr, const clang::NamedDecl *lhs,
+void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
                       const clang::Stmt *loc,
                       LifetimeAnnotationsAnalysis &state) {
   if (clang::isa<clang::DeclRefExpr>(expr)) {
     const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
-    state.CreateDependency(lhs, rhs_ref_decl, loc);
-  } else if (clang::isa<clang::UnaryOperator>(expr)) {
+    if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
+            rhs_ref_decl->getDecl()->getCanonicalDecl())) {
+      state.CreateDependency(lhs, rhs_var_decl, loc);
+    }
+  } 
+  // TODO implement else
+  /* else if (clang::isa<clang::UnaryOperator>(expr)) {
     debugInfo("Create dependency between var_decl and unary_operator");
     const auto *rhs_unary_op = clang::dyn_cast<clang::UnaryOperator>(expr);
     state.CreateDependency(lhs, rhs_unary_op, loc);
-  }
+  } */
 }
 
-void TransferRHS(const clang::NamedDecl *lhs, const clang::Expr *rhs,
+void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  const clang::Stmt *loc, PointsToMap &PointsTo,
                  LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("\t[TransferRHS]");
@@ -43,9 +48,12 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
     return Lifetime();
     // return std::move(err);
   }
-  debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n" + objectsLifetimes.DebugString());
+  debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n" +
+                 objectsLifetimes.DebugString());
   // TODO change this
-  return objectsLifetimes.GetLifetime(type);
+  llvm::Expected<Lifetime &> maybe_lifetime =
+      objectsLifetimes.GetLifetime(type);
+  return maybe_lifetime ? maybe_lifetime.get() : Lifetime();
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
@@ -71,10 +79,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   PointsTo.InsertExprLifetimes(op, rhs);
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
-
-  if (lhs_decl_ref_expr &&
-      State.IsLifetimeNotset(lhs_decl_ref_expr->getDecl())) {
-    TransferRHS(lhs_decl_ref_expr->getDecl(), rhs, op, PointsTo, State);
+  if (const auto *lhs_var_decl = dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
+    if (State.IsLifetimeNotset(lhs_var_decl)) {
+      TransferRHS(lhs_var_decl, rhs, op, PointsTo, State);
+    }
   } else {
     // TODO
   }
@@ -105,12 +113,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     }
 
     auto &func_info = FuncInfo[direct_callee];
-    const Lifetime &return_lifetime = func_info.GetReturnLifetime();
+    const Lifetime &return_lifetime = func_info.GetReturnLifetime(func_type);
 
     unsigned int i = -1;
     while (++i < func_info.GetNumParams()) {
       const clang::ParmVarDecl *param = func_info.GetParam(i);
-      const auto &param_lifetime = func_info.GetParamLifetime(param, param->getType());
+      const auto &param_lifetime =
+          func_info.GetParamLifetime(param, param->getType());
       if (param_lifetime.has_value() &&
           param_lifetime.value() == return_lifetime) {
         const Expr *arg = call->getArg(i)->IgnoreParens();
@@ -259,14 +268,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      if (!var_decl->getType()->isPointerType() &&
-          !var_decl->getType()->isReferenceType()) {
+      clang::QualType type = var_decl->getType();
+      if (!type->isPointerType() && !type->isReferenceType()) {
         debugWarn("Var decl is not pointer type");
         continue;
       }
 
       Lifetime lifetime = GetVarDeclLifetime(var_decl, Factory);
-      State.CreateVariable(var_decl, lifetime);
+      State.CreateVariable(var_decl, lifetime, type);
 
       // Don't need to record initializers because initialization has already
       // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
@@ -324,7 +333,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
   // }
 
   PointsTo.InsertExprLifetimes(op, nullptr);
-  State.CreateDeclRef(op, Lifetime(LOCAL));
+  // TODO change this
+  // State.CreateDeclRef(op, Lifetime(LOCAL));
   return std::nullopt;
 }
 
