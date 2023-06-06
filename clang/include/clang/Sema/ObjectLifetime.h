@@ -17,21 +17,23 @@ class ObjectLifetime {
   ObjectLifetime(llvm::StringRef name) : ThisLifetime(name) {}
   ObjectLifetime(char id) : ThisLifetime(id) {}
 
+  bool HasPointeeObject() { return PointeeObject != nullptr; }
+
   std::optional<ObjectLifetime> GetPointeeObject() {
-    return PointeeObject;
+    return PointeeObject != nullptr ? std::optional<ObjectLifetime>(*PointeeObject) : std::nullopt;
   }
 
   Lifetime& GetLifetime() { return ThisLifetime; }
-  std::optional<Lifetime> GetPointeeObjectLifetime() { return HasPointeeObject() ? PointeeObject.value().GetLifetime() : std::nullopt; }
+  std::optional<Lifetime> GetPointeeObjectLifetime() { return HasPointeeObject() ? std::optional<Lifetime>(PointeeObject->GetLifetime()) : std::nullopt; }
   clang::QualType& GetType() { return ThisType; }
-  clang::QualType& GetPointeeType() { return PointeeObject.GetType(); }
+  std::optional<clang::QualType&> GetPointeeType() { return HasPointeeObject() ? std::optional<clang::QualType&>(PointeeObject->GetType()) : std::nullopt; }
 
   void SetLifetime(Lifetime& lifetime) { ThisLifetime = lifetime; }
   void SetPointeeLifetime(Lifetime& lifetime) {
-    PointeeObject.SetLifetime(lifetime);
+    PointeeObject->SetLifetime(lifetime);
   }
-  void SetPointee(ObjectLifetime& objectLifetime) {
-    PointeeObject = objectLifetime;
+  void SetPointee(ObjectLifetime objectLifetime) {
+    PointeeObject = &objectLifetime;
   }
 
   std::string DebugString() const {
@@ -44,7 +46,7 @@ class ObjectLifetime {
 
  private:
   Lifetime ThisLifetime;
-  ObjectLifetime PointeeObject;
+  ObjectLifetime* PointeeObject;
   clang::QualType ThisType;
   bool HasPointeeObject = false;
 };
