@@ -74,10 +74,13 @@ class ObjectLifetime {
 class ObjectsLifetimes {
  public:
   ObjectsLifetimes() : ThisLifetime() {}
+  ObjectsLifetimes(Lifetime lifetime, clang::QualType &type) {
+    InsertPointeeObject(lifetime, type);
+  }
 
   Lifetime& GetLifetime() { return ThisLifetime.GetLifetime(); }
 
-  Lifetime GetLifetimeWithType(clang::QualType &type) {
+  Lifetime GetLifetime(clang::QualType &type) {
     debugLifetimes("The type we want is " + type.getAsString() + '\n');
     for (auto& pointee : PointeeObjects) {
       auto tmp = pointee.GetType();

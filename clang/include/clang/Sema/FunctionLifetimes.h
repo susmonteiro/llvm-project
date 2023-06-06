@@ -14,7 +14,7 @@ namespace clang {
 using LifetimeFactory =
     std::function<llvm::Expected<Lifetime>(const clang::Expr *)>;
 
-using ParamsLifetimesMap = llvm::DenseMap<const clang::ParmVarDecl *, Lifetime>;
+using ParamsLifetimesMap = llvm::DenseMap<const clang::ParmVarDecl *, ObjectsLifetimes>;
 
 class FunctionLifetimeFactory {
  public:
@@ -63,20 +63,18 @@ class FunctionLifetimes {
 
   ParamsLifetimesMap GetParamsLifetimes() const { return ParamsLifetimes; }
 
-  std::optional<Lifetime> GetParamLifetime(const clang::ParmVarDecl *param) const { 
+  std::optional<Lifetime> GetParamLifetime(const clang::ParmVarDecl *param, clang::QualType type) const { 
     auto it = ParamsLifetimes.find(param);
-    return it != ParamsLifetimes.end() ? std::optional<Lifetime>(it->second) : std::nullopt;
+    ObjectsLifetimes objects_lifetimes = it->second;
+    Lifetime lifetime = objects_lifetimes.GetLifetime(type);
+    return it != ParamsLifetimes.end() ? std::optional<Lifetime>(lifetime) : std::nullopt;
   }
 
-  // TODO change this
-  Lifetime& GetReturnLifetime() { return ReturnLifetime.GetLifetime(); }
-  // void SetReturnLifetime(Lifetime l) { ReturnLifetime = l; }
+  ObjectsLifetimes& GetReturnLifetime() { return ReturnLifetime; }
 
-// TODO change this
-  void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectsLifetimes &l) {
-    Lifetime lifetime = l.GetLifetime();
+  void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectsLifetimes &objectsLifetimes) {
     Params.emplace_back(param);
-    ParamsLifetimes[param] = lifetime;
+    ParamsLifetimes[param] = objectsLifetimes;
   }
 
   std::string DebugParams();

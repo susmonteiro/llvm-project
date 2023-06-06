@@ -43,9 +43,9 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
     return Lifetime();
     // return std::move(err);
   }
-  debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n", objectsLifetimes.DebugString());
+  debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n" + objectsLifetimes.DebugString());
   // TODO change this
-  return objectsLifetimes.GetLifetime();
+  return objectsLifetimes.GetLifetime(type);
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
@@ -110,7 +110,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     unsigned int i = -1;
     while (++i < func_info.GetNumParams()) {
       const clang::ParmVarDecl *param = func_info.GetParam(i);
-      const auto &param_lifetime = func_info.GetParamLifetime(param);
+      const auto &param_lifetime = func_info.GetParamLifetime(param, param->getType());
       if (param_lifetime.has_value() &&
           param_lifetime.value() == return_lifetime) {
         const Expr *arg = call->getArg(i)->IgnoreParens();

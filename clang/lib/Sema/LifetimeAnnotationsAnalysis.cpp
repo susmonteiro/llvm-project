@@ -9,22 +9,21 @@ LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis(
   for (auto &pair : params_lifetimes) {
     VariableLifetimes.insert({pair.first, pair.second});
   }
-  ReturnLifetime = Lifetime(function_info.GetReturnLifetime());
+  ReturnLifetime = function_info.GetReturnLifetime();
 }
 
 VariableLifetimesVector &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
   return VariableLifetimes;
 }
 
-Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
-    const clang::NamedDecl *var_decl) {
+Lifetime& LifetimeAnnotationsAnalysis::GetLifetime(
+    const clang::NamedDecl *var_decl, clang::QualType type) {
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
     // TODO error
     CreateVariable(var_decl);
   }
-  Lifetime &l = VariableLifetimes[var_decl];
-  return l;
+  return VariableLifetimes[var_decl].GetLifetime(type);
 }
 
 Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(

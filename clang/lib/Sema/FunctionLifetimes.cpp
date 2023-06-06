@@ -236,7 +236,8 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
   // debugLifetimes("Lifetime names");
   // debugLifetimes(lifetime_names);
 
-  llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(qualtype);
+  llvm::SmallVector<std::string> lifetime_params =
+      GetLifetimeParameters(qualtype);
 
   // DEBUG
   // debugLifetimes("Lifetime parameters");
@@ -290,7 +291,9 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
     return std::move(err);
   }
 
-  // debugLifetimes("Created the ObjectLifetime with type " + pointee.getAsString() + " and with lifetime " + retObjectLifetimes.GetLifetime().DebugString());
+  // debugLifetimes("Created the ObjectLifetime with type " +
+  // pointee.getAsString() + " and with lifetime " +
+  // retObjectLifetimes.GetLifetime().DebugString());
 
   const clang::Expr* lifetime_name = nullptr;
   if (!lifetime_names.empty()) {
@@ -314,9 +317,9 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
   retObjectLifetimes.InsertPointeeObject(lifetime, type);
   retObjectLifetimes.SetLifetime(lifetime, type);
 
-  // debugLifetimes("The outer pointee has lifetime", retObjectLifetimes.GetLifetime().DebugString());
+  // debugLifetimes("The outer pointee has lifetime",
+  // retObjectLifetimes.GetLifetime().DebugString());
 
-  // TODO change to optional maybe
   return retObjectLifetimes;
 }
 
@@ -416,9 +419,8 @@ std::string FunctionLifetimes::DebugParams() {
   res += "> Parameters Lifetimes:\n";
   int i = 0;
   for (const auto& pair : ParamsLifetimes) {
-    res += "Parameter " + std::to_string(i) + " -> ";
-    const Lifetime* l = &pair.second;
-    res += l->DebugString() + '\n';
+    res += "Parameter " + std::to_string(i) + " -> " +
+           pair.second.DebugString() + '\n';
   }
   return res;
 }
