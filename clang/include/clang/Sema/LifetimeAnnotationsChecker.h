@@ -27,10 +27,10 @@ class LifetimeAnnotationsChecker {
   void PropagateLifetimes();
   void CheckLifetimes(const clang::FunctionDecl *func, Sema &S);
 
-  std::string DebugString() const {
+  std::string DebugString() {
     std::string res;
     res += "[LifetimeAnnotationsChecker]: Functions Information\n";
-    for (const auto &pair : FunctionInfo) {
+    for (auto &pair : FunctionInfo) {
       res += "Function " + pair.first->getNameAsString() + '\n' +
              pair.second.DebugString() + "\n\n============\n\n";
     }

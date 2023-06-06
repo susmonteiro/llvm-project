@@ -193,22 +193,22 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::LifetimeFromName(
   return Lifetime(name_str);
 }
 
-llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateParamLifetimes(
+llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateParamLifetimes(
     clang::QualType param_type, clang::TypeLoc param_type_loc) const {
   return CreateLifetime(param_type, param_type_loc, ParamLifetimeFactory());
 }
 
-llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
+llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
     clang::QualType return_type, clang::TypeLoc return_type_loc) const {
   return CreateLifetime(return_type, return_type_loc, ReturnLifetimeFactory());
 }
 
-llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateVarLifetimes(
+llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateVarLifetimes(
     clang::QualType var_type, clang::TypeLoc var_type_loc) const {
   return CreateLifetime(var_type, var_type_loc, VarLifetimeFactory());
 }
 
-llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
+llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
     clang::QualType type, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
   assert(!type.isNull());
@@ -236,7 +236,7 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
   debugLifetimes("Lifetime names");
   debugLifetimes(lifetime_names);
 
-  Lifetime ret;
+  ObjectLifetime ret;
 
   llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
 
@@ -284,12 +284,19 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
 
   // TODO is this ok?
   // recursive call
-  Lifetime lifetime;
+  ObjectLifetime tmp;
   if (llvm::Error err =
           CreateLifetime(pointee, pointee_type_loc, lifetime_factory)
-              .moveInto(lifetime)) {
+              .moveInto(tmp)) {
     return std::move(err);
   }
+  
+  ret.InsertPointeeLifetime(pointee, tmp.GetVarLifetime());
+  ret.InsertPointeesLifetimes(tmp.GetPointeesLifetimes());
+
+  debugLifetimes("The pointee");
+  pointee->dump();
+  debugLifetimes("Has lifetime", tmp.GetVarLifetime().DebugString());
 
   const clang::Expr* lifetime_name = nullptr;
   if (!lifetime_names.empty()) {
@@ -304,9 +311,13 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::CreateLifetime(
     lifetime_name = lifetime_names.front();
   }
 
-  if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(ret)) {
+  Lifetime lifetime;
+  if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(lifetime)) {
     return std::move(err);
   }
+  ret.SetVarLifetime(lifetime);
+
+  debugLifetimes("The outer pointee has lifetime", ret.GetVarLifetime().DebugString());
 
   // TODO change to optional maybe
   return ret;
@@ -403,7 +414,7 @@ LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
 
 FunctionLifetimes::FunctionLifetimes() : FuncId(INVALID) {}
 
-std::string FunctionLifetimes::DebugParams() const {
+std::string FunctionLifetimes::DebugParams() {
   std::string res;
   res += "> Parameters Lifetimes:\n";
   int i = 0;
@@ -414,11 +425,14 @@ std::string FunctionLifetimes::DebugParams() const {
   }
   return res;
 }
-std::string FunctionLifetimes::DebugReturn() const {
-  return "> Return Lifetime: " + ReturnLifetime.DebugString() + '\n';
+
+std::string FunctionLifetimes::DebugReturn() {
+  // TODO change this
+  const Lifetime& l = ReturnLifetime.GetVarLifetime();
+  return "> Return Lifetime: " + l.DebugString() + '\n';
 }
 
-std::string FunctionLifetimes::DebugString() const {
+std::string FunctionLifetimes::DebugString() {
   return "[FunctionLifetimes]\n" + DebugParams() + DebugReturn();
 }
 
@@ -465,7 +479,7 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
 
-      Lifetime tmp;
+      ObjectLifetime tmp;
 
       // TODO check if this covers everything that should have a lifetime
       clang::TypeLoc pointee_type_loc;
@@ -483,6 +497,8 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
                   .moveInto(tmp)) {
         return std::move(err);
       }
+      debugLifetimes("Lifetimes of param " + param->getNameAsString() + ":\n");
+      debugLifetimes(tmp.DebugString());
       ret.InsertParamLifetime(param, tmp);
     }
   }
