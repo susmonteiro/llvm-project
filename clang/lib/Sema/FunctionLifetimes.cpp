@@ -209,15 +209,15 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateVarLifetimes(
 }
 
 llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
-    clang::QualType type, clang::TypeLoc type_loc,
+    clang::QualType qualtype, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
-  assert(!type.isNull());
+  assert(!qualtype.isNull());
   if (type_loc) {
-    assert(SameType(type_loc.getType(), type));
+    assert(SameType(type_loc.getType(), qualtype));
   }
 
-  type = type.IgnoreParens();
-  type = StripAttributes(type);
+  qualtype = qualtype.IgnoreParens();
+  qualtype = StripAttributes(qualtype);
 
   llvm::SmallVector<const clang::Attr*> attrs;
   if (!type_loc.isNull()) {
@@ -236,7 +236,7 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
   // debugLifetimes("Lifetime names");
   // debugLifetimes(lifetime_names);
 
-  llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
+  llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(qualtype);
 
   // DEBUG
   // debugLifetimes("Lifetime parameters");
@@ -268,7 +268,7 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
   }
 
   // TODO this is already done in the previous function
-  clang::QualType pointee = PointeeType(type);
+  clang::QualType pointee = PointeeType(qualtype);
   // TODO change this
   if (pointee.isNull()) return ObjectsLifetimes();
 
@@ -310,8 +310,10 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
     return std::move(err);
   }
 
+  const clang::QualType type = qualtype.getCanonicalType();
   retObjectLifetimes.InsertPointeeObject(lifetime, type);
   retObjectLifetimes.SetLifetime(lifetime, type);
+
   // debugLifetimes("The outer pointee has lifetime", retObjectLifetimes.GetLifetime().DebugString());
 
   // TODO change to optional maybe

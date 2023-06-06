@@ -18,7 +18,7 @@ class ObjectLifetime {
       : ThisLifetime(),
         ThisType(std::optional<clang::QualType>(type)),
         PointeeObject(nullptr) {}
-  ObjectLifetime(Lifetime& lifetime, clang::QualType& type)
+  ObjectLifetime(Lifetime& lifetime, const clang::QualType& type)
       : ThisLifetime(lifetime),
         ThisType(std::optional<clang::QualType>(type)),
         PointeeObject(nullptr) {}
@@ -76,10 +76,31 @@ class ObjectsLifetimes {
   ObjectsLifetimes() : ThisLifetime() {}
 
   Lifetime& GetLifetime() { return ThisLifetime.GetLifetime(); }
-  void SetLifetime(Lifetime& lifetime, clang::QualType& type) {
+
+  Lifetime GetLifetimeWithType(clang::QualType &type) {
+    debugLifetimes("The type we want is " + type.getAsString() + '\n');
+    for (auto& pointee : PointeeObjects) {
+      auto tmp = pointee.GetType();
+      if (!tmp.has_value()) {
+        debugWarn("The type is not set\n");
+        continue;
+      }
+      auto &tmp_type = tmp.value();
+      debugLifetimes("The type found is ", tmp_type.getAsString());
+      if (tmp_type == type) {
+        debugLifetimes("They are the same!");
+        return pointee.GetLifetime();
+      }
+    }
+    // TODO error
+    return Lifetime();
+  }
+
+  void SetLifetime(Lifetime& lifetime, const clang::QualType& type) {
     ThisLifetime = ObjectLifetime(lifetime, type);
   }
-  void InsertPointeeObject(Lifetime& lifetime, clang::QualType& type) {
+
+  void InsertPointeeObject(Lifetime& lifetime, const clang::QualType& type) {
     PointeeObjects.emplace_back(lifetime, type);
   }
 
