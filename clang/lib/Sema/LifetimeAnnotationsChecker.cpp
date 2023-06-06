@@ -64,12 +64,12 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
   if (expected_func_lifetimes) {
-    FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
+    FunctionLifetimes func_lifetimes = std::move(*expected_func_lifetimes);
 
     // DEBUG
     // debugLifetimes(func_lifetimes.DebugString());
 
-    FunctionInfo[func] = func_lifetimes;
+    FunctionInfo[func] = std::move(func_lifetimes);
     // TODO maybe keep track of analyzed functions
     // TODO need to check if the lifetimes in the declaration and definition are
     // the same?
@@ -89,7 +89,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 // Process functions' bodies
 void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
-  auto function_info = FunctionInfo[func];
+  auto function_info = std::move(FunctionInfo[func]);
   State = LifetimeAnnotationsAnalysis(function_info);
 
   // step 1

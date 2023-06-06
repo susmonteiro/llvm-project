@@ -9,54 +9,44 @@
 
 namespace clang {
 
-using PointeesLifetimesVector = llvm::DenseMap<clang::QualType*, Lifetime>;
-
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class ObjectLifetime {
  public:
-  ObjectLifetime() : VarLifetime() {}
-  ObjectLifetime(const Lifetime& varLifetime) : VarLifetime(varLifetime) {}
-  ObjectLifetime(llvm::StringRef name) : VarLifetime(name) {}
-  ObjectLifetime(char id) : VarLifetime(id) {}
+  ObjectLifetime() : ThisLifetime() {}
+  ObjectLifetime(const Lifetime& thisLifetime) : ThisLifetime(thisLifetime) {}
+  ObjectLifetime(llvm::StringRef name) : ThisLifetime(name) {}
+  ObjectLifetime(char id) : ThisLifetime(id) {}
 
-  Lifetime& GetVarLifetime() { return VarLifetime; }
-  PointeesLifetimesVector& GetPointeesLifetimes() { return PointeesLifetimes; }
-
-  void SetVarLifetime(Lifetime &lifetime) { VarLifetime = lifetime; }
-
-
-  void InsertPointeeLifetime(clang::QualType type, Lifetime& lifetime) {
-    PointeesLifetimes[&type] = lifetime;
+  std::optional<ObjectLifetime> GetPointeeObject() {
+    return PointeeObject;
   }
 
-  void InsertPointeesLifetimes(PointeesLifetimesVector pointeesLifetimes) {
-    PointeesLifetimes.insert(pointeesLifetimes.begin(),
-                             pointeesLifetimes.end());
-  }
+  Lifetime& GetLifetime() { return ThisLifetime; }
+  std::optional<Lifetime> GetPointeeObjectLifetime() { return HasPointeeObject() ? PointeeObject.value().GetLifetime() : std::nullopt; }
+  clang::QualType& GetType() { return ThisType; }
+  clang::QualType& GetPointeeType() { return PointeeObject.GetType(); }
 
-  // std::string DebugString() const {
-  //   std::string res = "[Object lifetime]\n\nMain lifetime: " + VarLifetime.DebugString() + "\n\nPointees lifetimes:\n";
-  //   for (auto &pair : PointeesLifetimes) {
-  //     if (pair.first->isNull()) res += "null\n";
-  //     res += pair.first->getAsString();
-  //   }
-  //   return res;
-  // }
+  void SetLifetime(Lifetime& lifetime) { ThisLifetime = lifetime; }
+  void SetPointeeLifetime(Lifetime& lifetime) {
+    PointeeObject.SetLifetime(lifetime);
+  }
+  void SetPointee(ObjectLifetime& objectLifetime) {
+    PointeeObject = objectLifetime;
+  }
 
   std::string DebugString() const {
-    std::string res = "YO";
-    debugLifetimes("[Object lifetime]\n\nMain lifetime: " + VarLifetime.DebugString() + "\n\nPointees lifetimes:\n");
-    for (auto &pair : PointeesLifetimes) {
-      if (pair.first->isNull()) debugLifetimes("null\n");
-      else debugLifetimes(pair.first->getAsString());
+    std::string res = "Type: " + ThisType.getAsString() +
+                      "\t\t\t[Lifetime]: " + ThisLifetime.DebugString() + "\n";
+    if (PointeeObject) {
+      res += PointeeObject->DebugString();
     }
-    debugLifetimes("Before return");
-    return res;
   }
 
  private:
-  Lifetime VarLifetime;
-  PointeesLifetimesVector PointeesLifetimes;
+  Lifetime ThisLifetime;
+  ObjectLifetime PointeeObject;
+  clang::QualType ThisType;
+  bool HasPointeeObject = false;
 };
 }  // namespace clang
 

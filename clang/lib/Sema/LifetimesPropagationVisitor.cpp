@@ -45,7 +45,7 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
   }
   debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n", objectLifetime.DebugString());
   // TODO change this
-  return objectLifetime.GetVarLifetime();
+  return objectLifetime.GetLifetime();
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(

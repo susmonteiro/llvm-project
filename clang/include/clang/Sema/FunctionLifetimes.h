@@ -70,12 +70,12 @@ class FunctionLifetimes {
   }
 
   // TODO change this
-  Lifetime& GetReturnLifetime() { return ReturnLifetime.GetVarLifetime(); }
+  Lifetime& GetReturnLifetime() { return ReturnLifetime.GetLifetime(); }
   void SetReturnLifetime(Lifetime l) { ReturnLifetime = l; }
 
 // TODO change this
   void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectLifetime l) {
-    Lifetime lifetime = l.GetVarLifetime();
+    Lifetime lifetime = l.GetLifetime();
     Params.emplace_back(param);
     ParamsLifetimes[param] = lifetime;
   }
