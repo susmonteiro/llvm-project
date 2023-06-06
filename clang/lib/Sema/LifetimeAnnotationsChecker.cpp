@@ -69,7 +69,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
     // DEBUG
     // debugLifetimes(func_lifetimes.DebugString());
 
-    FunctionInfo[func] = std::move(func_lifetimes);
+    FunctionInfo[func] = func_lifetimes;
     // TODO maybe keep track of analyzed functions
     // TODO need to check if the lifetimes in the declaration and definition are
     // the same?

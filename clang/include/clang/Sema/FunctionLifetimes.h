@@ -23,7 +23,7 @@ class FunctionLifetimeFactory {
       /* bool elision_enabled, */ const clang::FunctionDecl *func)
       : /* elision_enabled(elision_enabled), */ Func(func) {}
 
-  llvm::Expected<ObjectLifetime> CreateParamLifetimes(
+  llvm::Expected<llvm::SmallVector<ObjectLifetime>> CreateParamLifetimes(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
   llvm::Expected<ObjectLifetime> CreateReturnLifetimes(
@@ -33,6 +33,11 @@ class FunctionLifetimeFactory {
       clang::QualType var_type, clang::TypeLoc var_type_loc) const;
 
   static llvm::Expected<ObjectLifetime> CreateLifetime(
+      clang::QualType type, clang::TypeLoc type_loc,
+      LifetimeFactory lifetime_factory);
+
+  // TODO remove this
+  static llvm::Expected<llvm::SmallVector<ObjectLifetime>> CreateLifetimeParams(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
 
@@ -71,10 +76,10 @@ class FunctionLifetimes {
 
   // TODO change this
   Lifetime& GetReturnLifetime() { return ReturnLifetime.GetLifetime(); }
-  void SetReturnLifetime(Lifetime l) { ReturnLifetime = l; }
+  // void SetReturnLifetime(Lifetime l) { ReturnLifetime = l; }
 
 // TODO change this
-  void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectLifetime l) {
+  void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectLifetime &l) {
     Lifetime lifetime = l.GetLifetime();
     Params.emplace_back(param);
     ParamsLifetimes[param] = lifetime;
