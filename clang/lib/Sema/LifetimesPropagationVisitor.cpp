@@ -36,16 +36,16 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
   if (var_decl->getTypeSourceInfo()) {
     type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
   }
-  ObjectLifetime objectLifetime;
+  ObjectsLifetimes objectsLifetimes;
   if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
-                            .moveInto(objectLifetime)) {
+                            .moveInto(objectsLifetimes)) {
     // TODO error
     return Lifetime();
     // return std::move(err);
   }
-  debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n", objectLifetime.DebugString());
+  debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n", objectsLifetimes.DebugString());
   // TODO change this
-  return objectLifetime.GetLifetime();
+  return objectsLifetimes.GetLifetime();
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(

@@ -79,7 +79,7 @@ clang::TypeLoc StripAttributes(clang::TypeLoc type_loc,
 llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
     llvm::ArrayRef<const clang::Attr*> attrs) {
   llvm::SmallVector<const clang::Expr*> result;
-  
+
   bool saw_annotate_type = false;
 
   for (const clang::Attr* attr : attrs) {
@@ -193,22 +193,22 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::LifetimeFromName(
   return Lifetime(name_str);
 }
 
-llvm::Expected<llvm::SmallVector<ObjectLifetime>> FunctionLifetimeFactory::CreateParamLifetimes(
+llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateParamLifetimes(
     clang::QualType param_type, clang::TypeLoc param_type_loc) const {
-  return CreateLifetimeParams(param_type, param_type_loc, ParamLifetimeFactory());
+  return CreateLifetime(param_type, param_type_loc, ParamLifetimeFactory());
 }
 
-llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateReturnLifetimes(
+llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateReturnLifetimes(
     clang::QualType return_type, clang::TypeLoc return_type_loc) const {
   return CreateLifetime(return_type, return_type_loc, ReturnLifetimeFactory());
 }
 
-llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateVarLifetimes(
+llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateVarLifetimes(
     clang::QualType var_type, clang::TypeLoc var_type_loc) const {
   return CreateLifetime(var_type, var_type_loc, VarLifetimeFactory());
 }
 
-llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
+llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
     clang::QualType type, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
   assert(!type.isNull());
@@ -223,8 +223,8 @@ llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
   if (!type_loc.isNull()) {
     type_loc = StripAttributes(type_loc, attrs);
     // DEBUG
-    debugLifetimes("Attributes");
-    debugLifetimes(attrs);
+    // debugLifetimes("Attributes");
+    // debugLifetimes(attrs);
   }
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
@@ -233,14 +233,14 @@ llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
   }
 
   // DEBUG
-  debugLifetimes("Lifetime names");
-  debugLifetimes(lifetime_names);
+  // debugLifetimes("Lifetime names");
+  // debugLifetimes(lifetime_names);
 
   llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
 
   // DEBUG
-  debugLifetimes("Lifetime parameters");
-  debugLifetimes(lifetime_params);
+  // debugLifetimes("Lifetime parameters");
+  // debugLifetimes(lifetime_params);
 
   if (!lifetime_params.empty() && !lifetime_names.empty() &&
       lifetime_names.size() != lifetime_params.size()) {
@@ -253,6 +253,7 @@ llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
                      " lifetime arguments were given") */);
   }
 
+  // FIXME cannot remove this line
   debugLifetimes("Size of lifetime_params", lifetime_params.size());
 
   for (size_t i = 0; i < lifetime_params.size(); ++i) {
@@ -269,7 +270,7 @@ llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
   // TODO this is already done in the previous function
   clang::QualType pointee = PointeeType(type);
   // TODO change this
-  if (pointee.isNull()) return ObjectLifetime(pointee);
+  if (pointee.isNull()) return ObjectsLifetimes();
 
   clang::TypeLoc pointee_type_loc;
   if (type_loc) {
@@ -282,14 +283,14 @@ llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
 
   // TODO is this ok?
   // recursive call
-  ObjectLifetime tmp;
+  ObjectsLifetimes retObjectLifetimes;
   if (llvm::Error err =
           CreateLifetime(pointee, pointee_type_loc, lifetime_factory)
-              .moveInto(tmp)) {
+              .moveInto(retObjectLifetimes)) {
     return std::move(err);
   }
-  
-  debugLifetimes("Created the ObjectLifetime with type " + pointee.getAsString() + " and with lifetime " + tmp.GetLifetime().DebugString());
+
+  // debugLifetimes("Created the ObjectLifetime with type " + pointee.getAsString() + " and with lifetime " + retObjectLifetimes.GetLifetime().DebugString());
 
   const clang::Expr* lifetime_name = nullptr;
   if (!lifetime_names.empty()) {
@@ -309,119 +310,12 @@ llvm::Expected<ObjectLifetime> FunctionLifetimeFactory::CreateLifetime(
     return std::move(err);
   }
 
-  ObjectLifetime ret(lifetime, type, &tmp);
-  debugLifetimes("The outer pointee has lifetime", ret.GetLifetime().DebugString());
+  retObjectLifetimes.InsertPointeeObject(lifetime, type);
+  retObjectLifetimes.SetLifetime(lifetime, type);
+  // debugLifetimes("The outer pointee has lifetime", retObjectLifetimes.GetLifetime().DebugString());
 
   // TODO change to optional maybe
-  return ret;
-}
-
-// TODO remove this
-llvm::Expected<llvm::SmallVector<ObjectLifetime>> FunctionLifetimeFactory::CreateLifetimeParams(
-    clang::QualType type, clang::TypeLoc type_loc,
-    LifetimeFactory lifetime_factory) {
-  assert(!type.isNull());
-  if (type_loc) {
-    assert(SameType(type_loc.getType(), type));
-  }
-
-  type = type.IgnoreParens();
-  type = StripAttributes(type);
-
-  llvm::SmallVector<const clang::Attr*> attrs;
-  if (!type_loc.isNull()) {
-    type_loc = StripAttributes(type_loc, attrs);
-    // DEBUG
-    debugLifetimes("Attributes");
-    debugLifetimes(attrs);
-  }
-
-  llvm::SmallVector<const clang::Expr*> lifetime_names;
-  if (llvm::Error err = GetAttributeLifetimes(attrs).moveInto(lifetime_names)) {
-    return std::move(err);
-  }
-
-  // DEBUG
-  debugLifetimes("Lifetime names");
-  debugLifetimes(lifetime_names);
-
-  llvm::SmallVector<std::string> lifetime_params = GetLifetimeParameters(type);
-
-  // DEBUG
-  debugLifetimes("Lifetime parameters");
-  debugLifetimes(lifetime_params);
-
-  if (!lifetime_params.empty() && !lifetime_names.empty() &&
-      lifetime_names.size() != lifetime_params.size()) {
-    return llvm::createStringError(
-        llvm::inconvertibleErrorCode(),
-        "Number of types and lifetimes not the same"
-        // TODO abseil
-        /* absl::StrCat("Type has ", lifetime_params.size(),
-                     " lifetime parameters but ", lifetime_names.size(),
-                     " lifetime arguments were given") */);
-  }
-
-  debugLifetimes("Size of lifetime_params", lifetime_params.size());
-
-  for (size_t i = 0; i < lifetime_params.size(); ++i) {
-    Lifetime l;
-    const clang::Expr* lifetime_name = nullptr;
-    if (i < lifetime_names.size()) {
-      lifetime_name = lifetime_names[i];
-    }
-    if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(l)) {
-      return std::move(err);
-    }
-  }
-
-  // TODO this is already done in the previous function
-  clang::QualType pointee = PointeeType(type);
-  // TODO change this
-  if (pointee.isNull()) return SmallVector<ObjectLifetime>();
-
-  clang::TypeLoc pointee_type_loc;
-  if (type_loc) {
-    pointee_type_loc = PointeeTypeLoc(type_loc);
-    // Note: We can't assert that `pointee_type_loc` is non-null here. If
-    // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
-    // the pointee type because the pointee type never got spelled out at the
-    // location of the original `TypeLoc`.
-  }
-
-  // TODO is this ok?
-  // recursive call
-  SmallVector<ObjectLifetime> retSmallVector;
-  if (llvm::Error err =
-          CreateLifetimeParams(pointee, pointee_type_loc, lifetime_factory)
-              .moveInto(retSmallVector)) {
-    return std::move(err);
-  }
-  
-  const clang::Expr* lifetime_name = nullptr;
-  if (!lifetime_names.empty()) {
-    if (lifetime_names.size() != 1) {
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          // TODO abseil
-          "Expected a single lifetime but multiple were given"
-          /* absl::StrCat("Expected a single lifetime but ", lifetime_names.size(),
-                       " were given") */);
-    }
-    lifetime_name = lifetime_names.front();
-  }
-
-  Lifetime lifetime;
-  if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(lifetime)) {
-    return std::move(err);
-  }
-
-  ObjectLifetime ret(lifetime, type);
-  retSmallVector.emplace_back(ret);
-  debugLifetimes("The outer pointee has lifetime", ret.GetLifetime().DebugString());
-
-  // TODO change to optional maybe
-  return retSmallVector;
+  return retObjectLifetimes;
 }
 
 LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
@@ -580,7 +474,7 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
 
-      SmallVector<ObjectLifetime> tmpSmallVector;
+      ObjectsLifetimes tmpObjectLifetimes;
 
       // TODO check if this covers everything that should have a lifetime
       clang::TypeLoc pointee_type_loc;
@@ -595,13 +489,13 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
       if (llvm::Error err =
               lifetime_factory
                   .CreateParamLifetimes(type->getParamType(i), param_type_loc)
-                  .moveInto(tmpSmallVector)) {
+                  .moveInto(tmpObjectLifetimes)) {
         return std::move(err);
       }
-      for (auto tmp : tmpSmallVector) {
-        debugLifetimes("Lifetimes of param " + param->getNameAsString() + ": " + tmp.DebugString() + "\n");
-        ret.InsertParamLifetime(param, tmp);
-      }
+
+      debugLifetimes("Lifetimes of param " + param->getNameAsString() + ":\n" +
+                     tmpObjectLifetimes.DebugString() + "\n");
+      ret.InsertParamLifetime(param, tmpObjectLifetimes);
     }
   }
 

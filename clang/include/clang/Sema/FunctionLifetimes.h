@@ -6,7 +6,6 @@
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/ObjectLifetime.h"
 #include "clang/Sema/PointeeType.h"
-#include "llvm/ADT/SmallVector.h"
 // DEBUG
 #include "clang/Sema/DebugLifetimes.h"
 
@@ -23,21 +22,16 @@ class FunctionLifetimeFactory {
       /* bool elision_enabled, */ const clang::FunctionDecl *func)
       : /* elision_enabled(elision_enabled), */ Func(func) {}
 
-  llvm::Expected<llvm::SmallVector<ObjectLifetime>> CreateParamLifetimes(
+  llvm::Expected<ObjectsLifetimes> CreateParamLifetimes(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
-  llvm::Expected<ObjectLifetime> CreateReturnLifetimes(
+  llvm::Expected<ObjectsLifetimes> CreateReturnLifetimes(
       clang::QualType return_type, clang::TypeLoc return_type_loc) const;
 
-  llvm::Expected<ObjectLifetime> CreateVarLifetimes(
+  llvm::Expected<ObjectsLifetimes> CreateVarLifetimes(
       clang::QualType var_type, clang::TypeLoc var_type_loc) const;
 
-  static llvm::Expected<ObjectLifetime> CreateLifetime(
-      clang::QualType type, clang::TypeLoc type_loc,
-      LifetimeFactory lifetime_factory);
-
-  // TODO remove this
-  static llvm::Expected<llvm::SmallVector<ObjectLifetime>> CreateLifetimeParams(
+  static llvm::Expected<ObjectsLifetimes> CreateLifetime(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
 
@@ -79,7 +73,7 @@ class FunctionLifetimes {
   // void SetReturnLifetime(Lifetime l) { ReturnLifetime = l; }
 
 // TODO change this
-  void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectLifetime &l) {
+  void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectsLifetimes &l) {
     Lifetime lifetime = l.GetLifetime();
     Params.emplace_back(param);
     ParamsLifetimes[param] = lifetime;
@@ -100,7 +94,7 @@ class FunctionLifetimes {
   // stores param lifetimes in order
   std::vector<const clang::ParmVarDecl*> Params;
   ParamsLifetimesMap ParamsLifetimes;
-  ObjectLifetime ReturnLifetime;
+  ObjectsLifetimes ReturnLifetime;
   int FuncId;
 
   // TODO this

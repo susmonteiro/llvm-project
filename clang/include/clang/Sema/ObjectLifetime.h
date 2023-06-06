@@ -18,11 +18,12 @@ class ObjectLifetime {
       : ThisLifetime(),
         ThisType(std::optional<clang::QualType>(type)),
         PointeeObject(nullptr) {}
-  ObjectLifetime(Lifetime &lifetime, clang::QualType& type)
+  ObjectLifetime(Lifetime& lifetime, clang::QualType& type)
       : ThisLifetime(lifetime),
         ThisType(std::optional<clang::QualType>(type)),
         PointeeObject(nullptr) {}
-  ObjectLifetime(Lifetime &lifetime, clang::QualType& type, ObjectLifetime* pointee)
+  ObjectLifetime(Lifetime& lifetime, clang::QualType& type,
+                 ObjectLifetime* pointee)
       : ThisLifetime(lifetime),
         ThisType(std::optional<clang::QualType>(type)),
         PointeeObject(pointee) {}
@@ -57,13 +58,10 @@ class ObjectLifetime {
   }
 
   std::string DebugString() const {
-    std::string res = "Type: ";
+    std::string res = "\t[Type]: ";
     res +=
         ThisType.has_value() ? ThisType.value().getAsString() : "unknown type";
-    res += "\t\t\t[Lifetime]: " + ThisLifetime.DebugString() + "\n";
-    if (PointeeObject) {
-      res += PointeeObject->DebugString();
-    }
+    res += "\n\t[Lifetime]: " + ThisLifetime.DebugString() + "\n";
     return res;
   }
 
@@ -71,6 +69,37 @@ class ObjectLifetime {
   Lifetime ThisLifetime;
   std::optional<clang::QualType> ThisType;
   ObjectLifetime* PointeeObject;
+};
+
+class ObjectsLifetimes {
+ public:
+  ObjectsLifetimes() : ThisLifetime() {}
+
+  Lifetime& GetLifetime() { return ThisLifetime.GetLifetime(); }
+  void SetLifetime(Lifetime& lifetime, clang::QualType& type) {
+    ThisLifetime = ObjectLifetime(lifetime, type);
+  }
+  void InsertPointeeObject(Lifetime& lifetime, clang::QualType& type) {
+    PointeeObjects.emplace_back(lifetime, type);
+  }
+
+  std::string DebugString() const {
+    std::string res = "[ObjectsLifetimes]";
+    res += var_decl != nullptr ? " of " + var_decl->getNameAsString() : "";
+    res += ":\n";
+
+    for (auto& pointee : PointeeObjects) {
+      res += pointee.DebugString();
+    }
+    return res;
+  }
+
+ private:
+  llvm::SmallVector<ObjectLifetime> PointeeObjects;
+  // "main" lifetime -> remove this
+  ObjectLifetime ThisLifetime;
+  // TODO needed?
+  const clang::VarDecl* var_decl;
 };
 }  // namespace clang
 
