@@ -70,9 +70,7 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateVariable(const clang::VarDecl *var_decl, Lifetime lifetime,
                       clang::QualType &type) {
-    debugLifetimes("Type before", type.getAsString());
     type = type.getCanonicalType();
-    debugLifetimes("Type after", type.getAsString());
     VariableLifetimes[var_decl] = ObjectsLifetimes(lifetime, type);
   }
 

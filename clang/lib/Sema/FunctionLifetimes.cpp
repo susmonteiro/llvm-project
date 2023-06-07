@@ -255,7 +255,7 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
   }
 
   // FIXME cannot remove this line
-  debugLifetimes("Size of lifetime_params", lifetime_params.size());
+  // debugLifetimes("Size of lifetime_params", lifetime_params.size());
 
   for (size_t i = 0; i < lifetime_params.size(); ++i) {
     Lifetime l;

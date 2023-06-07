@@ -55,7 +55,7 @@ class ObjectsLifetimes {
 
   Lifetime& GetLifetime(clang::QualType &type) {
     type = type.getCanonicalType();
-    debugLifetimes("The type we want is " + type.getAsString() + '\n');
+    // debugLifetimes("The type we want is " + type.getAsString() + '\n');
     for (auto& pointee : PointeeObjects) {
       auto tmp = pointee.GetType();
       if (!tmp.has_value()) {
@@ -63,9 +63,9 @@ class ObjectsLifetimes {
         continue;
       }
       auto &tmp_type = tmp.value();
-      debugLifetimes("The type found is ", tmp_type.getAsString());
+      // debugLifetimes("The type found is ", tmp_type.getAsString());
       if (tmp_type == type) {
-        debugLifetimes("They are the same!");
+        // debugLifetimes("They are the same!");
         return pointee.GetLifetime();
       }
     }
@@ -86,8 +86,6 @@ class ObjectsLifetimes {
 
   std::string DebugString() const {
     std::string res = "[ObjectsLifetimes]:\n";
-    res += ":\n";
-
     for (auto& pointee : PointeeObjects) {
       res += pointee.DebugString();
     }

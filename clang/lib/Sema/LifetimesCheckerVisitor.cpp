@@ -301,10 +301,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     return std::nullopt;
   }
 
-  debugLifetimes("Before get return lifetime");
   Lifetime &return_lifetime = State.GetReturnLifetime(return_type);
-  debugLifetimes("After get return lifetime");
-
   if (return_lifetime.IsNotSet()) {
     debugWarn("Return does not have a valid lifetime");
     // TODO error
@@ -332,14 +329,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
 
       // there can only be one pointer/reference variable
       if (const auto *var_decl = dyn_cast<clang::VarDecl>(var->getDecl())) {
-        debugLifetimes("Before get var lifetime");
         Lifetime &var_lifetime = State.GetLifetime(var_decl, var_type);
-        debugLifetimes("After get var lifetime");
-        debugLifetimes("Var lifetime", var_lifetime.DebugString());
-        debugLifetimes("Return lifetime", return_lifetime.DebugString());
 
         if (var_lifetime < return_lifetime) {
-          debugLifetimes("var_lifetime < return_lifetime");
           if (var_lifetime.IsNotSet()) {
             const auto &var_shortest_lifetimes =
                 var_lifetime.GetShortestLifetimes();
@@ -355,7 +347,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
                          diag::note_lifetime_declared_here, (char)i);
             }
           } else {
-            debugLifetimes("var_lifetime >= return_lifetime");
             S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
                 << return_lifetime.GetLifetimeName()
                 << var_lifetime.GetLifetimeName()
