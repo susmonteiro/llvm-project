@@ -31,9 +31,8 @@ class LifetimeAnnotationsAnalysis {
 
   VariableLifetimesVector &GetVariableLifetimes();
   ObjectsLifetimes &GetObjectsLifetimes(const clang::VarDecl *var_decl);
-  Lifetime& GetLifetime(const clang::VarDecl *var_decl,
-                                         clang::QualType type);
-  Lifetime& GetReturnLifetime(clang::QualType &type);
+  Lifetime &GetLifetime(const clang::VarDecl *var_decl, clang::QualType type);
+  Lifetime &GetReturnLifetime(clang::QualType &type);
 
   bool IsLifetimeNotset(const clang::VarDecl *var_decl,
                         clang::QualType &type) const;
@@ -71,6 +70,9 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateVariable(const clang::VarDecl *var_decl, Lifetime lifetime,
                       clang::QualType &type) {
+    debugLifetimes("Type before", type.getAsString());
+    type = type.getCanonicalType();
+    debugLifetimes("Type after", type.getAsString());
     VariableLifetimes[var_decl] = ObjectsLifetimes(lifetime, type);
   }
 
@@ -82,8 +84,8 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
 
-  void CreateDependency(const clang::VarDecl *from,
-                        const clang::VarDecl *to, const clang::Stmt *loc);
+  void CreateDependency(const clang::VarDecl *from, const clang::VarDecl *to,
+                        const clang::Stmt *loc);
 
   void SetDependencies(VarStmtDependenciesMap dependencies) {
     LifetimeDependencies = std::move(dependencies);
