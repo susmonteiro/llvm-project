@@ -64,7 +64,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
   if (expected_func_lifetimes) {
-    FunctionLifetimes func_lifetimes = std::move(*expected_func_lifetimes);
+    FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
 
     // DEBUG
     // debugLifetimes(func_lifetimes.DebugString());
@@ -89,7 +89,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 // Process functions' bodies
 void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
-  auto function_info = std::move(FunctionInfo[func]);
+  auto function_info = FunctionInfo[func];
   State = LifetimeAnnotationsAnalysis(function_info);
 
   // step 1
@@ -156,7 +156,8 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         if (var_decl == el) continue;
         // TODO change to type?
         clang::QualType var_decl_type = var_decl->getType();
-        auto tmp_lifetimes = State.GetShortestLifetimes(var_decl, var_decl_type);
+        auto tmp_lifetimes =
+            State.GetShortestLifetimes(var_decl, var_decl_type);
         // TODO relation between lifetimes and stmts
         if (State.IsLifetimeNotset(var_decl)) {
           for (unsigned int i = 0; i < tmp_lifetimes.size(); i++) {
@@ -165,13 +166,13 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
             }
           }
         } else {
-          const char vardecl_lifetime_id = State.GetLifetime(var_decl, var_decl_type).GetId();
+          const char vardecl_lifetime_id =
+              State.GetLifetime(var_decl, var_decl_type).GetId();
           Lifetime::InsertShortestLifetimes(vardecl_lifetime_id, stmt,
                                             shortest_lifetimes);
         }
       }
     }
-
 
     // TODO this is not perfect
     if (new_children[el] != stmts ||
