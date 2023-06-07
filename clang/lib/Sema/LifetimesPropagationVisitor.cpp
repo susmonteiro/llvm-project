@@ -34,7 +34,7 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   }
 }
 
-Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
+ObjectsLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
                             FunctionLifetimeFactory &lifetime_factory) {
   clang::QualType type = var_decl->getType().IgnoreParens();
   clang::TypeLoc type_loc;
@@ -45,15 +45,12 @@ Lifetime GetVarDeclLifetime(const clang::VarDecl *var_decl,
   if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
                             .moveInto(objectsLifetimes)) {
     // TODO error
-    return Lifetime();
+    return ObjectsLifetimes();
     // return std::move(err);
   }
   debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n" +
                  objectsLifetimes.DebugString());
-  // TODO change this
-  llvm::Expected<Lifetime &> maybe_lifetime =
-      objectsLifetimes.GetLifetime(type);
-  return maybe_lifetime ? maybe_lifetime.get() : Lifetime();
+  return objectsLifetimes;
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
@@ -274,8 +271,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         continue;
       }
 
-      Lifetime lifetime = GetVarDeclLifetime(var_decl, Factory);
-      State.CreateVariable(var_decl, lifetime, type);
+      ObjectsLifetimes objectsLifetimes = GetVarDeclLifetime(var_decl, Factory);
+      State.CreateVariable(var_decl, objectsLifetimes);
 
       // Don't need to record initializers because initialization has already
       // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or

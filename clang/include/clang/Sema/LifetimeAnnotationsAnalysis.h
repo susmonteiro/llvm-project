@@ -68,10 +68,8 @@ class LifetimeAnnotationsAnalysis {
     VariableLifetimes[var_decl] = ObjectsLifetimes(Lifetime(), type);
   }
 
-  void CreateVariable(const clang::VarDecl *var_decl, Lifetime lifetime,
-                      clang::QualType &type) {
-    type = type.getCanonicalType();
-    VariableLifetimes[var_decl] = ObjectsLifetimes(lifetime, type);
+  void CreateVariable(const clang::VarDecl *var_decl, ObjectsLifetimes objectsLifetime) {
+    VariableLifetimes[var_decl] = objectsLifetime;
   }
 
   VarStmtDependenciesMap &GetLifetimeDependencies();
