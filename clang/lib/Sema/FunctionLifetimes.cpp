@@ -315,7 +315,6 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
 
   clang::QualType type = qualtype.getCanonicalType();
   retObjectLifetimes.InsertPointeeObject(lifetime, type);
-  retObjectLifetimes.SetLifetime(lifetime, type);
 
   // debugLifetimes("The outer pointee has lifetime",
   // retObjectLifetimes.GetLifetime().DebugString());
@@ -426,9 +425,7 @@ std::string FunctionLifetimes::DebugParams() {
 }
 
 std::string FunctionLifetimes::DebugReturn() {
-  // TODO change this
-  const Lifetime& l = ReturnLifetime.GetLifetime();
-  return "> Return Lifetime: " + l.DebugString() + '\n';
+  return "> Return Lifetime: " + ReturnLifetime.DebugString() + '\n';
 }
 
 std::string FunctionLifetimes::DebugString() {

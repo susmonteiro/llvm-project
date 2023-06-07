@@ -14,49 +14,24 @@ namespace clang {
 class ObjectLifetime {
  public:
   ObjectLifetime()
-      : ThisLifetime(), ThisType(std::nullopt), PointeeObject(nullptr) {}
+      : ThisLifetime(), ThisType(std::nullopt) {}
   ObjectLifetime(clang::QualType& type)
       : ThisLifetime(),
-        ThisType(std::optional<clang::QualType>(type)),
-        PointeeObject(nullptr) {}
+        ThisType(std::optional<clang::QualType>(type)) {}
   ObjectLifetime(Lifetime& lifetime, clang::QualType& type)
       : ThisLifetime(lifetime),
-        ThisType(std::optional<clang::QualType>(type)),
-        PointeeObject(nullptr) {}
-  ObjectLifetime(Lifetime& lifetime, clang::QualType& type,
-                 ObjectLifetime* pointee)
-      : ThisLifetime(lifetime),
-        ThisType(std::optional<clang::QualType>(type)),
-        PointeeObject(pointee) {}
+        ThisType(std::optional<clang::QualType>(type)) {}
 
   // ObjectLifetime(const Lifetime& thisLifetime) : ThisLifetime(thisLifetime)
   // {} ObjectLifetime(llvm::StringRef name) : ThisLifetime(name) {}
   // ObjectLifetime(char id) : ThisLifetime(id) {}
 
-  bool HasPointeeObject() { return PointeeObject != nullptr; }
-
-  ObjectLifetime& GetPointeeObject() { return *PointeeObject; }
 
   Lifetime& GetLifetime() { return ThisLifetime; }
-  Lifetime& GetPointeeObjectLifetime() { return PointeeObject->GetLifetime(); }
   std::optional<clang::QualType> GetType() { return ThisType; }
-  std::optional<clang::QualType> GetPointeeType() {
-    return HasPointeeObject() ? PointeeObject->GetType() : std::nullopt;
-  }
 
   void SetLifetime(Lifetime& lifetime) { ThisLifetime = lifetime; }
-  void SetPointeeLifetime(Lifetime& lifetime) {
-    PointeeObject->SetLifetime(lifetime);
-  }
   void SetType(std::optional<clang::QualType> type) { ThisType = type; }
-
-  void SetPointee(ObjectLifetime& objectLifetime) {
-    SetPointeeLifetime(objectLifetime.GetLifetime());
-    PointeeObject->SetType(objectLifetime.GetType());
-    if (objectLifetime.HasPointeeObject()) {
-      PointeeObject->SetPointee(objectLifetime.GetPointeeObject());
-    }
-  }
 
   std::string DebugString() const {
     std::string res = "\t[Type]: ";
@@ -69,17 +44,14 @@ class ObjectLifetime {
  private:
   Lifetime ThisLifetime;
   std::optional<clang::QualType> ThisType;
-  ObjectLifetime* PointeeObject;
 };
 
 class ObjectsLifetimes {
  public:
-  ObjectsLifetimes() : ThisLifetime() {}
+  ObjectsLifetimes() {}
   ObjectsLifetimes(Lifetime lifetime, clang::QualType &type) {
     InsertPointeeObject(lifetime, type);
   }
-
-  Lifetime& GetLifetime() { return ThisLifetime.GetLifetime(); }
 
   Lifetime& GetLifetime(clang::QualType &type) {
     type = type.getCanonicalType();
@@ -103,11 +75,6 @@ class ObjectsLifetimes {
 
   llvm::SmallVector<ObjectLifetime>& GetLifetimes() { return PointeeObjects; }
 
-
-  void SetLifetime(Lifetime& lifetime, clang::QualType& type) {
-    ThisLifetime = ObjectLifetime(lifetime, type);
-  }
-
   void InsertPointeeObject(Lifetime& lifetime, clang::QualType& type) {
     PointeeObjects.emplace_back(lifetime, type);
   }
@@ -118,8 +85,7 @@ class ObjectsLifetimes {
   }
 
   std::string DebugString() const {
-    std::string res = "[ObjectsLifetimes]";
-    res += var_decl != nullptr ? " of " + var_decl->getNameAsString() : "";
+    std::string res = "[ObjectsLifetimes]:\n";
     res += ":\n";
 
     for (auto& pointee : PointeeObjects) {
@@ -139,10 +105,6 @@ class ObjectsLifetimes {
 
  private:
   llvm::SmallVector<ObjectLifetime> PointeeObjects;
-  // "main" lifetime -> remove this
-  ObjectLifetime ThisLifetime;
-  // TODO needed?
-  const clang::VarDecl* var_decl;
 };
 }  // namespace clang
 
