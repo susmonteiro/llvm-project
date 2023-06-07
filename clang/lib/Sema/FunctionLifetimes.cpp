@@ -517,6 +517,9 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
                 .moveInto(ret.ReturnLifetime)) {
       return std::move(err);
     }
+    // DEBUG
+    debugLifetimes("Lifetimes of return value:\n" +
+                   ret.ReturnLifetime.DebugString() + "\n");
   }
 
   return ret;

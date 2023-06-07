@@ -62,7 +62,7 @@ class ObjectLifetime {
     std::string res = "\t[Type]: ";
     res +=
         ThisType.has_value() ? ThisType.value().getAsString() : "unknown type";
-    res += "\n\t[Lifetime]: " + ThisLifetime.DebugString() + "\n";
+    res += '\t' + ThisLifetime.DebugString() + '\n';
     return res;
   }
 
