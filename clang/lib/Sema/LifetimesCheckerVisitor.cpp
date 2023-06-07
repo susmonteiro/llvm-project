@@ -242,11 +242,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
       }
 
       for (const auto &expr : init_points_to) {
-        debugWarn("Inside loop");
-        expr->dump();
         if (expr == nullptr) continue;
         if (clang::isa<clang::DeclRefExpr>(expr)) {
-          debugWarn("It is a DeclRefExpr");
           const auto &init_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
           clang::QualType init_var_type = init_var->getType();
           if (!init_var_type->isPointerType() &&
