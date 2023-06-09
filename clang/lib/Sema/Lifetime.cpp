@@ -76,8 +76,10 @@ std::string Lifetime::GetLifetimeName(char id) const {
 }
 
 std::string Lifetime::DebugString() const {
-  std::string res;
-  res += "[Lifetime] -> " + GetLifetimeName() + "; ";
+  std::string res = "[Type]: ";
+  res += LifetimeType.has_value() ? LifetimeType.value().getAsString() : "unknown type";
+  res += "\t\t[Lifetime] -> " + GetLifetimeName() + "; ";
+  
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
     for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
@@ -87,7 +89,7 @@ std::string Lifetime::DebugString() const {
     }
     res += "}";
   }
-  return res;
+  return res + '\n';
 }
 
 void Lifetime::ProcessShortestLifetimes() {

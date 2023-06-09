@@ -10,42 +10,6 @@
 
 namespace clang {
 
-// the lifetime of a variable can be $static, $local or $c, where c is a char
-class ObjectLifetime {
- public:
-  ObjectLifetime()
-      : ThisLifetime(), ThisType(std::nullopt) {}
-  ObjectLifetime(clang::QualType& type)
-      : ThisLifetime(),
-        ThisType(std::optional<clang::QualType>(type)) {}
-  ObjectLifetime(Lifetime& lifetime, clang::QualType& type)
-      : ThisLifetime(lifetime),
-        ThisType(std::optional<clang::QualType>(type)) {}
-
-  // ObjectLifetime(const Lifetime& thisLifetime) : ThisLifetime(thisLifetime)
-  // {} ObjectLifetime(llvm::StringRef name) : ThisLifetime(name) {}
-  // ObjectLifetime(char id) : ThisLifetime(id) {}
-
-
-  Lifetime& GetLifetime() { return ThisLifetime; }
-  std::optional<clang::QualType> GetType() { return ThisType; }
-
-  void SetLifetime(Lifetime& lifetime) { ThisLifetime = lifetime; }
-  void SetType(std::optional<clang::QualType> type) { ThisType = type; }
-
-  std::string DebugString() const {
-    std::string res = "\t[Type]: ";
-    res +=
-        ThisType.has_value() ? ThisType.value().getAsString() : "unknown type";
-    res += '\t' + ThisLifetime.DebugString() + '\n';
-    return res;
-  }
-
- private:
-  Lifetime ThisLifetime;
-  std::optional<clang::QualType> ThisType;
-};
-
 class ObjectsLifetimes {
  public:
   ObjectsLifetimes() {}
@@ -66,17 +30,19 @@ class ObjectsLifetimes {
       // debugLifetimes("The type found is ", tmp_type.getAsString());
       if (tmp_type == type) {
         // debugLifetimes("They are the same!");
-        return pointee.GetLifetime();
+        return pointee;
       }
     }
     // TODO error?
     return InsertPointeeObject(type);
   }
 
-  llvm::SmallVector<ObjectLifetime>& GetLifetimes() { return PointeeObjects; }
+  llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
   void InsertPointeeObject(Lifetime& lifetime, clang::QualType& type) {
-    PointeeObjects.emplace_back(lifetime, type);
+    lifetime.SetType(type);
+    lifetime.DebugString();
+    PointeeObjects.emplace_back(lifetime);
   }
 
   Lifetime& InsertPointeeObject(clang::QualType& type) {
@@ -94,7 +60,7 @@ class ObjectsLifetimes {
 
   bool IsLifetimeNotSet() {
     for (auto &pointee : PointeeObjects) {
-      if (pointee.GetLifetime().IsNotSet()) {
+      if (pointee.IsNotSet()) {
         return true;
       }
     }
@@ -102,7 +68,7 @@ class ObjectsLifetimes {
   }
 
  private:
-  llvm::SmallVector<ObjectLifetime> PointeeObjects;
+  llvm::SmallVector<Lifetime> PointeeObjects;
 };
 }  // namespace clang
 

@@ -132,7 +132,7 @@ void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   for (const auto &pair : LifetimeDependencies) {
     auto &lifetimes = GetObjectsLifetimes(pair.first).GetLifetimes();
     for (auto &objectLifetime : lifetimes) {
-      Lifetime &lifetime = objectLifetime.GetLifetime();
+      Lifetime &lifetime = objectLifetime;
       if (lifetime.IsNotSet()) {
         lifetime.ProcessShortestLifetimes();
       }

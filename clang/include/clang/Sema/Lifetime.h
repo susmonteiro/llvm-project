@@ -22,10 +22,16 @@ constexpr char OFFSET = 5;
 class Lifetime {
  public:
   Lifetime();
-  Lifetime(const Lifetime &other) : Id(other.GetId()) {}
+  Lifetime(const Lifetime &other) : LifetimeType(other.GetType()), Id(other.GetId()) {}
   Lifetime(llvm::StringRef name);
   Lifetime(char id);
-
+  Lifetime(clang::QualType &type)
+      : LifetimeType(std::optional<clang::QualType>(type)), Id(NOTSET) {}
+  Lifetime(Lifetime &lifetime, clang::QualType &type)
+      : LifetimeType(std::optional<clang::QualType>(type)),
+        Id(lifetime.GetId()) {
+    debugLifetimes("Called this constructor");
+  }
 
   // Returns whether this lifetime is valid
   bool IsNotSet() const;
@@ -44,16 +50,14 @@ class Lifetime {
   // Sets the Id to $local
   void SetLocal();
 
-  static char CharToId(char id) {
-    return id < OFFSET ? id : id - 'a' + OFFSET;
-  }
-  static char IdToChar(char id) {
-    return id < OFFSET ? id : id + 'a' - OFFSET;
-  }
+  static char CharToId(char id) { return id < OFFSET ? id : id - 'a' + OFFSET; }
+  static char IdToChar(char id) { return id < OFFSET ? id : id + 'a' - OFFSET; }
 
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }
   void SetId(char id) { Id = id; }
+  std::optional<clang::QualType> GetType() const { return LifetimeType; }
+  void SetType(clang::QualType type) { LifetimeType = std::optional<clang::QualType>(type); }
 
   void ProcessShortestLifetimes();
 
@@ -147,6 +151,7 @@ class Lifetime {
 
   // TODO also store a vector with the lifetime ids that it depends on
   LifetimesVector ShortestLifetimes;
+  std::optional<clang::QualType> LifetimeType;
   char Id;
 };
 }  // namespace clang
