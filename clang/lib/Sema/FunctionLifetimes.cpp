@@ -184,13 +184,14 @@ bool SameType(clang::QualType type1, clang::QualType type2) {
 // === FunctionLifetimeFactory ===
 
 llvm::Expected<Lifetime> FunctionLifetimeFactory::LifetimeFromName(
-    const clang::Expr* name) const {
+    const clang::Expr* name, clang::QualType type) const {
+  clang::QualType canonical_type = type.getCanonicalType();
   llvm::StringRef name_str;
   if (llvm::Error err = EvaluateAsStringLiteral(name, Func->getASTContext())
                             .moveInto(name_str)) {
     return std::move(err);
   }
-  return Lifetime(name_str);
+  return Lifetime(name_str, canonical_type);
 }
 
 llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateParamLifetimes(
@@ -218,6 +219,7 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
 
   qualtype = qualtype.IgnoreParens();
   qualtype = StripAttributes(qualtype);
+  clang::QualType canonical_type = qualtype.getCanonicalType();
 
   llvm::SmallVector<const clang::Attr*> attrs;
   if (!type_loc.isNull()) {
@@ -258,12 +260,13 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
   // debugLifetimes("Size of lifetime_params", lifetime_params.size());
 
   for (size_t i = 0; i < lifetime_params.size(); ++i) {
-    Lifetime l;
+    Lifetime l(canonical_type);
     const clang::Expr* lifetime_name = nullptr;
     if (i < lifetime_names.size()) {
       lifetime_name = lifetime_names[i];
     }
-    if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(l)) {
+    if (llvm::Error err =
+            lifetime_factory(lifetime_name, canonical_type).moveInto(l)) {
       return std::move(err);
     }
   }
@@ -308,13 +311,13 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
     lifetime_name = lifetime_names.front();
   }
 
-  Lifetime lifetime;
-  if (llvm::Error err = lifetime_factory(lifetime_name).moveInto(lifetime)) {
+  Lifetime lifetime(canonical_type);
+  if (llvm::Error err =
+          lifetime_factory(lifetime_name, canonical_type).moveInto(lifetime)) {
     return std::move(err);
   }
 
-  clang::QualType type = qualtype.getCanonicalType();
-  retObjectLifetimes.InsertPointeeObject(lifetime, type);
+  retObjectLifetimes.InsertPointeeObject(lifetime);
 
   // debugLifetimes("The outer pointee has lifetime",
   // retObjectLifetimes.GetLifetime().DebugString());
@@ -323,10 +326,15 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
 }
 
 LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
-  return [this](const clang::Expr* name) -> llvm::Expected<Lifetime> {
+  return [this](const clang::Expr* name,
+                clang::QualType type) -> llvm::Expected<Lifetime> {
+    // clang::QualType expr_type = name->getType().getCanonicalType();
+    // Lifetime lifetime(expr_type);
+    clang::QualType canonical_type = type.getCanonicalType();
+    Lifetime lifetime(canonical_type);
     if (name) {
-      Lifetime lifetime;
-      if (llvm::Error err = LifetimeFromName(name).moveInto(lifetime)) {
+      if (llvm::Error err =
+              LifetimeFromName(name, canonical_type).moveInto(lifetime)) {
         return std::move(err);
       }
       return lifetime;
@@ -347,17 +355,22 @@ LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
           //              func->getNameAsString(), "'")
       );
     }
-
-    return Lifetime();
+    // TODO change me
+    return lifetime;
   };
 }
 
 LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
-  return [this](const clang::Expr* name/*,
-                  &input_lifetime */) -> llvm::Expected<Lifetime> {
+  return [this](const clang::Expr* name, clang::QualType type
+                /*,&input_lifetime */) -> llvm::Expected<Lifetime> {
+    // TODO change me
+    // clang::QualType expr_type = name->getType().getCanonicalType();
+    // Lifetime lifetime(expr_type);
+    clang::QualType canonical_type = type.getCanonicalType();
+    Lifetime lifetime(canonical_type);
     if (name) {
-      Lifetime lifetime;
-      if (llvm::Error err = LifetimeFromName(name).moveInto(lifetime)) {
+      if (llvm::Error err =
+              LifetimeFromName(name, canonical_type).moveInto(lifetime)) {
         return std::move(err);
       }
       return lifetime;
@@ -368,10 +381,10 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
     //   return llvm::createStringError(
     //       llvm::inconvertibleErrorCode(),
     //       "Lifetime elision not enabled for function"
-          // TODO abseil
-          // absl::StrCat("Lifetime elision not enabled for '",
-          //              func->getNameAsString(), "'")
-      // );
+    // TODO abseil
+    // absl::StrCat("Lifetime elision not enabled for '",
+    //              func->getNameAsString(), "'")
+    // );
     // }
 
     // TODO uncomment this
@@ -390,22 +403,28 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
     //                    "exactly one input lifetime"));
     // }
     // });
-  // TODO remove this
-  return Lifetime();
+    // TODO remove this
+    return lifetime;
   };
 }
 
 LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
-  return [this](const clang::Expr* name) -> llvm::Expected<Lifetime> {
+  return [this](const clang::Expr* name,
+                clang::QualType type) -> llvm::Expected<Lifetime> {
+    // TODO change me
+    // clang::QualType expr_type = name->getType().getCanonicalType();
+    // Lifetime lifetime(expr_type);
+    clang::QualType canonical_type = type.getCanonicalType();
+    Lifetime lifetime(canonical_type);
     if (name) {
-      Lifetime lifetime;
-      if (llvm::Error err = LifetimeFromName(name).moveInto(lifetime)) {
+      if (llvm::Error err =
+              LifetimeFromName(name, canonical_type).moveInto(lifetime)) {
         return std::move(err);
       }
       return lifetime;
     }
     // TODO error?
-    return Lifetime();
+    return lifetime;
   };
 }
 

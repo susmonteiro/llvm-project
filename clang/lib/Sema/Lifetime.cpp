@@ -19,7 +19,8 @@ Lifetime::Lifetime(char id) {
   }
 }
 
-Lifetime::Lifetime(llvm::StringRef name) {
+Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
+    : LifetimeType(std::optional<clang::QualType>(type)) {
   if (name.equals(STATIC_NAME)) {
     *this = Lifetime(STATIC);
   } else if (name.equals(LOCAL_NAME)) {

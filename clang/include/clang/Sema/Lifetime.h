@@ -23,15 +23,10 @@ class Lifetime {
  public:
   Lifetime();
   Lifetime(const Lifetime &other) : LifetimeType(other.GetType()), Id(other.GetId()) {}
-  Lifetime(llvm::StringRef name);
+  Lifetime(llvm::StringRef name, clang::QualType type);
   Lifetime(char id);
   Lifetime(clang::QualType &type)
       : LifetimeType(std::optional<clang::QualType>(type)), Id(NOTSET) {}
-  Lifetime(Lifetime &lifetime, clang::QualType &type)
-      : LifetimeType(std::optional<clang::QualType>(type)),
-        Id(lifetime.GetId()) {
-    debugLifetimes("Called this constructor");
-  }
 
   // Returns whether this lifetime is valid
   bool IsNotSet() const;

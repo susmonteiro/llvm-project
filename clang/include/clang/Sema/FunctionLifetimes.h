@@ -11,10 +11,11 @@
 
 namespace clang {
 
-using LifetimeFactory =
-    std::function<llvm::Expected<Lifetime>(const clang::Expr *)>;
+using LifetimeFactory = std::function<llvm::Expected<Lifetime>(
+    const clang::Expr *, clang::QualType type)>;
 
-using ParamsLifetimesMap = llvm::DenseMap<const clang::ParmVarDecl *, ObjectsLifetimes>;
+using ParamsLifetimesMap =
+    llvm::DenseMap<const clang::ParmVarDecl *, ObjectsLifetimes>;
 
 class FunctionLifetimeFactory {
  public:
@@ -35,7 +36,8 @@ class FunctionLifetimeFactory {
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
 
-  llvm::Expected<Lifetime> LifetimeFromName(const clang::Expr *name) const;
+  llvm::Expected<Lifetime> LifetimeFromName(const clang::Expr *name,
+                                            clang::QualType type) const;
 
   LifetimeFactory ParamLifetimeFactory() const;
   LifetimeFactory ReturnLifetimeFactory() const;
@@ -58,23 +60,30 @@ class FunctionLifetimes {
   // Returns the number of function parameters (excluding the implicit `this).
   size_t GetNumParams() const { return Params.size(); }
 
-  std::vector<const clang::ParmVarDecl*> GetParamsInOrder() const { return Params; }
+  std::vector<const clang::ParmVarDecl *> GetParamsInOrder() const {
+    return Params;
+  }
   const clang::ParmVarDecl *GetParam(unsigned int i) const { return Params[i]; }
 
   ParamsLifetimesMap GetParamsLifetimes() const { return ParamsLifetimes; }
 
-  std::optional<Lifetime> GetParamLifetime(const clang::ParmVarDecl *param, clang::QualType type) const { 
+  std::optional<Lifetime> GetParamLifetime(const clang::ParmVarDecl *param,
+                                           clang::QualType type) const {
     auto it = ParamsLifetimes.find(param);
     ObjectsLifetimes objects_lifetimes = it->second;
-    llvm::Expected<Lifetime&> lifetime = objects_lifetimes.GetLifetime(type);
+    llvm::Expected<Lifetime &> lifetime = objects_lifetimes.GetLifetime(type);
     if (!lifetime) return std::nullopt;
-    return it != ParamsLifetimes.end() ? std::optional<Lifetime>(lifetime.get()) : std::nullopt;
+    return it != ParamsLifetimes.end() ? std::optional<Lifetime>(lifetime.get())
+                                       : std::nullopt;
   }
 
-  ObjectsLifetimes& GetReturnLifetime() { return ReturnLifetime; }
-  Lifetime& GetReturnLifetime(clang::QualType &type) { return ReturnLifetime.GetLifetime(type); }
+  ObjectsLifetimes &GetReturnLifetime() { return ReturnLifetime; }
+  Lifetime &GetReturnLifetime(clang::QualType &type) {
+    return ReturnLifetime.GetLifetime(type);
+  }
 
-  void InsertParamLifetime(const clang::ParmVarDecl *param, ObjectsLifetimes &objectsLifetimes) {
+  void InsertParamLifetime(const clang::ParmVarDecl *param,
+                           ObjectsLifetimes &objectsLifetimes) {
     Params.emplace_back(param);
     ParamsLifetimes[param] = objectsLifetimes;
   }
@@ -92,7 +101,7 @@ class FunctionLifetimes {
   // lifetime
 
   // stores param lifetimes in order
-  std::vector<const clang::ParmVarDecl*> Params;
+  std::vector<const clang::ParmVarDecl *> Params;
   ParamsLifetimesMap ParamsLifetimes;
   ObjectsLifetimes ReturnLifetime;
   int FuncId;

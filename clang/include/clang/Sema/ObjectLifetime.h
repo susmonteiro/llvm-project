@@ -13,8 +13,8 @@ namespace clang {
 class ObjectsLifetimes {
  public:
   ObjectsLifetimes() {}
-  ObjectsLifetimes(Lifetime lifetime, clang::QualType &type) {
-    InsertPointeeObject(lifetime, type);
+  ObjectsLifetimes(Lifetime lifetime) {
+    InsertPointeeObject(lifetime);
   }
 
   Lifetime& GetLifetime(clang::QualType &type) {
@@ -39,9 +39,9 @@ class ObjectsLifetimes {
 
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
-  void InsertPointeeObject(Lifetime& lifetime, clang::QualType& type) {
-    lifetime.SetType(type);
-    lifetime.DebugString();
+  void InsertPointeeObject(Lifetime& lifetime) {
+    debugLifetimes("InsertPointeeObject", lifetime.DebugString());
+    assert(lifetime.GetType().has_value());
     PointeeObjects.emplace_back(lifetime);
   }
 

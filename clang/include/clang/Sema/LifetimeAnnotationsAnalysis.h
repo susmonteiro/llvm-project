@@ -65,7 +65,7 @@ class LifetimeAnnotationsAnalysis {
   }
 
   void CreateVariable(const clang::VarDecl *var_decl, clang::QualType &type) {
-    VariableLifetimes[var_decl] = ObjectsLifetimes(Lifetime(), type);
+    VariableLifetimes[var_decl] = ObjectsLifetimes(Lifetime(type));
   }
 
   void CreateVariable(const clang::VarDecl *var_decl, ObjectsLifetimes objectsLifetime) {
