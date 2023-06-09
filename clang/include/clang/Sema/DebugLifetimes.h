@@ -26,11 +26,6 @@ void debugLifetimes(
         var_stmt,
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>
         stmt_var);
-void debugLifetimes(
-    llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::Stmt *>>
-        var_stmt,
-    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::Expr *>>
-        stmt_expr);
 void debugImportant(std::string txt);
 void debugImportant(std::string txt1, std::string txt2);
 void debugInfo(std::string txt);
