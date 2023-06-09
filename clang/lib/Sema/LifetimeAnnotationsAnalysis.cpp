@@ -131,8 +131,7 @@ void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   // iterate over variables with no fixed lifetime
   for (const auto &pair : LifetimeDependencies) {
     auto &lifetimes = GetObjectsLifetimes(pair.first).GetLifetimes();
-    for (auto &objectLifetime : lifetimes) {
-      Lifetime &lifetime = objectLifetime.GetLifetime();
+    for (auto &lifetime : lifetimes) {
       if (lifetime.IsNotSet()) {
         lifetime.ProcessShortestLifetimes();
       }

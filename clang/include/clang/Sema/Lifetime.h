@@ -11,6 +11,7 @@ namespace clang {
 using StmtDenseSet = llvm::DenseSet<const clang::Stmt *>;
 using LifetimesVector = llvm::SmallVector<StmtDenseSet>;
 
+// TODO start at 0?
 constexpr char NOTSET = 1;
 constexpr char LOCAL = 2;
 constexpr char STATIC = 3;
@@ -21,11 +22,14 @@ constexpr char OFFSET = 6;
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
  public:
+  // TODO delete this
   Lifetime();
-  Lifetime(const Lifetime &other) : Id(other.GetId()) {}
-  Lifetime(llvm::StringRef name);
+  Lifetime(clang::QualType &type);
+  Lifetime(const Lifetime &other) : ObjectType(other.GetType()), Id(other.GetId()) {}
+  Lifetime(char id, clang::QualType &type);
+  // TODO delete this
   Lifetime(char id);
-
+  Lifetime(llvm::StringRef name, clang::QualType &type);
 
   // Returns whether this lifetime is valid
   bool IsNotSet() const;
@@ -44,16 +48,16 @@ class Lifetime {
   // Sets the Id to $local
   void SetLocal();
 
-  static char CharToId(char id) {
-    return id < OFFSET ? id : id - 'a' + OFFSET;
-  }
-  static char IdToChar(char id) {
-    return id < OFFSET ? id : id + 'a' - OFFSET;
-  }
+  static char CharToId(char id) { return id < OFFSET ? id : id - 'a' + OFFSET; }
+  static char IdToChar(char id) { return id < OFFSET ? id : id + 'a' - OFFSET; }
+  char GenerateLifetimeId(char id) const;
 
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }
   void SetId(char id) { Id = id; }
+  // TODO make const
+  // TODO make return reference
+  std::optional<clang::QualType/* & */> GetType() const { return ObjectType; }
 
   void ProcessShortestLifetimes();
 
@@ -145,8 +149,11 @@ class Lifetime {
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
-  // TODO also store a vector with the lifetime ids that it depends on
   LifetimesVector ShortestLifetimes;
+  // TODO not optional
+  // TODO should be reference? &?
+  // TODO make const?
+  std::optional<clang::QualType> ObjectType;
   char Id;
 };
 }  // namespace clang

@@ -5,31 +5,41 @@ namespace clang {
 constexpr llvm::StringRef STATIC_NAME = "static";
 constexpr llvm::StringRef LOCAL_NAME = "local";
 
-Lifetime::Lifetime() : Id(NOTSET) {}
+Lifetime::Lifetime() : ObjectType(std::nullopt), Id(NOTSET) {}
+Lifetime::Lifetime(clang::QualType &type) : ObjectType(type), Id(NOTSET) {}
 
-Lifetime::Lifetime(char id) {
-  if (id == NOTSET || id == LOCAL || id == STATIC) {
-    Id = id;
-  } else if (id >= 'a' && id <= 'z') {
-    Id = CharToId(id);
+Lifetime::Lifetime(char id, clang::QualType &type)
+    : ObjectType(std::optional<clang::QualType>(type)),
+      Id(GenerateLifetimeId(id)) {}
+
+// TODO delete this
+Lifetime::Lifetime(char id) : Id(GenerateLifetimeId(id)) {}
+
+Lifetime::Lifetime(llvm::StringRef name, clang::QualType &type)
+    : ObjectType(std::optional<clang::QualType>(type)) {
+  if (name.equals(STATIC_NAME)) {
+    *this = Lifetime(STATIC, type);
+  } else if (name.equals(LOCAL_NAME)) {
+    *this = Lifetime(LOCAL, type);
+  } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
+    *this = Lifetime(name.front(), type);
   } else {
     // TODO error
     // TODO change this
-    Id = NOTSET;
+    *this = Lifetime(NOTSET, type);
   }
 }
 
-Lifetime::Lifetime(llvm::StringRef name) {
-  if (name.equals(STATIC_NAME)) {
-    *this = Lifetime(STATIC);
-  } else if (name.equals(LOCAL_NAME)) {
-    *this = Lifetime(LOCAL);
-  } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
-    *this = Lifetime(name.front());
+char Lifetime::GenerateLifetimeId(char id) const {
+  if (id == NOTSET || id == LOCAL || id == STATIC ||
+      id == INVALID_ID_TOMBSTONE || id == INVALID_EMPTY) {
+    return id;
+  } else if (id >= 'a' && id <= 'z') {
+    return CharToId(id);
   } else {
     // TODO error
     // TODO change this
-    *this = Lifetime(NOTSET);
+    return NOTSET;
   }
 }
 
@@ -76,8 +86,11 @@ std::string Lifetime::GetLifetimeName(char id) const {
 }
 
 std::string Lifetime::DebugString() const {
-  std::string res;
-  res += "[Lifetime] -> " + GetLifetimeName() + "; ";
+  std::string res = "[Type]: ";
+  res += ObjectType.has_value() ? ObjectType.value().getAsString()
+                                : "unknown type";
+  res += "\t\t[Lifetime] -> " + GetLifetimeName() + "; ";
+
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
     for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
@@ -87,7 +100,7 @@ std::string Lifetime::DebugString() const {
     }
     res += "}";
   }
-  return res;
+  return res + '\n';
 }
 
 void Lifetime::ProcessShortestLifetimes() {

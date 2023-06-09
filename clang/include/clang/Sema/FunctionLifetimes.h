@@ -12,7 +12,7 @@
 namespace clang {
 
 using LifetimeFactory =
-    std::function<llvm::Expected<Lifetime>(const clang::Expr *)>;
+    std::function<llvm::Expected<Lifetime>(const clang::Expr *, clang::QualType &type)>;
 
 using ParamsLifetimesMap = llvm::DenseMap<const clang::ParmVarDecl *, ObjectsLifetimes>;
 
@@ -35,7 +35,7 @@ class FunctionLifetimeFactory {
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
 
-  llvm::Expected<Lifetime> LifetimeFromName(const clang::Expr *name) const;
+  llvm::Expected<Lifetime> LifetimeFromName(const clang::Expr *name, clang::QualType &type) const;
 
   LifetimeFactory ParamLifetimeFactory() const;
   LifetimeFactory ReturnLifetimeFactory() const;
