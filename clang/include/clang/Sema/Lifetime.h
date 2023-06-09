@@ -11,12 +11,12 @@ namespace clang {
 using StmtDenseSet = llvm::DenseSet<const clang::Stmt *>;
 using LifetimesVector = llvm::SmallVector<StmtDenseSet>;
 
-constexpr char NOTSET = 1;
-constexpr char LOCAL = 2;
-constexpr char STATIC = 3;
-constexpr char INVALID_ID_TOMBSTONE = 4;
-constexpr char INVALID_EMPTY = 5;
-constexpr char OFFSET = 6;
+constexpr char NOTSET = 0;
+constexpr char LOCAL = 1;
+constexpr char STATIC = 2;
+constexpr char INVALID_ID_TOMBSTONE = 3;
+constexpr char INVALID_EMPTY = 4;
+constexpr char OFFSET = 5;
 
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
