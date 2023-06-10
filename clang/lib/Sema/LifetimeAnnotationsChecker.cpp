@@ -168,8 +168,9 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         // debugLifetimes("Type of lhs", lhs_type.getAsString());
         // TODO change this
         auto rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
+        debugLifetimes("rhs_lifetime", rhs_lifetime.DebugString());
         // TODO relation between lifetimes and stmts
-        if (State.IsLifetimeNotset(var_decl)) {
+        if (rhs_lifetime.IsNotSet()) {
           debugLifetimes("RHS IS NOT SET");
 
           for (unsigned int i = 0; i < rhs_shortest_lifetimes.size(); i++) {
