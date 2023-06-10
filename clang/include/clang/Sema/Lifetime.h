@@ -25,6 +25,7 @@ class Lifetime {
   Lifetime(const Lifetime &other) : LifetimeType(other.GetType()), Id(other.GetId()) {}
   Lifetime(llvm::StringRef name, clang::QualType type);
   Lifetime(char id);
+  Lifetime(char id, clang::QualType type);
   Lifetime(clang::QualType &type)
       : LifetimeType(std::optional<clang::QualType>(type)), Id(NOTSET) {}
 

@@ -19,6 +19,19 @@ Lifetime::Lifetime(char id) {
   }
 }
 
+// TODO change this
+Lifetime::Lifetime(char id, clang::QualType type) : LifetimeType(std::optional<clang::QualType>(type)) {
+  if (id == NOTSET || id == LOCAL || id == STATIC) {
+    Id = id;
+  } else if (id >= 'a' && id <= 'z') {
+    Id = CharToId(id);
+  } else {
+    // TODO error
+    // TODO change this
+    Id = NOTSET;
+  }
+}
+
 Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
     : LifetimeType(std::optional<clang::QualType>(type)) {
   if (name.equals(STATIC_NAME)) {

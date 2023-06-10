@@ -11,13 +11,7 @@ void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
             rhs_ref_decl->getDecl()->getCanonicalDecl())) {
       state.CreateDependency(lhs, rhs_var_decl, loc);
     }
-  } 
-  // TODO implement else
-  /* else if (clang::isa<clang::UnaryOperator>(expr)) {
-    debugInfo("Create dependency between var_decl and unary_operator");
-    const auto *rhs_unary_op = clang::dyn_cast<clang::UnaryOperator>(expr);
-    state.CreateDependency(lhs, rhs_unary_op, loc);
-  } */
+  }
 }
 
 void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
@@ -27,15 +21,16 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
   CreateDependency(rhs, lhs, loc, state);
   for (const auto &expr : points_to) {
-    debugInfo("Found expr in points_to");
-    expr->dump();
-    if (expr == nullptr) continue;
-    CreateDependency(expr, lhs, loc, state);
+    // debugInfo("Found expr in points_to");
+    // expr->dump();
+    if (expr != nullptr) {
+      CreateDependency(expr, lhs, loc, state);
+    }
   }
 }
 
 ObjectsLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
-                            FunctionLifetimeFactory &lifetime_factory) {
+                                    FunctionLifetimeFactory &lifetime_factory) {
   clang::QualType type = var_decl->getType().IgnoreParens();
   clang::TypeLoc type_loc;
   if (var_decl->getTypeSourceInfo()) {
@@ -76,7 +71,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   PointsTo.InsertExprLifetimes(op, rhs);
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs);
-  if (const auto *lhs_var_decl = dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
+  if (const auto *lhs_var_decl =
+          dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
     if (State.IsLifetimeNotset(lhs_var_decl)) {
       TransferRHS(lhs_var_decl, rhs, op, PointsTo, State);
     }
@@ -138,10 +134,11 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // TODO
       debugLight("> Case LValueToRValue");
       if (cast->getType()->isPointerType()) {
-        // Converting from a glvalue to a prvalue means that we need to perform
-        // a dereferencing operation because the objects associated with
-        // glvalues and prvalues have different meanings:
-        // - A glvalue is associated with the object identified by the glvalue.
+        // Converting from a glvalue to a prvalue means that we need to
+        // perform a dereferencing operation because the objects associated
+        // with glvalues and prvalues have different meanings:
+        // - A glvalue is associated with the object identified by the
+        // glvalue.
         // - A prvalue is only associated with an object if the prvalue is of
         //   pointer type; the object it is associated with is the object the
         //   pointer points to.
@@ -214,8 +211,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
 
       // diag_reporter_(
       //     Func->getBeginLoc(),
-      //     "cannot infer lifetimes because function uses a type-unsafe cast",
-      //     clang::DiagnosticIDs::Warning);
+      //     "cannot infer lifetimes because function uses a type-unsafe
+      //     cast", clang::DiagnosticIDs::Warning);
       // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
       //                clang::DiagnosticIDs::Note);
       // return "type-unsafe cast prevents analysis";
@@ -265,7 +262,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      clang::QualType type = var_decl->getType();
+      clang::QualType type = var_decl->getType().getCanonicalType();
       if (!type->isPointerType() && !type->isReferenceType()) {
         debugWarn("Var decl is not pointer type");
         continue;
@@ -282,8 +279,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         Visit(const_cast<clang::Expr *>(init));
         debugInfo("The vardecl has init");
         if (State.IsLifetimeNotset(var_decl)) {
-          debugInfo(
-              "The lifetime of vardecl is not set, thus we call TransferRHS");
+          // debugInfo(
+          //     "The lifetime of vardecl is not set, thus we call
+          //     TransferRHS");
           TransferRHS(var_decl, init, decl_stmt, PointsTo, State);
         }
       }

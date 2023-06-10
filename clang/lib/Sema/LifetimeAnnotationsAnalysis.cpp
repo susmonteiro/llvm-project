@@ -26,9 +26,19 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
     // TODO error
-    CreateVariable(var_decl, type);
+    CreateVariable(var_decl, Lifetime(type));
   }
   return VariableLifetimes[var_decl].GetLifetime(type);
+}
+
+Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
+    const clang::VarDecl *var_decl, clang::QualType type) {
+  VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
+  if (it == VariableLifetimes.end()) {
+    // TODO error
+    CreateVariable(var_decl, Lifetime(LOCAL, type));
+  }
+  return VariableLifetimes[var_decl].GetLifetimeOrLocal(type);
 }
 
 Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime(

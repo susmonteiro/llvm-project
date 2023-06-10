@@ -68,12 +68,11 @@ void debugLifetimes(llvm::DenseSet<char> vec) {
   debugLifetimes(res);
 }
 
-void debugLifetimes(llvm::DenseMap<const clang::VarDecl *,
-                                   llvm::DenseSet<const clang::Stmt *>>
-                        var_stmt,
-                    llvm::DenseMap<const clang::Stmt *,
-                                   llvm::DenseSet<const clang::VarDecl *>>
-                        stmt_var) {
+void debugLifetimes(
+    llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::Stmt *>>
+        var_stmt,
+    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>
+        stmt_var) {
   if (stop_debug) return;
   std::string res;
   for (const auto &pair : var_stmt) {
@@ -84,8 +83,8 @@ void debugLifetimes(llvm::DenseMap<const clang::VarDecl *,
       }
     }
     res += '\n';
-    debugLifetimes(res);
   }
+  debugLifetimes(res);
 }
 
 void debugImportant(std::string txt) {

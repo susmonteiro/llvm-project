@@ -32,7 +32,9 @@ class LifetimeAnnotationsAnalysis {
   VariableLifetimesVector &GetVariableLifetimes();
   ObjectsLifetimes &GetObjectsLifetimes(const clang::VarDecl *var_decl);
   Lifetime &GetLifetime(const clang::VarDecl *var_decl, clang::QualType type);
+  Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl, clang::QualType type);
   Lifetime &GetReturnLifetime(clang::QualType &type);
+
 
   bool IsLifetimeNotset(const clang::VarDecl *var_decl,
                         clang::QualType &type) const;
@@ -50,9 +52,8 @@ class LifetimeAnnotationsAnalysis {
   void PropagateShortestLifetimes(const clang::VarDecl *target,
                                   LifetimesVector shortest_lifetimes,
                                   clang::QualType &type) {
-    llvm::Expected<Lifetime &> maybe_lifetime = GetLifetime(target, type);
-    if (maybe_lifetime)
-      maybe_lifetime.get().InsertShortestLifetimes(shortest_lifetimes);
+    Lifetime &lifetime = GetLifetime(target, type);
+    lifetime.InsertShortestLifetimes(shortest_lifetimes);
   }
 
   void PropagateShortestLifetimes(const clang::VarDecl *to,
@@ -66,6 +67,10 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateVariable(const clang::VarDecl *var_decl, clang::QualType &type) {
     VariableLifetimes[var_decl] = ObjectsLifetimes(Lifetime(type));
+  }
+
+  void CreateVariable(const clang::VarDecl *var_decl, Lifetime &lifetime) {
+    VariableLifetimes[var_decl] = ObjectsLifetimes(lifetime);
   }
 
   void CreateVariable(const clang::VarDecl *var_decl, ObjectsLifetimes objectsLifetime) {

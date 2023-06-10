@@ -13,11 +13,9 @@ namespace clang {
 class ObjectsLifetimes {
  public:
   ObjectsLifetimes() {}
-  ObjectsLifetimes(Lifetime lifetime) {
-    InsertPointeeObject(lifetime);
-  }
+  ObjectsLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
 
-  Lifetime& GetLifetime(clang::QualType &type) {
+  Lifetime& GetLifetime(clang::QualType& type) {
     type = type.getCanonicalType();
     // debugLifetimes("The type we want is " + type.getAsString() + '\n');
     for (auto& pointee : PointeeObjects) {
@@ -26,7 +24,7 @@ class ObjectsLifetimes {
         debugWarn("The type is not set\n");
         continue;
       }
-      auto &tmp_type = tmp.value();
+      auto& tmp_type = tmp.value();
       // debugLifetimes("The type found is ", tmp_type.getAsString());
       if (tmp_type == type) {
         // debugLifetimes("They are the same!");
@@ -37,17 +35,36 @@ class ObjectsLifetimes {
     return InsertPointeeObject(type);
   }
 
+  Lifetime& GetLifetimeOrLocal(clang::QualType& type) {
+    type = type.getCanonicalType();
+    // debugLifetimes("The type we want is " + type.getAsString() + '\n');
+    for (auto& pointee : PointeeObjects) {
+      auto tmp = pointee.GetType();
+      if (!tmp.has_value()) {
+        debugWarn("The type is not set\n");
+        continue;
+      }
+      auto& tmp_type = tmp.value();
+      // debugLifetimes("The type found is ", tmp_type.getAsString());
+      if (tmp_type == type) {
+        // debugLifetimes("They are the same!");
+        return pointee;
+      }
+    }
+    Lifetime lifetime = Lifetime(LOCAL, type);
+    return InsertPointeeObject(lifetime);
+  }
+
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
-  void InsertPointeeObject(Lifetime& lifetime) {
+  Lifetime& InsertPointeeObject(Lifetime& lifetime) {
     debugLifetimes("InsertPointeeObject", lifetime.DebugString());
     assert(lifetime.GetType().has_value());
-    PointeeObjects.emplace_back(lifetime);
+    return PointeeObjects.emplace_back(lifetime);
   }
 
   Lifetime& InsertPointeeObject(clang::QualType& type) {
-    PointeeObjects.emplace_back(type);
-    return GetLifetime(type);
+    return PointeeObjects.emplace_back(type);
   }
 
   std::string DebugString() const {
@@ -59,7 +76,7 @@ class ObjectsLifetimes {
   }
 
   bool IsLifetimeNotSet() {
-    for (auto &pointee : PointeeObjects) {
+    for (auto& pointee : PointeeObjects) {
       if (pointee.IsNotSet()) {
         return true;
       }
