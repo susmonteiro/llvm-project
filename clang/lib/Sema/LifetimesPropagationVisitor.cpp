@@ -310,7 +310,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     const clang::UnaryOperator *op) {
-  // TODO implement
   if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
 
   if (!op->isGLValue() && !op->getType()->isPointerType() &&
@@ -319,26 +318,20 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     return std::nullopt;
   }
 
-  // TODO needed?
-  // for (const auto &child : op->children()) {
-  //   Visit(const_cast<clang::Stmt *>(child));
-  //   debugInfo("Visited addrof child");
-  //   if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-  //     debugInfo("Insert addrof in PointsTo because it is expr");
-  //     PointsTo.InsertExprLifetimes(op, child_expr);
-  //   }
-  // }
-
-  PointsTo.InsertExprLifetimes(op, nullptr);
-  // TODO change this
-  // State.CreateDeclRef(op, Lifetime(LOCAL));
+  for (const auto &child : op->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+    debugInfo("Visited addrof child");
+    if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+      debugInfo("Insert addrof in PointsTo because it is expr");
+      PointsTo.InsertExprLifetimes(op, child_expr);
+    }
+  }
   return std::nullopt;
 }
 
 // TODO sometimes this is not being visited
 std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryDeref(
     const clang::UnaryOperator *op) {
-  // TODO implement
   if (debugEnabled) debugLifetimes("[VisitUnaryDeref]");
 
   if (!op->isGLValue() && !op->getType()->isPointerType() &&

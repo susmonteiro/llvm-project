@@ -78,9 +78,10 @@ std::string Lifetime::GetLifetimeName(char id) const {
 
 std::string Lifetime::DebugString() const {
   std::string res = "[Type]: ";
-  res += LifetimeType.has_value() ? LifetimeType.value().getAsString() : "unknown type";
+  res += LifetimeType.has_value() ? LifetimeType.value().getAsString()
+                                  : "unknown type";
   res += "\t\t[Lifetime] -> " + GetLifetimeName() + "; ";
-  
+
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
     for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
@@ -96,7 +97,6 @@ std::string Lifetime::DebugString() const {
 void Lifetime::ProcessShortestLifetimes() {
   // should only reach this if lifetime is not set
   assert(IsNotSet());
-
   if (ContainsLocal()) {
     // lifetime $local is the shortest possible
     SetLocal();
@@ -108,15 +108,15 @@ void Lifetime::ProcessShortestLifetimes() {
     // not belong to shortest lifetimes
     RemoveFromShortestLifetimes(STATIC);
   }
-
-  if (ShortestLifetimes.size() == 1) {
-    for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
-      if (!ShortestLifetimes[i].empty()) {
-        SetId(i);
-        return;
-      }
+  char unique_id = NOTSET;
+  for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
+    if (!ShortestLifetimes[i].empty()) {
+      if (unique_id != NOTSET)
+        return;  // there are more than one shortest lifetimes
+      unique_id = i;
     }
   }
+  SetId(unique_id);
 
   // in all other cases, the Id of the lifetime remains NOTSET
   // - if ShortestLifetimes is empty, the lifetime of this variable is
