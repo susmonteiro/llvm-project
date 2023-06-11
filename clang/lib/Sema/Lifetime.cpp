@@ -20,7 +20,8 @@ Lifetime::Lifetime(char id) {
 }
 
 // TODO change this
-Lifetime::Lifetime(char id, clang::QualType type) : LifetimeType(std::optional<clang::QualType>(type)) {
+Lifetime::Lifetime(char id, clang::QualType type)
+    : LifetimeType(std::optional<clang::QualType>(type)) {
   if (id == NOTSET || id == LOCAL || id == STATIC) {
     Id = id;
   } else if (id >= 'a' && id <= 'z') {
@@ -147,11 +148,22 @@ std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
              : std::optional(ShortestLifetimes[id]);
 }
 
-// TODO this ok?
+// TODO do test that checks this
 bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
-  const auto &OtherShortestLifetimes = Other.GetShortestLifetimes();
-  for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
-    if (ShortestLifetimes[i].empty()) return false;
+  const auto &other_shortest_lifetimes = Other.GetShortestLifetimes();
+  const auto &largest_vec =
+      ShortestLifetimes.size() > other_shortest_lifetimes.size()
+          ? ShortestLifetimes
+          : other_shortest_lifetimes;
+  const auto &shortest_vec =
+      ShortestLifetimes.size() > other_shortest_lifetimes.size()
+          ? other_shortest_lifetimes
+          : ShortestLifetimes;
+  for (unsigned int i = 0; i < shortest_vec.size(); i++) {
+    if (largest_vec[i].empty() != shortest_vec[i].empty()) return false;
+  }
+  for (unsigned int i = shortest_vec.size(); i < largest_vec.size(); i++) {
+    if (!largest_vec[i].empty()) return false;
   }
   return true;
 }
