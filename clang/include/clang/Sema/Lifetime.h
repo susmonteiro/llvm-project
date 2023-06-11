@@ -82,7 +82,7 @@ class Lifetime {
     return GetShortestLifetime(id, ShortestLifetimes);
   }
 
-  LifetimesVector GetShortestLifetimes() const { return ShortestLifetimes; }
+  const LifetimesVector& GetShortestLifetimes() const { return ShortestLifetimes; }
   std::optional<StmtDenseSet> GetStmts(char id);
 
   static void ResizeShortestLifetimes(char id,

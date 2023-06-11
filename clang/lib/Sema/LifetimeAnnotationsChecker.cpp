@@ -194,6 +194,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     if (new_children[el] != stmts ||
         State.GetShortestLifetimes(el, el_type) != shortest_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
+      debugLifetimes("Propagate shortest lifetimes");
       State.PropagateShortestLifetimes(el, shortest_lifetimes, el_type);
 
       for (const auto &parent : parents[el]) {

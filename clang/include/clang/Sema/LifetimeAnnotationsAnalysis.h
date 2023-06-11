@@ -32,9 +32,9 @@ class LifetimeAnnotationsAnalysis {
   VariableLifetimesVector &GetVariableLifetimes();
   ObjectsLifetimes &GetObjectsLifetimes(const clang::VarDecl *var_decl);
   Lifetime &GetLifetime(const clang::VarDecl *var_decl, clang::QualType type);
-  Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl, clang::QualType type);
+  Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl,
+                               clang::QualType type);
   Lifetime &GetReturnLifetime(clang::QualType &type);
-
 
   bool IsLifetimeNotset(const clang::VarDecl *var_decl,
                         clang::QualType &type) const;
@@ -42,18 +42,15 @@ class LifetimeAnnotationsAnalysis {
 
   PointsToMap &GetPointsTo() { return PointsTo; }
 
-  LifetimesVector GetShortestLifetimes(const clang::VarDecl *var_decl,
-                                       clang::QualType &type) {
-    llvm::Expected<Lifetime &> maybe_lifetime = GetLifetime(var_decl, type);
-    return maybe_lifetime ? maybe_lifetime.get().GetShortestLifetimes()
-                          : LifetimesVector();
+  const LifetimesVector &GetShortestLifetimes(const clang::VarDecl *var_decl,
+                                        clang::QualType &type) {
+    return GetLifetime(var_decl, type).GetShortestLifetimes();
   }
 
   void PropagateShortestLifetimes(const clang::VarDecl *target,
-                                  LifetimesVector shortest_lifetimes,
+                                  const LifetimesVector &shortest_lifetimes,
                                   clang::QualType &type) {
-    Lifetime &lifetime = GetLifetime(target, type);
-    lifetime.InsertShortestLifetimes(shortest_lifetimes);
+    GetLifetime(target, type).InsertShortestLifetimes(shortest_lifetimes);
   }
 
   void PropagateShortestLifetimes(const clang::VarDecl *to,
@@ -61,7 +58,7 @@ class LifetimeAnnotationsAnalysis {
                                   const clang::VarDecl *from,
                                   clang::QualType &from_type) {
     // TODO maybe same type is enough
-    const auto from_lifetimes = GetShortestLifetimes(from, from_type);
+    const auto &from_lifetimes = GetShortestLifetimes(from, from_type);
     PropagateShortestLifetimes(to, from_lifetimes, to_type);
   }
 
@@ -73,7 +70,8 @@ class LifetimeAnnotationsAnalysis {
     VariableLifetimes[var_decl] = ObjectsLifetimes(lifetime);
   }
 
-  void CreateVariable(const clang::VarDecl *var_decl, ObjectsLifetimes objectsLifetime) {
+  void CreateVariable(const clang::VarDecl *var_decl,
+                      ObjectsLifetimes objectsLifetime) {
     VariableLifetimes[var_decl] = objectsLifetime;
   }
 

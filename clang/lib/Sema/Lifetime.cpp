@@ -147,6 +147,7 @@ std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
              : std::optional(ShortestLifetimes[id]);
 }
 
+// TODO this ok?
 bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
   const auto &OtherShortestLifetimes = Other.GetShortestLifetimes();
   for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
