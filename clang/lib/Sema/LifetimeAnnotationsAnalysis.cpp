@@ -59,19 +59,8 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
   }
 }
 
-bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
-    const clang::VarDecl *var_decl) const {
-  auto it = VariableLifetimes.find(var_decl);
-  if (it != VariableLifetimes.end()) {
-    ObjectsLifetimes ol = std::move(it->second);
-    return ol.IsLifetimeNotSet();
-  } else {
-    // TODO error?
-    return false;
-  }
-}
-
 void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
+                                                    clang::QualType from_type,
                                                    const clang::VarDecl *to,
                                                    const clang::Stmt *loc) {
   // TODO implement
@@ -92,7 +81,6 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
   // }
   // if (from != to) {
   // TODO
-  clang::QualType from_type = from->getType().getCanonicalType();
   debugLifetimes("Type of lhs", from_type.getAsString());
   CreateLifetimeDependency(from, from_type, loc);
   CreateStmtDependency(loc, to);
@@ -124,7 +112,7 @@ LifetimeAnnotationsAnalysis::TransposeDependencies() {
     clang::QualType type = pair.first.second;
     for (const auto &stmt : pair.second) {
       for (const auto &child : StmtDependencies[stmt]) {
-        if (IsLifetimeNotset(child)) result[std::pair(child, type)].insert(pair.first);
+        if (IsLifetimeNotset(child, type)) result[std::pair(child, type)].insert(pair.first);
       }
     }
   }
