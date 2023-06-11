@@ -158,10 +158,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
         if (var_decl == el) continue;
-        debugLifetimes("Before creating local", State.GetObjectsLifetimes(var_decl).DebugString());
         Lifetime &rhs_lifetime = State.GetLifetimeOrLocal(var_decl, el_type);
-        debugLifetimes("After creating local", State.GetObjectsLifetimes(var_decl).DebugString());
-
 
         // for (auto &ol : objectLifetimes.GetLifetimes()) {
         // std::optional<clang::QualType> lhs_maybe_type = ol.GetType();
@@ -173,18 +170,14 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         // debugLifetimes("Type of lhs", lhs_type.getAsString());
         // TODO change this
         auto rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
-        debugLifetimes("rhs_lifetime", rhs_lifetime.DebugString());
         // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
-          debugLifetimes("RHS IS NOT SET");
-
           for (unsigned int i = 0; i < rhs_shortest_lifetimes.size(); i++) {
             if (!rhs_shortest_lifetimes[i].empty()) {
               Lifetime::InsertShortestLifetimes(i, stmt, shortest_lifetimes);
             }
           }
         } else {
-          debugLifetimes("RHS IS SET");
           char vardecl_lifetime_id = rhs_lifetime.GetId();
           Lifetime::InsertShortestLifetimes(vardecl_lifetime_id, stmt,
                                             shortest_lifetimes);
@@ -199,11 +192,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     if (new_children[el] != stmts ||
         State.GetShortestLifetimes(el, el_type) != shortest_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
-      debugLifetimes("Propagate shortest lifetimes");
       State.PropagateShortestLifetimes(el, shortest_lifetimes, el_type);
-      debugLifetimes("State after propagate shortest lifetimes",
-                     State.DebugString());
-
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);
       }
@@ -217,7 +206,6 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable
-  debugLifetimes("Before processing shortest lifetimes", State.DebugString());
   State.ProcessShortestLifetimes();
 }
 

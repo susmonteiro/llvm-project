@@ -17,7 +17,6 @@ class ObjectsLifetimes {
 
   Lifetime& GetLifetime(clang::QualType& type) {
     type = type.getCanonicalType();
-    // debugLifetimes("The type we want is " + type.getAsString() + '\n');
     for (auto& pointee : PointeeObjects) {
       auto tmp = pointee.GetType();
       if (!tmp.has_value()) {
@@ -25,9 +24,7 @@ class ObjectsLifetimes {
         continue;
       }
       auto& tmp_type = tmp.value();
-      // debugLifetimes("The type found is ", tmp_type.getAsString());
       if (tmp_type == type) {
-        // debugLifetimes("They are the same!");
         return pointee;
       }
     }
@@ -37,7 +34,6 @@ class ObjectsLifetimes {
 
   Lifetime& GetLifetimeOrLocal(clang::QualType& type) {
     type = type.getCanonicalType();
-    // debugLifetimes("The type we want is " + type.getAsString() + '\n');
     for (auto& pointee : PointeeObjects) {
       auto tmp = pointee.GetType();
       if (!tmp.has_value()) {
@@ -45,19 +41,11 @@ class ObjectsLifetimes {
         continue;
       }
       auto& tmp_type = tmp.value();
-      // debugLifetimes("The type found is ", tmp_type.getAsString());
       if (tmp_type == type) {
-        // debugLifetimes("They are the same!");
         return pointee;
       }
     }
-    debugLifetimes(
-        "Before creating local lifetime for type" + type.getAsString(),
-        DebugString());
     Lifetime& lifetime = InsertPointeeObject(Lifetime(LOCAL, type));
-    debugLifetimes(
-        "After creating local lifetime for type" + type.getAsString(),
-        DebugString());
     return lifetime;
   }
 
@@ -65,21 +53,11 @@ class ObjectsLifetimes {
 
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
     assert(lifetime.GetType().has_value());
-    debugLifetimes("Before insert lifetime", DebugString());
-    debugLifetimes("And its size is", PointeeObjects.size());
-    PointeeObjects.push_back(lifetime);
-    debugLifetimes("After insert lifetime", DebugString());
-    debugLifetimes("And its size is", PointeeObjects.size());
-
-    // return new_lifetime;
-    clang::QualType type = lifetime.GetType().value();
-    return GetLifetime(type);
+    return PointeeObjects.emplace_back(lifetime);
   }
 
   Lifetime& InsertPointeeObject(clang::QualType type) {
-    type = type.getCanonicalType();
-    PointeeObjects.push_back(type);
-    return GetLifetime(type);
+    return PointeeObjects.emplace_back(type);
   }
 
   std::string DebugString() const {
