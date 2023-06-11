@@ -124,7 +124,10 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto parents = std::move(State.TransposeDependencies());
 
   debugLifetimes("=== dependencies_ ===");
-  debugLifetimes(children, stmt_dependencies);
+  for (const auto &pair : children) {
+    debugLifetimes(pair.first.first, pair.first.second, pair.second,
+                   stmt_dependencies);
+  }
 
   debugLifetimes("State at the beginning of step 2", State.DebugString());
 
@@ -143,9 +146,11 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
     auto &el = worklist.back();
     worklist.pop_back();
-    clang::QualType el_type = el->getType().getCanonicalType();
 
-    debugLifetimes("\nPropagation of", el->getNameAsString());
+    auto *current_var = el.first;
+    auto current_type = el.second;
+    debugLifetimes("\nPropagation of", current_type.getAsString() + ' ' +
+                                           current_var->getNameAsString());
 
     // each entry of the vector corresponds to a lifetime char
     llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> shortest_lifetimes;
@@ -154,22 +159,14 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     // ObjectsLifetimes objectLifetimes = State.GetObjectsLifetimes(el);
     // debugLifetimes("Processing " + objectLifetimes.DebugString());
 
-    for (const auto &stmt : children[el]) {
+    for (auto &stmt : children[el]) {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
-        if (var_decl == el) continue;
-        Lifetime &rhs_lifetime = State.GetLifetimeOrLocal(var_decl, el_type);
+        if (var_decl == current_var) continue;
+        Lifetime &rhs_lifetime =
+            State.GetLifetimeOrLocal(var_decl, current_type);
+        auto &rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
 
-        // for (auto &ol : objectLifetimes.GetLifetimes()) {
-        // std::optional<clang::QualType> lhs_maybe_type = ol.GetType();
-        // if (!lhs_maybe_type.has_value()) {
-        //   debugWarn("LHS does not have type!");
-        //   continue;
-        // }
-        // clang::QualType lhs_type = lhs_maybe_type.value();
-        // debugLifetimes("Type of lhs", lhs_type.getAsString());
-        // TODO change this
-        auto rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
         // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
           for (unsigned int i = 0; i < rhs_shortest_lifetimes.size(); i++) {
@@ -190,16 +187,21 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     // debugLifetimes("New shortest lifetimes", shortest_lifetimes.size());
     // TODO this is not perfect
     if (new_children[el] != stmts ||
-        State.GetShortestLifetimes(el, el_type) != shortest_lifetimes) {
+        State.GetShortestLifetimes(current_var, current_type) !=
+            shortest_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
-      State.PropagateShortestLifetimes(el, shortest_lifetimes, el_type);
+      State.PropagateShortestLifetimes(current_var, shortest_lifetimes,
+                                       current_type);
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);
       }
     }
 
     debugLifetimes("=== children ===");
-    debugLifetimes(new_children, stmt_dependencies);
+    for (const auto &pair : new_children) {
+      debugLifetimes(pair.first.first, pair.first.second, pair.second,
+                     stmt_dependencies);
+    }
   }
 
   State.SetDependencies(new_children);

@@ -5,10 +5,12 @@
 
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/TypeOrdering.h"
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/PointeeType.h"
 #include "clang/Sema/PointsToMap.h"
+#include "llvm/ADT/DenseMap.h"
 // DEBUG
 #include "clang/Sema/DebugLifetimes.h"
 
@@ -20,8 +22,32 @@ using VariableLifetimesVector =
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>;
 
+using VarTypePair = std::pair<const clang::VarDecl *, clang::QualType>;
+
+struct VarTypePairInfo {
+  static inline VarTypePair getEmptyKey() {
+    return std::make_pair(nullptr, clang::QualType());
+  }
+
+  static inline VarTypePair getTombstoneKey() {
+    return std::make_pair(reinterpret_cast<clang::VarDecl *>(-1),
+                          clang::QualType());
+  }
+
+  static unsigned getHashValue(const VarTypePair &pair) {
+    return llvm::hash_combine(
+        llvm::DenseMapInfo<const clang::VarDecl *>::getHashValue(pair.first),
+        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.second));
+  }
+
+  static bool isEqual(const VarTypePair &lhs, const VarTypePair &rhs) {
+    return lhs.first == rhs.first && lhs.second == rhs.second;
+  }
+};
+
 using VarStmtDependenciesMap =
-    llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::Stmt *>>;
+    llvm::DenseMap<VarTypePair, llvm::DenseSet<const clang::Stmt *>,
+                   VarTypePairInfo>;
 
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
@@ -53,9 +79,8 @@ class LifetimeAnnotationsAnalysis {
     debugLifetimes("Inserting shortest lifetimes into",
                    GetLifetime(target, type).DebugString());
     GetLifetime(target, type).InsertShortestLifetimes(shortest_lifetimes);
-        debugLifetimes("After inserting shortest lifetimes into",
+    debugLifetimes("After inserting shortest lifetimes into",
                    GetLifetime(target, type).DebugString());
-
   }
 
   void PropagateShortestLifetimes(const clang::VarDecl *to,
@@ -84,6 +109,7 @@ class LifetimeAnnotationsAnalysis {
   StmtVarDependenciesMap &GetStmtDependencies();
 
   void CreateLifetimeDependency(const clang::VarDecl *from,
+                                clang::QualType from_type,
                                 const clang::Stmt *to);
 
   void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
@@ -97,10 +123,9 @@ class LifetimeAnnotationsAnalysis {
 
   void ProcessShortestLifetimes();
 
-  llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::VarDecl *>>
+  llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo>
   TransposeDependencies();
-  std::vector<const clang::VarDecl *> InitializeWorklist() const;
-
+  std::vector<VarTypePair> InitializeWorklist() const;
   std::string DebugString();
 
  private:

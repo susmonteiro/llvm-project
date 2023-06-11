@@ -9,7 +9,6 @@
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
-
 // TODO delete this file
 
 void debugLifetimes(std::string txt);
@@ -19,11 +18,13 @@ void debugLifetimes(llvm::SmallVector<const clang::Expr *> vec);
 void debugLifetimes(llvm::SmallVector<const clang::Attr *> vec);
 void debugLifetimes(llvm::SmallVector<std::string> vec);
 void debugLifetimes(std::vector<const clang::VarDecl *> vec);
+void debugLifetimes(
+    std::vector<std::pair<const clang::VarDecl *, clang::QualType>> vec);
 void debugLifetimes(llvm::DenseSet<const clang::VarDecl *> vec);
 void debugLifetimes(llvm::DenseSet<char> vec);
 void debugLifetimes(
-    llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::Stmt *>>
-        var_stmt,
+    const clang::VarDecl *var, clang::QualType type,
+    llvm::DenseSet<const clang::Stmt *> var_stmt,
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>
         stmt_var);
 void debugImportant(std::string txt);

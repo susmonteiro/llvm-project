@@ -52,6 +52,18 @@ void debugLifetimes(std::vector<const clang::VarDecl *> vec) {
   debugLifetimes(res);
 }
 
+void debugLifetimes(
+    std::vector<std::pair<const clang::VarDecl *, clang::QualType>> vec) {
+  if (stop_debug) return;
+  std::string res;
+  for (const auto &el : vec) {
+    res += '{' + el.second.getAsString() + ' ' + el.first->getNameAsString() +
+           "}, ";
+  }
+  res += '\n';
+  debugLifetimes(res);
+}
+
 void debugLifetimes(llvm::DenseSet<const clang::VarDecl *> vec) {
   if (stop_debug) return;
   for (const auto &el : vec) {
@@ -69,18 +81,17 @@ void debugLifetimes(llvm::DenseSet<char> vec) {
 }
 
 void debugLifetimes(
-    llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::Stmt *>>
-        var_stmt,
+    const clang::VarDecl *var, clang::QualType type,
+    llvm::DenseSet<const clang::Stmt *> var_stmt,
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>
         stmt_var) {
   if (stop_debug) return;
   std::string res;
-  for (const auto &pair : var_stmt) {
-    res += "Dependencies of " + pair.first->getNameAsString() + ": ";
-    for (const auto &stmt : pair.second) {
-      for (const auto &var : stmt_var[stmt]) {
-        res += var->getNameAsString() + ' ';
-      }
+  res += "Dependencies of " + var->getNameAsString() + ": ";
+  res += "[Type]: " + type.getAsString() + "\t[vars]: ";
+  for (const auto &stmt : var_stmt) {
+    for (const auto &var : stmt_var[stmt]) {
+      res += var->getNameAsString() + ' ';
     }
     res += '\n';
   }

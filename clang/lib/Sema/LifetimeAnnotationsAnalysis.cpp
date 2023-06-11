@@ -92,7 +92,9 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
   // }
   // if (from != to) {
   // TODO
-  CreateLifetimeDependency(from, loc);
+  clang::QualType from_type = from->getType().getCanonicalType();
+  debugLifetimes("Type of lhs", from_type.getAsString());
+  CreateLifetimeDependency(from, from_type, loc);
   CreateStmtDependency(loc, to);
   // }
 }
@@ -106,8 +108,8 @@ StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
 }
 
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
-    const clang::VarDecl *from, const clang::Stmt *to) {
-  LifetimeDependencies[from].insert(to);
+    const clang::VarDecl *from, clang::QualType from_type, const clang::Stmt *to) {
+  LifetimeDependencies[std::pair(from, from_type)].insert(to);
 }
 
 void LifetimeAnnotationsAnalysis::CreateStmtDependency(
@@ -115,23 +117,23 @@ void LifetimeAnnotationsAnalysis::CreateStmtDependency(
   StmtDependencies[from].insert(to);
 }
 
-llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::VarDecl *>>
+llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo>
 LifetimeAnnotationsAnalysis::TransposeDependencies() {
-  llvm::DenseMap<const clang::VarDecl *, llvm::DenseSet<const clang::VarDecl *>>
-      result;
+  llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo> result;
   for (const auto &pair : LifetimeDependencies) {
+    clang::QualType type = pair.first.second;
     for (const auto &stmt : pair.second) {
       for (const auto &child : StmtDependencies[stmt]) {
-        if (IsLifetimeNotset(child)) result[child].insert(pair.first);
+        if (IsLifetimeNotset(child)) result[std::pair(child, type)].insert(pair.first);
       }
     }
   }
   return result;
 }
 
-std::vector<const clang::VarDecl *>
+std::vector<VarTypePair>
 LifetimeAnnotationsAnalysis::InitializeWorklist() const {
-  std::vector<const clang::VarDecl *> worklist;
+  std::vector<VarTypePair> worklist;
   for (const auto &pair : LifetimeDependencies) {
     worklist.emplace_back(pair.first);
   }
@@ -141,7 +143,7 @@ LifetimeAnnotationsAnalysis::InitializeWorklist() const {
 void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   // iterate over variables with no fixed lifetime
   for (const auto &pair : LifetimeDependencies) {
-    auto &lifetimes = GetObjectsLifetimes(pair.first).GetLifetimes();
+    auto &lifetimes = GetObjectsLifetimes(pair.first.first).GetLifetimes();
     for (auto &objectLifetime : lifetimes) {
       Lifetime &lifetime = objectLifetime;
       if (lifetime.IsNotSet()) {
@@ -161,7 +163,8 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
 
   str += "\n>> Dependencies\n\n";
   for (const auto &pair : LifetimeDependencies) {
-    str += pair.first->getNameAsString() + ": ";
+    str += pair.first.first->getNameAsString() + ": ";
+      str += "[type] " + pair.first.second.getAsString() + "\t[var] ";
     for (const auto &stmt : pair.second) {
       for (const auto &var : StmtDependencies[stmt])
         str += var->getNameAsString() + ' ';
