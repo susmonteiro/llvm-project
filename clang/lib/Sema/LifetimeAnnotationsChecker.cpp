@@ -126,6 +126,8 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   debugLifetimes("=== dependencies_ ===");
   debugLifetimes(children, stmt_dependencies);
 
+  debugLifetimes("State at the beginning of step 2", State.DebugString());
+
   // debugLifetimes("=== parents (transposed) ===");
   // debugLifetimes(parents);
 
@@ -156,7 +158,10 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
       stmts.insert(stmt);
       for (const auto &var_decl : stmt_dependencies[stmt]) {
         if (var_decl == el) continue;
+        debugLifetimes("Before creating local", State.GetObjectsLifetimes(var_decl).DebugString());
         Lifetime &rhs_lifetime = State.GetLifetimeOrLocal(var_decl, el_type);
+        debugLifetimes("After creating local", State.GetObjectsLifetimes(var_decl).DebugString());
+
 
         // for (auto &ol : objectLifetimes.GetLifetimes()) {
         // std::optional<clang::QualType> lhs_maybe_type = ol.GetType();
@@ -187,15 +192,17 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         // }
       }
     }
-    debugLifetimes("Original shortest lifetimes",
-                   State.GetShortestLifetimes(el, el_type).size());
-    debugLifetimes("New shortest lifetimes", shortest_lifetimes.size());
+    // debugLifetimes("Original shortest lifetimes",
+    //                State.GetShortestLifetimes(el, el_type).size());
+    // debugLifetimes("New shortest lifetimes", shortest_lifetimes.size());
     // TODO this is not perfect
     if (new_children[el] != stmts ||
         State.GetShortestLifetimes(el, el_type) != shortest_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
       debugLifetimes("Propagate shortest lifetimes");
       State.PropagateShortestLifetimes(el, shortest_lifetimes, el_type);
+      debugLifetimes("State after propagate shortest lifetimes",
+                     State.DebugString());
 
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);

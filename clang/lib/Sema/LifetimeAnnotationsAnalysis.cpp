@@ -36,6 +36,7 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
     // TODO error
+    debugWarn("Lifetime not found in VariableLifetimes");
     CreateVariable(var_decl, Lifetime(LOCAL, type));
   }
   return VariableLifetimes[var_decl].GetLifetimeOrLocal(type);

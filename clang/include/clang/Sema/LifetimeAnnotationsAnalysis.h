@@ -43,14 +43,19 @@ class LifetimeAnnotationsAnalysis {
   PointsToMap &GetPointsTo() { return PointsTo; }
 
   const LifetimesVector &GetShortestLifetimes(const clang::VarDecl *var_decl,
-                                        clang::QualType &type) {
+                                              clang::QualType type) {
     return GetLifetime(var_decl, type).GetShortestLifetimes();
   }
 
   void PropagateShortestLifetimes(const clang::VarDecl *target,
                                   const LifetimesVector &shortest_lifetimes,
-                                  clang::QualType &type) {
+                                  clang::QualType type) {
+    debugLifetimes("Inserting shortest lifetimes into",
+                   GetLifetime(target, type).DebugString());
     GetLifetime(target, type).InsertShortestLifetimes(shortest_lifetimes);
+        debugLifetimes("After inserting shortest lifetimes into",
+                   GetLifetime(target, type).DebugString());
+
   }
 
   void PropagateShortestLifetimes(const clang::VarDecl *to,

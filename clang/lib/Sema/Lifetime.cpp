@@ -5,9 +5,13 @@ namespace clang {
 constexpr llvm::StringRef STATIC_NAME = "static";
 constexpr llvm::StringRef LOCAL_NAME = "local";
 
-Lifetime::Lifetime() : Id(NOTSET) {}
+Lifetime::Lifetime() : Id(NOTSET) { 
+  // ReserveShortestLifetimes(); 
+  }
 
 Lifetime::Lifetime(char id) {
+  // ReserveShortestLifetimes();
+
   if (id == NOTSET || id == LOCAL || id == STATIC) {
     Id = id;
   } else if (id >= 'a' && id <= 'z') {
@@ -22,6 +26,8 @@ Lifetime::Lifetime(char id) {
 // TODO change this
 Lifetime::Lifetime(char id, clang::QualType type)
     : LifetimeType(std::optional<clang::QualType>(type)) {
+  // ReserveShortestLifetimes();
+
   if (id == NOTSET || id == LOCAL || id == STATIC) {
     Id = id;
   } else if (id >= 'a' && id <= 'z') {
@@ -35,6 +41,8 @@ Lifetime::Lifetime(char id, clang::QualType type)
 
 Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
     : LifetimeType(std::optional<clang::QualType>(type)) {
+  // ReserveShortestLifetimes();
+
   if (name.equals(STATIC_NAME)) {
     *this = Lifetime(STATIC);
   } else if (name.equals(LOCAL_NAME)) {

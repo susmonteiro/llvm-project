@@ -22,12 +22,19 @@ constexpr char OFFSET = 5;
 class Lifetime {
  public:
   Lifetime();
-  Lifetime(const Lifetime &other) : LifetimeType(other.GetType()), Id(other.GetId()) {}
+  Lifetime(const Lifetime &other)
+      : LifetimeType(other.GetType()), Id(other.GetId()) {
+          // ReserveShortestLifetimes();
+
+      }
   Lifetime(llvm::StringRef name, clang::QualType type);
   Lifetime(char id);
   Lifetime(char id, clang::QualType type);
   Lifetime(clang::QualType &type)
-      : LifetimeType(std::optional<clang::QualType>(type)), Id(NOTSET) {}
+      : LifetimeType(std::optional<clang::QualType>(type)), Id(NOTSET) {
+          // ReserveShortestLifetimes();
+
+      }
 
   // Returns whether this lifetime is valid
   bool IsNotSet() const;
@@ -53,9 +60,16 @@ class Lifetime {
   char GetId() const { return Id; }
   void SetId(char id) { Id = id; }
   std::optional<clang::QualType> GetType() const { return LifetimeType; }
-  void SetType(clang::QualType type) { LifetimeType = std::optional<clang::QualType>(type); }
+  void SetType(clang::QualType type) {
+    LifetimeType = std::optional<clang::QualType>(type);
+  }
 
   void ProcessShortestLifetimes();
+  void ReserveShortestLifetimes() {
+    // TODO change this
+    ShortestLifetimes.reserve(32);
+    ShortestLifetimes.resize(32);
+  }
 
   std::string DebugString() const;
 
@@ -82,7 +96,9 @@ class Lifetime {
     return GetShortestLifetime(id, ShortestLifetimes);
   }
 
-  const LifetimesVector& GetShortestLifetimes() const { return ShortestLifetimes; }
+  const LifetimesVector &GetShortestLifetimes() const {
+    return ShortestLifetimes;
+  }
   std::optional<StmtDenseSet> GetStmts(char id);
 
   static void ResizeShortestLifetimes(char id,
@@ -114,8 +130,11 @@ class Lifetime {
   }
 
   void InsertShortestLifetimes(LifetimesVector shortest_lifetimes) {
+    debugLifetimes("Size of shortest lifetimes before resize",
+                   ShortestLifetimes.size());
     if (shortest_lifetimes.size() > ShortestLifetimes.size())
       ShortestLifetimes.resize(shortest_lifetimes.size());
+      debugLifetimes("Size of shortest lifetimes after resize", ShortestLifetimes.size());
     for (unsigned int i = 0; i < shortest_lifetimes.size(); i++) {
       GetShortestLifetime(i)->insert(
           GetShortestLifetime(i, shortest_lifetimes)->begin(),
@@ -124,11 +143,11 @@ class Lifetime {
   }
 
   void SetShortestLifetimes(LifetimesVector shortest_lifetimes) {
-    ShortestLifetimes = shortest_lifetimes;
+      ShortestLifetimes = shortest_lifetimes;
   }
 
   void RemoveFromShortestLifetimes(char id) {
-    GetShortestLifetime(id)->clear();
+      GetShortestLifetime(id)->clear();
   }
 
   bool CompareShortestLifetimes(const Lifetime &other) const;
@@ -157,19 +176,19 @@ namespace llvm {
 template <>
 struct DenseMapInfo<clang::Lifetime, void> {
   static clang::Lifetime getEmptyKey() {
-    return clang::Lifetime::InvalidEmpty();
+      return clang::Lifetime::InvalidEmpty();
   }
 
   static clang::Lifetime getTombstoneKey() {
-    return clang::Lifetime::InvalidTombstone();
+      return clang::Lifetime::InvalidTombstone();
   }
 
   static unsigned getHashValue(clang::Lifetime lifetime) {
-    return llvm::hash_value(lifetime.Id);
+      return llvm::hash_value(lifetime.Id);
   }
 
   static bool isEqual(clang::Lifetime lhs, clang::Lifetime rhs) {
-    return lhs.Id == rhs.Id;
+      return lhs.Id == rhs.Id;
   }
 };
 

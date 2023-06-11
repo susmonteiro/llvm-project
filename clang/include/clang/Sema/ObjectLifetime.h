@@ -51,20 +51,35 @@ class ObjectsLifetimes {
         return pointee;
       }
     }
-    Lifetime lifetime = Lifetime(LOCAL, type);
-    return InsertPointeeObject(lifetime);
+    debugLifetimes(
+        "Before creating local lifetime for type" + type.getAsString(),
+        DebugString());
+    Lifetime& lifetime = InsertPointeeObject(Lifetime(LOCAL, type));
+    debugLifetimes(
+        "After creating local lifetime for type" + type.getAsString(),
+        DebugString());
+    return lifetime;
   }
 
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
-  Lifetime& InsertPointeeObject(Lifetime& lifetime) {
-    debugLifetimes("InsertPointeeObject", lifetime.DebugString());
+  Lifetime& InsertPointeeObject(Lifetime lifetime) {
     assert(lifetime.GetType().has_value());
-    return PointeeObjects.emplace_back(lifetime);
+    debugLifetimes("Before insert lifetime", DebugString());
+    debugLifetimes("And its size is", PointeeObjects.size());
+    PointeeObjects.push_back(lifetime);
+    debugLifetimes("After insert lifetime", DebugString());
+    debugLifetimes("And its size is", PointeeObjects.size());
+
+    // return new_lifetime;
+    clang::QualType type = lifetime.GetType().value();
+    return GetLifetime(type);
   }
 
-  Lifetime& InsertPointeeObject(clang::QualType& type) {
-    return PointeeObjects.emplace_back(type);
+  Lifetime& InsertPointeeObject(clang::QualType type) {
+    type = type.getCanonicalType();
+    PointeeObjects.push_back(type);
+    return GetLifetime(type);
   }
 
   std::string DebugString() const {
