@@ -30,7 +30,7 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
 }
 
 ObjectLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
-                                    FunctionLifetimeFactory &lifetime_factory) {
+                                   FunctionLifetimeFactory &lifetime_factory) {
   clang::QualType type = var_decl->getType().IgnoreParens();
   clang::TypeLoc type_loc;
   if (var_decl->getTypeSourceInfo()) {
@@ -55,11 +55,8 @@ void LifetimesPropagationVisitor::PropagateBinAssign(
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
   if (const auto *lhs_var_decl =
           dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-    clang::QualType lhs_type = lhs->getType().getCanonicalType();
-    if (State.IsLifetimeNotset(lhs_var_decl, lhs_type)) {
-      TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op,
-                  PointsTo, State);
-    }
+    TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op,
+                PointsTo, State);
   }
 }
 

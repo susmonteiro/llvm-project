@@ -60,7 +60,7 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
 }
 
 void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
-                                                    clang::QualType from_type,
+                                                   clang::QualType from_type,
                                                    const clang::VarDecl *to,
                                                    const clang::Stmt *loc) {
   // TODO implement
@@ -82,8 +82,13 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
   // if (from != to) {
   // TODO
   debugLifetimes("Type of lhs", from_type.getAsString());
-  CreateLifetimeDependency(from, from_type, loc);
-  CreateStmtDependency(loc, to);
+  while (from_type->isPointerType() || from_type->isReferenceType()) {
+    if (IsLifetimeNotset(from, from_type)) {
+      CreateLifetimeDependency(from, from_type, loc);
+      CreateStmtDependency(loc, to);
+    }
+    from_type = from_type->getPointeeType();
+  }
   // }
 }
 
@@ -96,7 +101,8 @@ StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
 }
 
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
-    const clang::VarDecl *from, clang::QualType from_type, const clang::Stmt *to) {
+    const clang::VarDecl *from, clang::QualType from_type,
+    const clang::Stmt *to) {
   LifetimeDependencies[std::pair(from, from_type)].insert(to);
 }
 
@@ -107,20 +113,22 @@ void LifetimeAnnotationsAnalysis::CreateStmtDependency(
 
 llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo>
 LifetimeAnnotationsAnalysis::TransposeDependencies() {
-  llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo> result;
+  llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo>
+      result;
   for (const auto &pair : LifetimeDependencies) {
     clang::QualType type = pair.first.second;
     for (const auto &stmt : pair.second) {
       for (const auto &child : StmtDependencies[stmt]) {
-        if (IsLifetimeNotset(child, type)) result[std::pair(child, type)].insert(pair.first);
+        if (IsLifetimeNotset(child, type))
+          result[std::pair(child, type)].insert(pair.first);
       }
     }
   }
   return result;
 }
 
-std::vector<VarTypePair>
-LifetimeAnnotationsAnalysis::InitializeWorklist() const {
+std::vector<VarTypePair> LifetimeAnnotationsAnalysis::InitializeWorklist()
+    const {
   std::vector<VarTypePair> worklist;
   for (const auto &pair : LifetimeDependencies) {
     worklist.emplace_back(pair.first);
@@ -152,7 +160,7 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
   str += "\n>> Dependencies\n\n";
   for (const auto &pair : LifetimeDependencies) {
     str += pair.first.first->getNameAsString() + ": ";
-      str += "[type] " + pair.first.second.getAsString() + "\t[var] ";
+    str += "[type] " + pair.first.second.getAsString() + "\t[var] ";
     for (const auto &stmt : pair.second) {
       for (const auto &var : StmtDependencies[stmt])
         str += var->getNameAsString() + ' ';
