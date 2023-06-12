@@ -78,6 +78,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     return std::nullopt;
   }
 
+  Lifetime::GetNumberIndirections(lhs->getType().getCanonicalType());
+
   Visit(lhs);
   PointsTo.InsertExprLifetimes(op, lhs);
 

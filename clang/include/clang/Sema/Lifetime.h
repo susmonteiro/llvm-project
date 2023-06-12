@@ -53,6 +53,7 @@ class Lifetime {
 
   static char CharToId(char id) { return id < OFFSET ? id : id - 'a' + OFFSET; }
   static char IdToChar(char id) { return id < OFFSET ? id : id + 'a' - OFFSET; }
+  static unsigned int GetNumberIndirections(clang::QualType type);
 
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }

@@ -71,6 +71,19 @@ bool Lifetime::ContainsLocal() const {
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
 
+unsigned int Lifetime::GetNumberIndirections(clang::QualType type) {
+  unsigned int num_indirections_lhs = 0;
+  type = type.getCanonicalType();
+  while (type->isPointerType() || type->isReferenceType()) {
+    ++num_indirections_lhs;
+    // TODO uncomment or delete comment
+    type = type->getPointeeType()/* .getCanonicalType() */;
+  }
+  debugLifetimes("Number of indirections", num_indirections_lhs);
+  return num_indirections_lhs;
+}
+
+
 Lifetime Lifetime::InvalidEmpty() { return Lifetime(INVALID_EMPTY); }
 
 Lifetime Lifetime::InvalidTombstone() { return Lifetime(INVALID_ID_TOMBSTONE); }
