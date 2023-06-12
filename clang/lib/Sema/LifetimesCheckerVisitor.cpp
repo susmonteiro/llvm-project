@@ -145,10 +145,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
         Lifetime &lhs_lifetime = State.GetLifetime(lhs_var_decl, lhs_type);
         for (const auto &expr : rhs_points_to) {
           if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-            const auto *rhs_decl_ref_expr = clang::dyn_cast<clang::DeclRefExpr>(expr);
+            const auto *rhs_decl_ref_expr =
+                clang::dyn_cast<clang::DeclRefExpr>(expr);
             clang::QualType rhs_type = rhs->getType();
-            if (!rhs_type->isPointerType() &&
-                !rhs_type->isReferenceType()) {
+            if (!rhs_type->isPointerType() && !rhs_type->isReferenceType()) {
               continue;
             }
 
@@ -227,17 +227,20 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
 
       const auto *init = var_decl->getInit()->IgnoreParens();
 
-      if (const auto *unary_op =
-              dyn_cast<clang::UnaryOperator>(var_decl->getInit())) {
-        if (unary_op->getOpcode() == UO_AddrOf) {
-          debugInfo("The rhs is unary operator &");
-          Lifetime init_lifetime = Lifetime(LOCAL);
-          CompareAndCheckLifetimes(var_decl_lifetime, init_lifetime, var_decl,
-                                   init->getExprLoc(), init->getSourceRange(),
-                                   diag::warn_assign_lifetimes_differ,
-                                   diag::note_lifetime_declared_here);
-        }
-      }
+      // TODO delete this
+      // if (const auto *unary_op =
+      //         dyn_cast<clang::UnaryOperator>(var_decl->getInit())) {
+      //   if (unary_op->getOpcode() == UO_AddrOf) {
+      //     debugInfo("The rhs is unary operator &");
+      //     Lifetime init_lifetime = Lifetime(LOCAL);
+      //     CompareAndCheckLifetimes(var_decl_lifetime, init_lifetime,
+      //     var_decl,
+      //                              init->getExprLoc(),
+      //                              init->getSourceRange(),
+      //                              diag::warn_assign_lifetimes_differ,
+      //                              diag::note_lifetime_declared_here);
+      //   }
+      // }
 
       const auto &init_points_to = PointsTo.GetExprPointsTo(init);
       // TODO remove this
@@ -246,38 +249,36 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
       }
 
       for (const auto &expr : init_points_to) {
-        if (expr == nullptr) continue;
-        if (clang::isa<clang::DeclRefExpr>(expr)) {
-          const auto &init_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
-          clang::QualType init_var_type = init_var->getType();
-          if (!init_var_type->isPointerType() &&
-              !init_var_type->isReferenceType()) {
-            continue;
-          }
+        if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) continue;
+        const auto &init_var = clang::dyn_cast<clang::DeclRefExpr>(expr);
+        clang::QualType init_type = init->getType();
+        if (!init_type->isPointerType() && !init_type->isReferenceType()) {
+          continue;
+        }
 
-          if (const auto *init_var_decl =
-                  dyn_cast<clang::VarDecl>(init_var->getDecl())) {
-            Lifetime &init_lifetime =
-                State.GetLifetime(init_var_decl, init_var_type);
+        if (const auto *init_var_decl =
+                dyn_cast<clang::VarDecl>(init_var->getDecl())) {
+          Lifetime &init_lifetime = State.GetLifetime(init_var_decl, init_type);
 
-            // TODO check this
-            CompareAndCheckLifetimes(var_decl_lifetime, init_lifetime, var_decl,
-                                     init_var->getDecl(),
-                                     diag::warn_assign_lifetimes_differ,
-                                     diag::note_lifetime_declared_here);
-          }
-        } else if (clang::isa<clang::UnaryOperator>(expr)) {
-          debugLifetimes("Is the unary operator pointer type?",
-                         expr->getType()->isPointerType() ||
-                             expr->getType()->isReferenceType());
-          Lifetime init_lifetime = Lifetime(LOCAL);
-        } else {
-          debugWarn("No option was good");
+          // TODO check this
+          CompareAndCheckLifetimes(var_decl_lifetime, init_lifetime, var_decl,
+                                   init_var->getDecl(),
+                                   diag::warn_assign_lifetimes_differ,
+                                   diag::note_lifetime_declared_here);
         }
       }
+      // TODO delete this
+      // else if (clang::isa<clang::UnaryOperator>(expr)) {
+      //   debugLifetimes("Is the unary operator pointer type?",
+      //                  expr->getType()->isPointerType() ||
+      //                      expr->getType()->isReferenceType());
+      //   Lifetime init_lifetime = Lifetime(LOCAL);
+      // }
+      // else {
+      //   debugWarn("No option was good");
+      // }
     }
   }
-
   return std::nullopt;
 }
 
