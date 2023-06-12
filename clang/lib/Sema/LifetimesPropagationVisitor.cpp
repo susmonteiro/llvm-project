@@ -24,7 +24,7 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
     // debugInfo("Found expr in points_to");
     // expr->dump();
     if (expr != nullptr) {
-      CreateDependency(expr, lhs, lhs_type,loc, state);
+      CreateDependency(expr, lhs, lhs_type, loc, state);
     }
   }
 }
@@ -69,29 +69,22 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   const auto &rhs = op->getRHS()->IgnoreParens();
   Visit(rhs);
   PointsTo.InsertExprLifetimes(op, rhs);
-  debugLifetimes("After visiting lhs and rhs");
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
 
   for (const auto &expr : lhs_points_to) {
-    debugLifetimes("Found expr");
     if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      debugLifetimes("Isa DeclRefExpr");
-      if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr)) {
-        debugLifetimes("After dyn cast to DeclRefExpr");
-        if (const auto *lhs_var_decl =
-                dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-          clang::QualType lhs_type = lhs_var_decl->getType().getCanonicalType();
-          if (State.IsLifetimeNotset(lhs_var_decl, lhs_type)) {
-            debugLifetimes("Before TransferRHS");
-            TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op, PointsTo, State);
-          }
+      const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
+      if (const auto *lhs_var_decl =
+              dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
+        clang::QualType lhs_type = lhs->getType().getCanonicalType();
+        if (State.IsLifetimeNotset(lhs_var_decl, lhs_type)) {
+          TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op,
+                      PointsTo, State);
         }
       }
     }
   }
-  debugLifetimes("End of BinAssign");
-
   return std::nullopt;
 }
 
