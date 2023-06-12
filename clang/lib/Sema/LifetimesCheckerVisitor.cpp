@@ -48,10 +48,12 @@ void LifetimesCheckerVisitor::PrintNotes(Lifetime &lifetime,
 }
 
 void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
-    Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
-    const clang::VarDecl *lhs_var_decl, const clang::ValueDecl *rhs_var_decl,
-    int warn, int note) const {
-  if (rhs_lifetime < lhs_lifetime) {
+    const clang::VarDecl *lhs_var_decl, const clang::VarDecl *rhs_var_decl,
+    clang::QualType lhs_type, int warn, int note) const {
+  while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
+    Lifetime &lhs_lifetime = State.GetLifetime(lhs_var_decl, lhs_type);
+    Lifetime &rhs_lifetime = State.GetLifetime(rhs_var_decl, lhs_type);
+    if (rhs_lifetime < lhs_lifetime) {
     if (rhs_lifetime.IsNotSet()) {
       const auto &init_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
       for (unsigned int i = 0; i < init_shortest_lifetimes.size(); i++) {
@@ -72,6 +74,9 @@ void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
       PrintNotes(rhs_lifetime, rhs_var_decl, note);
     }
   }
+    lhs_type = lhs_type->getPointeeType();
+  }
+  
 }
 
 void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
@@ -233,6 +238,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
         debugWarn("Var decl is not pointer type");
         continue;
       }
+      clang::QualType var_decl_type = var_decl->getType().getCanonicalType();
       Lifetime &var_decl_lifetime =
           State.GetLifetime(var_decl, var_decl->getType());
       // no initializer, nothing to check
@@ -275,8 +281,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
           Lifetime &init_lifetime = State.GetLifetime(init_var_decl, init_type);
 
           // TODO check this
-          CompareAndCheckLifetimes(var_decl_lifetime, init_lifetime, var_decl,
-                                   init_var->getDecl(),
+          CompareAndCheckLifetimes(var_decl, init_var_decl, var_decl_type,
                                    diag::warn_assign_lifetimes_differ,
                                    diag::note_lifetime_declared_here);
         }
