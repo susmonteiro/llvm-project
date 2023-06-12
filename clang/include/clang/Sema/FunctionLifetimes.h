@@ -70,11 +70,13 @@ class FunctionLifetimes {
   std::optional<Lifetime> GetParamLifetime(const clang::ParmVarDecl *param,
                                            clang::QualType type) const {
     auto it = ParamsLifetimes.find(param);
+    if (it == ParamsLifetimes.end()) return std::nullopt;
+
     ObjectsLifetimes objects_lifetimes = it->second;
     llvm::Expected<Lifetime &> lifetime = objects_lifetimes.GetLifetime(type);
     if (!lifetime) return std::nullopt;
-    return it != ParamsLifetimes.end() ? std::optional<Lifetime>(lifetime.get())
-                                       : std::nullopt;
+    
+    return std::optional<Lifetime>(lifetime.get());
   }
 
   ObjectsLifetimes &GetReturnLifetime() { return ReturnLifetime; }
