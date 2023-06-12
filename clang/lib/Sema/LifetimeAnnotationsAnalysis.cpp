@@ -51,7 +51,7 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
     const clang::VarDecl *var_decl, clang::QualType &type) const {
   auto it = VariableLifetimes.find(var_decl);
   if (it != VariableLifetimes.end()) {
-    ObjectsLifetimes ol = std::move(it->second);
+    ObjectsLifetimes ol = it->second;
     return ol.GetLifetime(type).IsNotSet();
   } else {
     // TODO error?
