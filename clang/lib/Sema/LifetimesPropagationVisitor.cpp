@@ -291,13 +291,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
         debugInfo("The vardecl has init");
-        clang::QualType var_decl_type = var_decl->getType().getCanonicalType();
-        if (State.IsLifetimeNotset(var_decl, var_decl_type)) {
-          // debugInfo(
-          //     "The lifetime of vardecl is not set, thus we call
-          //     TransferRHS");
-          TransferRHS(var_decl, init, type, decl_stmt, PointsTo, State);
-        }
+        TransferRHS(var_decl, init, type, decl_stmt, PointsTo, State);
       }
     }
   }
