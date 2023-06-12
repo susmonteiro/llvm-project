@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include "clang/Sema/Lifetime.h"
-#include "clang/Sema/ObjectLifetime.h"
+#include "clang/Sema/ObjectLifetimes.h"
 #include "clang/Sema/PointeeType.h"
 // DEBUG
 #include "clang/Sema/DebugLifetimes.h"
@@ -15,7 +15,7 @@ using LifetimeFactory = std::function<llvm::Expected<Lifetime>(
     const clang::Expr *, clang::QualType type)>;
 
 using ParamsLifetimesMap =
-    llvm::DenseMap<const clang::ParmVarDecl *, ObjectsLifetimes>;
+    llvm::DenseMap<const clang::ParmVarDecl *, ObjectLifetimes>;
 
 class FunctionLifetimeFactory {
  public:
@@ -23,16 +23,16 @@ class FunctionLifetimeFactory {
       /* bool elision_enabled, */ const clang::FunctionDecl *func)
       : /* elision_enabled(elision_enabled), */ Func(func) {}
 
-  llvm::Expected<ObjectsLifetimes> CreateParamLifetimes(
+  llvm::Expected<ObjectLifetimes> CreateParamLifetimes(
       clang::QualType param_type, clang::TypeLoc param_type_loc) const;
 
-  llvm::Expected<ObjectsLifetimes> CreateReturnLifetimes(
+  llvm::Expected<ObjectLifetimes> CreateReturnLifetimes(
       clang::QualType return_type, clang::TypeLoc return_type_loc) const;
 
-  llvm::Expected<ObjectsLifetimes> CreateVarLifetimes(
+  llvm::Expected<ObjectLifetimes> CreateVarLifetimes(
       clang::QualType var_type, clang::TypeLoc var_type_loc) const;
 
-  static llvm::Expected<ObjectsLifetimes> CreateLifetime(
+  static llvm::Expected<ObjectLifetimes> CreateLifetime(
       clang::QualType type, clang::TypeLoc type_loc,
       LifetimeFactory lifetime_factory);
 
@@ -72,20 +72,20 @@ class FunctionLifetimes {
     auto it = ParamsLifetimes.find(param);
     if (it == ParamsLifetimes.end()) return std::nullopt;
 
-    ObjectsLifetimes objects_lifetimes = it->second;
+    ObjectLifetimes objects_lifetimes = it->second;
     llvm::Expected<Lifetime &> lifetime = objects_lifetimes.GetLifetime(type);
     if (!lifetime) return std::nullopt;
     
     return std::optional<Lifetime>(lifetime.get());
   }
 
-  ObjectsLifetimes &GetReturnLifetime() { return ReturnLifetime; }
+  ObjectLifetimes &GetReturnLifetime() { return ReturnLifetime; }
   Lifetime &GetReturnLifetime(clang::QualType &type) {
     return ReturnLifetime.GetLifetime(type);
   }
 
   void InsertParamLifetime(const clang::ParmVarDecl *param,
-                           ObjectsLifetimes &objectsLifetimes) {
+                           ObjectLifetimes &objectsLifetimes) {
     Params.emplace_back(param);
     ParamsLifetimes[param] = objectsLifetimes;
   }
@@ -105,7 +105,7 @@ class FunctionLifetimes {
   // stores param lifetimes in order
   std::vector<const clang::ParmVarDecl *> Params;
   ParamsLifetimesMap ParamsLifetimes;
-  ObjectsLifetimes ReturnLifetime;
+  ObjectLifetimes ReturnLifetime;
   int FuncId;
 
   // TODO this

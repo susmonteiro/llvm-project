@@ -16,7 +16,7 @@ VariableLifetimesVector &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
   return VariableLifetimes;
 }
 
-ObjectsLifetimes &LifetimeAnnotationsAnalysis::GetObjectsLifetimes(
+ObjectLifetimes &LifetimeAnnotationsAnalysis::GetObjectLifetimes(
     const clang::VarDecl *var_decl) {
   return VariableLifetimes[var_decl];
 }
@@ -51,7 +51,7 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
     const clang::VarDecl *var_decl, clang::QualType &type) const {
   auto it = VariableLifetimes.find(var_decl);
   if (it != VariableLifetimes.end()) {
-    ObjectsLifetimes ol = it->second;
+    ObjectLifetimes ol = it->second;
     return ol.GetLifetime(type).IsNotSet();
   } else {
     // TODO error?
@@ -131,7 +131,7 @@ LifetimeAnnotationsAnalysis::InitializeWorklist() const {
 void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
   // iterate over variables with no fixed lifetime
   for (const auto &pair : LifetimeDependencies) {
-    auto &lifetimes = GetObjectsLifetimes(pair.first.first).GetLifetimes();
+    auto &lifetimes = GetObjectLifetimes(pair.first.first).GetLifetimes();
     for (auto &objectLifetime : lifetimes) {
       Lifetime &lifetime = objectLifetime;
       if (lifetime.IsNotSet()) {

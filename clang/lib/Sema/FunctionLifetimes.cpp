@@ -194,22 +194,22 @@ llvm::Expected<Lifetime> FunctionLifetimeFactory::LifetimeFromName(
   return Lifetime(name_str, canonical_type);
 }
 
-llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateParamLifetimes(
+llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateParamLifetimes(
     clang::QualType param_type, clang::TypeLoc param_type_loc) const {
   return CreateLifetime(param_type, param_type_loc, ParamLifetimeFactory());
 }
 
-llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateReturnLifetimes(
+llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateReturnLifetimes(
     clang::QualType return_type, clang::TypeLoc return_type_loc) const {
   return CreateLifetime(return_type, return_type_loc, ReturnLifetimeFactory());
 }
 
-llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateVarLifetimes(
+llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateVarLifetimes(
     clang::QualType var_type, clang::TypeLoc var_type_loc) const {
   return CreateLifetime(var_type, var_type_loc, VarLifetimeFactory());
 }
 
-llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
+llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
     clang::QualType qualtype, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
   assert(!qualtype.isNull());
@@ -274,7 +274,7 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
   // TODO this is already done in the previous function
   clang::QualType pointee = PointeeType(qualtype);
   // TODO change this
-  if (pointee.isNull()) return ObjectsLifetimes();
+  if (pointee.isNull()) return ObjectLifetimes();
 
   clang::TypeLoc pointee_type_loc;
   if (type_loc) {
@@ -287,7 +287,7 @@ llvm::Expected<ObjectsLifetimes> FunctionLifetimeFactory::CreateLifetime(
 
   // TODO is this ok?
   // recursive call
-  ObjectsLifetimes retObjectLifetimes;
+  ObjectLifetimes retObjectLifetimes;
   if (llvm::Error err =
           CreateLifetime(pointee, pointee_type_loc, lifetime_factory)
               .moveInto(retObjectLifetimes)) {
@@ -494,7 +494,7 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
 
-      ObjectsLifetimes tmpObjectLifetimes;
+      ObjectLifetimes tmpObjectLifetimes;
 
       // TODO check if this covers everything that should have a lifetime
       clang::TypeLoc pointee_type_loc;

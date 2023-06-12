@@ -17,7 +17,7 @@
 namespace clang {
 
 using VariableLifetimesVector =
-    llvm::DenseMap<const clang::VarDecl *, ObjectsLifetimes>;
+    llvm::DenseMap<const clang::VarDecl *, ObjectLifetimes>;
 
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>;
@@ -56,7 +56,7 @@ class LifetimeAnnotationsAnalysis {
   LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info);
 
   VariableLifetimesVector &GetVariableLifetimes();
-  ObjectsLifetimes &GetObjectsLifetimes(const clang::VarDecl *var_decl);
+  ObjectLifetimes &GetObjectLifetimes(const clang::VarDecl *var_decl);
   Lifetime &GetLifetime(const clang::VarDecl *var_decl, clang::QualType type);
   Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl,
                                clang::QualType type);
@@ -92,15 +92,15 @@ class LifetimeAnnotationsAnalysis {
   }
 
   void CreateVariable(const clang::VarDecl *var_decl, clang::QualType &type) {
-    VariableLifetimes[var_decl] = ObjectsLifetimes(Lifetime(type));
+    VariableLifetimes[var_decl] = ObjectLifetimes(Lifetime(type));
   }
 
   void CreateVariable(const clang::VarDecl *var_decl, Lifetime &lifetime) {
-    VariableLifetimes[var_decl] = ObjectsLifetimes(lifetime);
+    VariableLifetimes[var_decl] = ObjectLifetimes(lifetime);
   }
 
   void CreateVariable(const clang::VarDecl *var_decl,
-                      ObjectsLifetimes objectsLifetime) {
+                      ObjectLifetimes objectsLifetime) {
     VariableLifetimes[var_decl] = objectsLifetime;
   }
 
@@ -133,7 +133,7 @@ class LifetimeAnnotationsAnalysis {
   // ? can one stmt point to more than one var_decl?
   StmtVarDependenciesMap StmtDependencies;
   PointsToMap PointsTo;
-  ObjectsLifetimes ReturnLifetime;
+  ObjectLifetimes ReturnLifetime;
 
   // TODO this
   // std::optional<ValueLifetimes> this_lifetimes_;

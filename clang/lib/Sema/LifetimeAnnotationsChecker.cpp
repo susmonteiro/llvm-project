@@ -156,7 +156,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> shortest_lifetimes;
     llvm::DenseSet<const clang::Stmt *> stmts;
 
-    // ObjectsLifetimes objectLifetimes = State.GetObjectsLifetimes(el);
+    // ObjectLifetimes objectLifetimes = State.GetObjectLifetimes(el);
     // debugLifetimes("Processing " + objectLifetimes.DebugString());
 
     for (auto &stmt : children[el]) {

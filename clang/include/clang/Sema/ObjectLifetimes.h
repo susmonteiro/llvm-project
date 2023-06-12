@@ -10,10 +10,10 @@
 
 namespace clang {
 
-class ObjectsLifetimes {
+class ObjectLifetimes {
  public:
-  ObjectsLifetimes() {}
-  ObjectsLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
+  ObjectLifetimes() {}
+  ObjectLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
 
   Lifetime& GetLifetime(clang::QualType& type) {
     type = type.getCanonicalType();
@@ -61,7 +61,7 @@ class ObjectsLifetimes {
   }
 
   std::string DebugString() const {
-    std::string res = "[ObjectsLifetimes]:\n";
+    std::string res = "[ObjectLifetimes]:\n";
     for (auto& pointee : PointeeObjects) {
       res += pointee.DebugString();
     }
