@@ -36,7 +36,11 @@ class LifetimesPropagationVisitor
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
   std::optional<std::string> VisitUnaryAddrOf(const clang::UnaryOperator *op);
   std::optional<std::string> VisitUnaryDeref(const clang::UnaryOperator *op);
-  
+
+  void PropagateBinAssign(const clang::Expr *lhs, const clang::Expr *rhs,
+                          const clang::Expr *expr,
+                          const clang::BinaryOperator *op) const;
+
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;

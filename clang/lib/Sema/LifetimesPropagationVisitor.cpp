@@ -48,6 +48,21 @@ ObjectsLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
   return objectsLifetimes;
 }
 
+void LifetimesPropagationVisitor::PropagateBinAssign(
+    const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
+    const clang::BinaryOperator *op) const {
+  if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) return;
+  const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
+  if (const auto *lhs_var_decl =
+          dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
+    clang::QualType lhs_type = lhs->getType().getCanonicalType();
+    if (State.IsLifetimeNotset(lhs_var_decl, lhs_type)) {
+      TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op,
+                  PointsTo, State);
+    }
+  }
+}
+
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
@@ -72,19 +87,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
 
-  for (const auto &expr : lhs_points_to) {
-    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
-      if (const auto *lhs_var_decl =
-              dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-        clang::QualType lhs_type = lhs->getType().getCanonicalType();
-        if (State.IsLifetimeNotset(lhs_var_decl, lhs_type)) {
-          TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op,
-                      PointsTo, State);
-        }
-      }
-    }
+  if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
+    PropagateBinAssign(lhs, rhs, lhs_decl_ref_expr, op);
   }
+
+  for (const auto &expr : lhs_points_to) {
+    PropagateBinAssign(lhs, rhs, expr, op);
+  }
+
   return std::nullopt;
 }
 

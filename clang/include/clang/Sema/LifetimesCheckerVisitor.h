@@ -34,7 +34,7 @@ class LifetimesCheckerVisitor
   void VerifyBinAssign(
       const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
       const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
-      const clang::BinaryOperator *op);
+      const clang::BinaryOperator *op) const;
 
   void CompareAndCheckLifetimes(Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
                                 const clang::VarDecl *lhs_var_decl,

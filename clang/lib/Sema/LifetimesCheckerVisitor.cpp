@@ -104,7 +104,7 @@ void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
 void LifetimesCheckerVisitor::VerifyBinAssign(
     const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
     const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
-    const clang::BinaryOperator *op) {
+    const clang::BinaryOperator *op) const {
   if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) {
     return;
   }
