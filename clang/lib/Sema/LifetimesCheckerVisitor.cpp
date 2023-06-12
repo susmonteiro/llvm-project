@@ -101,6 +101,78 @@ void LifetimesCheckerVisitor::CompareAndCheckLifetimes(
   }
 }
 
+void LifetimesCheckerVisitor::VerifyBinAssign(
+    const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
+    const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
+    const clang::BinaryOperator *op) {
+  if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) {
+    return;
+  }
+
+  const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
+  if (const auto *lhs_var_decl =
+          dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
+    clang::QualType lhs_type = lhs->getType().getCanonicalType();
+    Lifetime &lhs_lifetime = State.GetLifetime(lhs_var_decl, lhs_type);
+    for (const auto &expr : rhs_points_to) {
+      if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+        const auto *rhs_decl_ref_expr =
+            clang::dyn_cast<clang::DeclRefExpr>(expr);
+        clang::QualType rhs_type = rhs->getType();
+        if (!rhs_type->isPointerType() && !rhs_type->isReferenceType()) {
+          continue;
+        }
+
+        // there can only be one pointer/reference variable
+        if (const auto *rhs_var_decl =
+                dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
+          Lifetime &rhs_lifetime = State.GetLifetime(rhs_var_decl, rhs_type);
+          if (rhs_lifetime < lhs_lifetime) {
+            if (lhs_lifetime.IsNotSet()) {
+              debugWarn("LHS LIFETIME IS NOT SET");
+              // TODO should this case exist?
+              // ! if LHS lifetime is not set then it will have all
+              // lifetimes from ! rhs because of the propagation
+              //   for (char l : lhs_lifetime.GetShortestLifetimes()) {
+              //     if (l == rhs_lifetime.GetId()) continue;
+              //     S.Diag(op->getExprLoc(),
+              //     diag::warn_assign_lifetimes_differ)
+              //         << rhs_lifetime.GetLifetimeName()
+              //         << lhs_lifetime.GetLifetimeName(l) <<
+              //         op->getSourceRange();
+              //   }
+              //   // TODO implement the notes in this case
+            } else if (rhs_lifetime.IsNotSet()) {
+              const auto &rhs_shortest_lifetimes =
+                  rhs_lifetime.GetShortestLifetimes();
+              for (unsigned int i = 0; i < rhs_shortest_lifetimes.size(); i++) {
+                if (rhs_shortest_lifetimes[i].empty() ||
+                    (char)i == lhs_lifetime.GetId())
+                  continue;
+                S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+                    << lhs_lifetime.GetLifetimeName()
+                    << rhs_lifetime.GetLifetimeName(i) << op->getSourceRange();
+                PrintNotes(lhs_lifetime, lhs_var_decl,
+                           diag::note_lifetime_declared_here, i);
+              }
+              PrintNotes(lhs_lifetime, lhs_var_decl,
+                         diag::note_lifetime_declared_here);
+            } else {
+              S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
+                  << lhs_lifetime.GetLifetimeName()
+                  << rhs_lifetime.GetLifetimeName() << op->getSourceRange();
+              PrintNotes(rhs_lifetime, rhs_var_decl,
+                         diag::note_lifetime_declared_here);
+              PrintNotes(lhs_lifetime, lhs_var_decl,
+                         diag::note_lifetime_declared_here);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
@@ -109,8 +181,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   const auto &lhs = op->getLHS()->IgnoreParens();
 
   // Because of how we handle reference-like structs, a member access to a
-  // non-reference-like field in a struct might still produce lifetimes. We
-  // don't want to change points-to sets in those cases.
+  // non-reference-like field in a struct might still produce lifetimes.
+  // We don't want to change points-to sets in those cases.
   // TODO need to check for references?
   if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
     debugWarn("LHS of bin_op is not pointer type");
@@ -136,74 +208,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   }
 
-  for (const auto &expr : lhs_points_to) {
-    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
-      if (const auto *lhs_var_decl =
-              dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-        clang::QualType lhs_type = lhs->getType().getCanonicalType();
-        Lifetime &lhs_lifetime = State.GetLifetime(lhs_var_decl, lhs_type);
-        for (const auto &expr : rhs_points_to) {
-          if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-            const auto *rhs_decl_ref_expr =
-                clang::dyn_cast<clang::DeclRefExpr>(expr);
-            clang::QualType rhs_type = rhs->getType();
-            if (!rhs_type->isPointerType() && !rhs_type->isReferenceType()) {
-              continue;
-            }
+  if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
+    VerifyBinAssign(lhs, rhs, lhs_decl_ref_expr, rhs_points_to, op);
+  }  
 
-            // there can only be one pointer/reference variable
-            if (const auto *rhs_var_decl =
-                    dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
-              Lifetime &rhs_lifetime =
-                  State.GetLifetime(rhs_var_decl, rhs_type);
-              if (rhs_lifetime < lhs_lifetime) {
-                if (lhs_lifetime.IsNotSet()) {
-                  debugWarn("LHS LIFETIME IS NOT SET");
-                  // TODO should this case exist?
-                  // ! if LHS lifetime is not set then it will have all
-                  // lifetimes from ! rhs because of the propagation
-                  //   for (char l : lhs_lifetime.GetShortestLifetimes()) {
-                  //     if (l == rhs_lifetime.GetId()) continue;
-                  //     S.Diag(op->getExprLoc(),
-                  //     diag::warn_assign_lifetimes_differ)
-                  //         << rhs_lifetime.GetLifetimeName()
-                  //         << lhs_lifetime.GetLifetimeName(l) <<
-                  //         op->getSourceRange();
-                  //   }
-                  //   // TODO implement the notes in this case
-                } else if (rhs_lifetime.IsNotSet()) {
-                  const auto &rhs_shortest_lifetimes =
-                      rhs_lifetime.GetShortestLifetimes();
-                  for (unsigned int i = 0; i < rhs_shortest_lifetimes.size();
-                       i++) {
-                    if (rhs_shortest_lifetimes[i].empty() ||
-                        (char)i == lhs_lifetime.GetId())
-                      continue;
-                    S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-                        << lhs_lifetime.GetLifetimeName()
-                        << rhs_lifetime.GetLifetimeName(i)
-                        << op->getSourceRange();
-                    PrintNotes(lhs_lifetime, lhs_var_decl,
-                               diag::note_lifetime_declared_here, i);
-                  }
-                  PrintNotes(lhs_lifetime, lhs_var_decl,
-                             diag::note_lifetime_declared_here);
-                } else {
-                  S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-                      << lhs_lifetime.GetLifetimeName()
-                      << rhs_lifetime.GetLifetimeName() << op->getSourceRange();
-                  PrintNotes(rhs_lifetime, rhs_var_decl,
-                             diag::note_lifetime_declared_here);
-                  PrintNotes(lhs_lifetime, lhs_var_decl,
-                             diag::note_lifetime_declared_here);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+  for (const auto &expr : lhs_points_to) {
+    VerifyBinAssign(lhs, rhs, expr, rhs_points_to, op);
   }
   return std::nullopt;
 }

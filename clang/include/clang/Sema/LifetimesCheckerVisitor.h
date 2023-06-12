@@ -31,15 +31,21 @@ class LifetimesCheckerVisitor
   // TODO delete this
   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
+  void VerifyBinAssign(
+      const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
+      const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
+      const clang::BinaryOperator *op);
+
   void CompareAndCheckLifetimes(Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
                                 const clang::VarDecl *lhs_var_decl,
                                 const clang::ValueDecl *rhs_var_decl, int warn,
                                 int note) const;
 
-  void CompareAndCheckLifetimes(
-      Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
-      const clang::VarDecl *lhs_var_decl, clang::SourceLocation loc,
-      clang::SourceRange range, int warn, int note) const;
+  void CompareAndCheckLifetimes(Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
+                                const clang::VarDecl *lhs_var_decl,
+                                clang::SourceLocation loc,
+                                clang::SourceRange range, int warn,
+                                int note) const;
 
   void PrintNotes(Lifetime &lifetime, const clang::NamedDecl *var_decl,
                   int msg) const;

@@ -247,7 +247,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
   }
 
   assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
-
   PointsTo.InsertExprLifetimes(decl_ref, nullptr);
 
   // TODO
