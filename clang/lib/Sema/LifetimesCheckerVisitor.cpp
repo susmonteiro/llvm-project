@@ -105,8 +105,6 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
                    (char)i);
       }
     } else {
-      expr->dump();
-      return_stmt->dump();
       S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
           << return_lifetime.GetLifetimeName() << var_lifetime.GetLifetimeName()
           << return_stmt->getSourceRange();

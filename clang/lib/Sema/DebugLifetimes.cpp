@@ -94,8 +94,8 @@ void debugLifetimes(
       if (var == rhs_var) continue;
       res += rhs_var->getNameAsString() + ' ';
     }
-    res += '\n';
   }
+  res += '\n';
   debugLifetimes(res);
 }
 
