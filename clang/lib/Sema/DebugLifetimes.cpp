@@ -90,8 +90,9 @@ void debugLifetimes(
   res += "Dependencies of " + var->getNameAsString() + ": ";
   res += "[Type]: " + type.getAsString() + "\t[vars]: ";
   for (const auto &stmt : var_stmt) {
-    for (const auto &var : stmt_var[stmt]) {
-      res += var->getNameAsString() + ' ';
+    for (const auto &rhs_var : stmt_var[stmt]) {
+      if (var == rhs_var) continue;
+      res += rhs_var->getNameAsString() + ' ';
     }
     res += '\n';
   }

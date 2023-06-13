@@ -79,17 +79,29 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
   //     type->isStructureOrClassType()) {
   //   // TODO implement
   // }
-  // if (from != to) {
+  // if (from != to) { }
+
   // TODO
+
+  if (IsLifetimeNotset(from, from_type)) {
+    CreateLifetimeDependency(from, from_type, loc);
+    CreateStmtDependency(loc, to);
+  }
+
+  from_type = from_type->getPointeeType();
+
   debugLifetimes("Type of lhs", from_type.getAsString());
   while (from_type->isPointerType() || from_type->isReferenceType()) {
     if (IsLifetimeNotset(from, from_type)) {
       CreateLifetimeDependency(from, from_type, loc);
       CreateStmtDependency(loc, to);
     }
+    if (IsLifetimeNotset(to, from_type)) {
+      CreateLifetimeDependency(to, from_type, loc);
+      CreateStmtDependency(loc, from);
+    }
     from_type = from_type->getPointeeType();
   }
-  // }
 }
 
 VarStmtDependenciesMap &LifetimeAnnotationsAnalysis::GetLifetimeDependencies() {
@@ -119,7 +131,7 @@ LifetimeAnnotationsAnalysis::TransposeDependencies() {
     clang::QualType type = pair.first.second;
     for (const auto &stmt : pair.second) {
       for (const auto &child : StmtDependencies[stmt]) {
-        if (IsLifetimeNotset(child, type))
+        if (IsLifetimeNotset(child, type) && pair.first.first != child)
           result[std::pair(child, type)].insert(pair.first);
       }
     }
@@ -162,8 +174,10 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
     str += pair.first.first->getNameAsString() + ": ";
     str += "[type] " + pair.first.second.getAsString() + "\t[var] ";
     for (const auto &stmt : pair.second) {
-      for (const auto &var : StmtDependencies[stmt])
+      for (const auto &var : StmtDependencies[stmt]) {
+        if (pair.first.first == var) continue;
         str += var->getNameAsString() + ' ';
+      }
     }
     str += '\n';
   }
