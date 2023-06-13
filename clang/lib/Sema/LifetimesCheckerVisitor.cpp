@@ -186,16 +186,17 @@ void LifetimesCheckerVisitor::CompareAndCheck(
       // there can only be one pointer/reference variable
       if (const auto *rhs_var_decl =
               dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
-        while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
+        clang::QualType current_type = lhs_type;
+        while (current_type->isPointerType() || current_type->isReferenceType()) {
           Lifetime &lhs_lifetime =
-              return_lifetime ? State.GetReturnLifetime(lhs_type)
-                              : State.GetLifetime(lhs_var_decl, lhs_type);
-          Lifetime &rhs_lifetime = State.GetLifetime(rhs_var_decl, lhs_type);
+              return_lifetime ? State.GetReturnLifetime(current_type)
+                              : State.GetLifetime(lhs_var_decl, current_type);
+          Lifetime &rhs_lifetime = State.GetLifetime(rhs_var_decl, current_type);
           if (rhs_lifetime < lhs_lifetime) {
             factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                     rhs_lifetime);
           }
-          lhs_type = lhs_type->getPointeeType();
+          current_type = current_type->getPointeeType();
         }
       }
     }
@@ -306,15 +307,14 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   }
 
   const auto &return_value = return_stmt->getRetValue()->IgnoreParens();
-  const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
 
   // TODO remove this
-  if (return_expr.empty()) {
+  if (PointsTo.IsEmpty(return_value)) {
     debugWarn("Return expr is not in PointsToMap");
     Visit(const_cast<clang::Expr *>(return_value));
-    const auto &lhs_points_to = PointsTo.GetExprPointsTo(return_value);
   }
-  debugLifetimes("Before compare and check");
+
+  const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
   CompareAndCheck(nullptr, return_type, return_value, return_stmt, return_expr,
                   nullptr, true, Factory.ReturnStmtFactory());
   return std::nullopt;

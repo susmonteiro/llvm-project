@@ -109,6 +109,10 @@ class PointsToMap {
     return ExprPointsTo[expr];
   }
 
+  bool IsEmpty(const clang::Expr* expr) {
+    return ExprPointsTo[expr].empty();
+  }
+
   void InsertExprLifetimes(const clang::Expr* parent,
                            const clang::Expr* child) {
     ExprPointsTo[parent].insert(child);
