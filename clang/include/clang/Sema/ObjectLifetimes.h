@@ -53,11 +53,19 @@ class ObjectLifetimes {
 
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
     assert(lifetime.GetType().has_value());
-    return PointeeObjects.emplace_back(lifetime);
+    clang::QualType type = lifetime.GetType().value();
+    debugLifetimes("Before emplace", DebugString());
+    PointeeObjects.emplace_back(lifetime);
+    debugLifetimes("After emplace", DebugString());
+    return GetLifetime(type);
   }
 
   Lifetime& InsertPointeeObject(clang::QualType type) {
-    return PointeeObjects.emplace_back(type);
+    debugLifetimes("Before emplace", DebugString());
+    PointeeObjects.emplace_back(type);
+    debugLifetimes("After emplace", DebugString());
+    return GetLifetime(type);
+
   }
 
   std::string DebugString() const {
@@ -68,14 +76,14 @@ class ObjectLifetimes {
     return res;
   }
 
-  bool IsLifetimeNotSet() {
-    for (auto& pointee : PointeeObjects) {
-      if (pointee.IsNotSet()) {
-        return true;
-      }
-    }
-    return false;
-  }
+  // bool IsLifetimeNotSet() {
+  //   for (auto& pointee : PointeeObjects) {
+  //     if (pointee.IsNotSet()) {
+  //       return true;
+  //     }
+  //   }
+  //   return false;
+  // }
 
  private:
   llvm::SmallVector<Lifetime> PointeeObjects;
