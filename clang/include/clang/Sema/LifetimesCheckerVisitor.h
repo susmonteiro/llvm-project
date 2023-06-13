@@ -12,13 +12,44 @@
 
 namespace clang {
 
+using PrintNotesFactory =
+    std::function<void(const clang::VarDecl *, const clang::VarDecl *,
+                       const clang::BinaryOperator *, const clang::Expr *,
+                       const clang::Stmt *, Lifetime &, Lifetime &)>;
+
+class LifetimesCheckerVisitorFactory {
+ public:
+  // TODO implement constructor
+  LifetimesCheckerVisitorFactory(Sema &sema) : S(sema) {}
+
+  void PrintNotes(Lifetime &lifetime, const clang::VarDecl *var_decl,
+                  int msg) const;
+  void PrintNotes(Lifetime &lifetime, clang::SourceLocation loc,
+                  clang::SourceRange range, int msg) const;
+  void PrintNotes(Lifetime &lifetime, const clang::VarDecl *var_decl, int msg,
+                  char id) const;
+  void PrintNotes(Lifetime &lifetime, clang::SourceLocation Loc,
+                  clang::SourceRange range, int msg, char id) const;
+
+  PrintNotesFactory BinAssignFactory() const;
+  PrintNotesFactory DeclStmtFactory() const;
+  PrintNotesFactory ReturnStmtFactory() const;
+
+ private:
+  Sema &S;
+};
+
 class LifetimesCheckerVisitor
     : public clang::StmtVisitor<LifetimesCheckerVisitor,
                                 std::optional<std::string>> {
  public:
   LifetimesCheckerVisitor(const clang::FunctionDecl *func,
                           LifetimeAnnotationsAnalysis &state, Sema &sema)
-      : Func(func), State(state), PointsTo(state.GetPointsTo()), S(sema) {}
+      : Func(func),
+        State(state),
+        PointsTo(state.GetPointsTo()),
+        S(sema),
+        Factory(sema) {}
 
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
@@ -32,35 +63,23 @@ class LifetimesCheckerVisitor
   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
   void VerifyBinAssign(
-      const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
+      clang::QualType lhs_type, const clang::Expr *rhs, const clang::Expr *expr,
       const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
-      const clang::BinaryOperator *op) const;
+      const clang::BinaryOperator *op, PrintNotesFactory factory) const;
 
-  void CompareAndCheckLifetimes(const clang::VarDecl *lhs_var_decl,
-                                const clang::VarDecl *rhs_var_decl,
-                                clang::QualType lhs_type, int warn,
-                                int note) const;
-
-  void CompareAndCheckLifetimes(Lifetime &lhs_lifetime, Lifetime &rhs_lifetime,
-                                const clang::VarDecl *lhs_var_decl,
-                                clang::SourceLocation loc,
-                                clang::SourceRange range, int warn,
-                                int note) const;
-
-  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl *var_decl,
-                  int msg) const;
-  void PrintNotes(Lifetime &lifetime, clang::SourceLocation loc,
-                  clang::SourceRange range, int msg) const;
-  void PrintNotes(Lifetime &lifetime, const clang::NamedDecl *var_decl, int msg,
-                  char id) const;
-  void PrintNotes(Lifetime &lifetime, clang::SourceLocation Loc,
-                  clang::SourceRange range, int msg, char id) const;
+  void CompareAndCheck(
+      const clang::VarDecl *lhs_var_decl, clang::QualType lhs_type,
+      const clang::Expr *rhs, const clang::Stmt *stmt,
+      const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
+      const clang::BinaryOperator *op, bool return_lifetime,
+      PrintNotesFactory factory) const;
 
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;
   PointsToMap &PointsTo;
   Sema &S;
+  LifetimesCheckerVisitorFactory Factory;
   bool debugEnabled = true;  // TODO delete this
 };
 
