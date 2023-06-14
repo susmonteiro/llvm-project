@@ -17,6 +17,12 @@ using LifetimeFactory = std::function<llvm::Expected<Lifetime>(
 using ParamsLifetimesMap =
     llvm::DenseMap<const clang::ParmVarDecl *, ObjectLifetimes>;
 
+using ParamIdxPair = std::pair<const clang::ParmVarDecl *, unsigned int>;
+
+// for each level of indirections, store the params with that level of
+// indirection idx = 0, int*; idx = 1, int**; etc
+using ParamsByTypeVector = llvm::SmallVector<llvm::SmallVector<ParamIdxPair>>;
+
 class FunctionLifetimeFactory {
  public:
   FunctionLifetimeFactory(
@@ -63,20 +69,21 @@ class FunctionLifetimes {
   std::vector<const clang::ParmVarDecl *> GetParamsInOrder() const {
     return Params;
   }
+
+  ParamsByTypeVector GetParamsByType() const { return ParamsByType; }
+
   const clang::ParmVarDecl *GetParam(unsigned int i) const { return Params[i]; }
 
   ParamsLifetimesMap GetParamsLifetimes() const { return ParamsLifetimes; }
 
-  std::optional<Lifetime> GetParamLifetime(const clang::ParmVarDecl *param,
-                                           clang::QualType type) const {
+  Lifetime &GetParamLifetime(const clang::ParmVarDecl *param,
+                             clang::QualType type) {
+    type = type.getCanonicalType();
     auto it = ParamsLifetimes.find(param);
-    if (it == ParamsLifetimes.end()) return std::nullopt;
+    assert(it != ParamsLifetimes.end());
 
-    ObjectLifetimes objects_lifetimes = it->second;
-    llvm::Expected<Lifetime &> lifetime = objects_lifetimes.GetLifetime(type);
-    if (!lifetime) return std::nullopt;
-    
-    return std::optional<Lifetime>(lifetime.get());
+    ObjectLifetimes object_lifetimes = it->second;
+    return object_lifetimes.GetLifetimeOrLocal(type);
   }
 
   ObjectLifetimes &GetReturnLifetime() { return ReturnLifetime; }
@@ -90,7 +97,10 @@ class FunctionLifetimes {
     ParamsLifetimes[param] = objectsLifetimes;
   }
 
+  void ProcessParams();
+
   std::string DebugParams();
+  std::string DebugParamsByType();
   std::string DebugReturn();
   std::string DebugString();
 
@@ -105,6 +115,7 @@ class FunctionLifetimes {
   // stores param lifetimes in order
   std::vector<const clang::ParmVarDecl *> Params;
   ParamsLifetimesMap ParamsLifetimes;
+  ParamsByTypeVector ParamsByType;
   ObjectLifetimes ReturnLifetime;
   int FuncId;
 

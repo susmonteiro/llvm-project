@@ -79,8 +79,16 @@ unsigned int Lifetime::GetNumberIndirections(clang::QualType type) {
     // TODO uncomment or delete comment
     type = type->getPointeeType()/* .getCanonicalType() */;
   }
-  debugLifetimes("Number of indirections", num_indirections_lhs);
   return num_indirections_lhs;
+}
+
+clang::QualType Lifetime::GetTypeFromNumberIndirections(clang::QualType type, unsigned int number_indirections) {
+  while(number_indirections > 0) {
+    assert(type->isPointerType() || type->isReferenceType());
+    type = type->getPointeeType();
+    --number_indirections;
+  }
+  return type;
 }
 
 

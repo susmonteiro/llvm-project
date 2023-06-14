@@ -75,8 +75,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
     return std::nullopt;
   }
 
-  Lifetime::GetNumberIndirections(lhs->getType().getCanonicalType());
-
   Visit(lhs);
   PointsTo.InsertExprLifetimes(op, lhs);
 
@@ -125,10 +123,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     unsigned int i = -1;
     while (++i < func_info.GetNumParams()) {
       const clang::ParmVarDecl *param = func_info.GetParam(i);
+      if (!param->getType()->isPointerType() &&
+          !param->getType()->isReferenceType()) {
+        debugWarn("Param type is not pointer type");
+        continue;
+      }
       const auto &param_lifetime =
           func_info.GetParamLifetime(param, param->getType());
-      if (param_lifetime.has_value() &&
-          param_lifetime.value() == return_lifetime) {
+      if (param_lifetime == return_lifetime) {
         const Expr *arg = call->getArg(i)->IgnoreParens();
         Visit(const_cast<clang::Expr *>(arg));
         PointsTo.InsertExprLifetimes(call, arg);

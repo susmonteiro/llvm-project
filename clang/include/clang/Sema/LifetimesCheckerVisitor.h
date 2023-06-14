@@ -43,15 +43,19 @@ class LifetimesCheckerVisitor
     : public clang::StmtVisitor<LifetimesCheckerVisitor,
                                 std::optional<std::string>> {
  public:
-  LifetimesCheckerVisitor(const clang::FunctionDecl *func,
-                          LifetimeAnnotationsAnalysis &state, Sema &sema)
+  LifetimesCheckerVisitor(
+      const clang::FunctionDecl *func, LifetimeAnnotationsAnalysis &state,
+      Sema &sema,
+      llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &func_info)
       : Func(func),
         State(state),
+        FuncInfo(func_info),
         PointsTo(state.GetPointsTo()),
         S(sema),
         Factory(sema) {}
 
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
+  std::optional<std::string> VisitCallExpr(const clang::CallExpr *call);
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitReturnStmt(
@@ -77,6 +81,7 @@ class LifetimesCheckerVisitor
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;
+  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &FuncInfo;
   PointsToMap &PointsTo;
   Sema &S;
   LifetimesCheckerVisitorFactory Factory;

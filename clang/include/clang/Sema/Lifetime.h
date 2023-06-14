@@ -54,9 +54,12 @@ class Lifetime {
   static char CharToId(char id) { return id < OFFSET ? id : id - 'a' + OFFSET; }
   static char IdToChar(char id) { return id < OFFSET ? id : id + 'a' - OFFSET; }
   static unsigned int GetNumberIndirections(clang::QualType type);
+  static clang::QualType GetTypeFromNumberIndirections(
+      clang::QualType type, unsigned int number_indirections);
 
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }
+  char GetIdNoOffset() const { return Id - OFFSET; }
   void SetId(char id) { Id = id; }
   std::optional<clang::QualType> GetType() const { return LifetimeType; }
   void SetType(clang::QualType type) {
@@ -117,7 +120,8 @@ class Lifetime {
   //     llvm::DenseMap<clang::QualType, llvm::DenseSet<const clang::Stmt *>>
   //         stmts,
   //     LifetimesVector &shortest_lifetimes) {
-  //   Lifetime::GetAndResizeShortestLifetime(id, shortest_lifetimes)->insert(stmts.begin(), stmts.end());
+  //   Lifetime::GetAndResizeShortestLifetime(id,
+  //   shortest_lifetimes)->insert(stmts.begin(), stmts.end());
   // }
 
   void InsertShortestLifetimes(char id, const clang::Stmt *stmt) {

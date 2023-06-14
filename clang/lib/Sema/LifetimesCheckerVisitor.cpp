@@ -86,12 +86,12 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
 }
 
 PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
-  return [this](const clang::VarDecl *_lhs_var_decl, const clang::VarDecl *var_decl,
+  return [this](const clang::VarDecl *_lhs_var_decl,
+                const clang::VarDecl *var_decl,
                 const clang::BinaryOperator *_op, const clang::Expr *expr,
                 const clang::Stmt *return_stmt, Lifetime &return_lifetime,
                 Lifetime &var_lifetime) {
-    assert(var_decl != nullptr &&
-           expr != nullptr && return_stmt != nullptr);
+    assert(var_decl != nullptr && expr != nullptr && return_stmt != nullptr);
     if (var_lifetime.IsNotSet()) {
       const auto &var_shortest_lifetimes = var_lifetime.GetShortestLifetimes();
       for (unsigned int i = 0; i < var_shortest_lifetimes.size(); i++) {
@@ -185,11 +185,13 @@ void LifetimesCheckerVisitor::CompareAndCheck(
       if (const auto *rhs_var_decl =
               dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
         clang::QualType current_type = lhs_type;
-        while (current_type->isPointerType() || current_type->isReferenceType()) {
+        while (current_type->isPointerType() ||
+               current_type->isReferenceType()) {
           Lifetime &lhs_lifetime =
               return_lifetime ? State.GetReturnLifetime(current_type)
                               : State.GetLifetime(lhs_var_decl, current_type);
-          Lifetime &rhs_lifetime = State.GetLifetime(rhs_var_decl, current_type);
+          Lifetime &rhs_lifetime =
+              State.GetLifetime(rhs_var_decl, current_type);
           if (rhs_lifetime < lhs_lifetime) {
             factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                     rhs_lifetime);
@@ -246,6 +248,92 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   for (const auto &expr : lhs_points_to) {
     VerifyBinAssign(lhs_type, rhs, expr, rhs_points_to, op,
                     Factory.BinAssignFactory());
+  }
+  return std::nullopt;
+}
+
+const clang::VarDecl *GetDeclFromArg(const clang::Expr *arg) {
+  if (const auto *decl_ref_expr = dyn_cast<clang::DeclRefExpr>(arg)) {
+    return dyn_cast<clang::VarDecl>(decl_ref_expr->getDecl());
+  } else if (const auto *member_expr = dyn_cast<clang::MemberExpr>(arg)) {
+    return dyn_cast<clang::VarDecl>(member_expr->getMemberDecl());
+  } else {
+    return nullptr;
+  }
+}
+
+std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
+    const clang::CallExpr *call) {
+  if (debugEnabled) debugLifetimes("[VisitCallExpr]");
+
+  const clang::FunctionDecl *direct_callee = call->getDirectCallee();
+  if (direct_callee) {
+    auto it = FuncInfo.find(direct_callee);
+    if (it == FuncInfo.end()) {
+      // TODO error
+      debugWarn("Did not find function in FuncInfo");
+      return std::nullopt;
+    }
+
+    auto &func_info = FuncInfo[direct_callee];
+    const auto &params_by_type = func_info.GetParamsByType();
+    // llvm::SmallVector<const clang::ParmVarDecl *> params_set;
+    llvm::DenseMap<const clang::ParmVarDecl *,
+                   std::pair<clang::QualType, unsigned int>>
+        params_set;
+    // params_set.reserve(func_info.GetNumParams());
+
+    unsigned int num_indirections = params_by_type.size();
+
+    while (num_indirections-- != 0) {
+      debugLifetimes("Num indirections", num_indirections);
+      llvm::DenseMap<char,
+                     llvm::DenseSet<std::pair<clang::QualType, unsigned int>>>
+          param_lifetimes;
+      // get lifetimes for the current indirection level
+      for (const auto &pair : params_set) {
+        debugLifetimes("Found param set");
+        clang::QualType param_type = pair.second.first->getPointeeType();
+        params_set[pair.first].first = param_type;
+        Lifetime &param_lifetime = func_info.GetParamLifetime(pair.first, param_type);
+        param_lifetimes[param_lifetime.GetIdNoOffset()].insert(pair.second);
+      }
+      // check lifetimes of higher indirections
+      for (const auto &pair : param_lifetimes) {
+        debugLifetimes("Found param lifetimes");
+        if (pair.second.size() < 2) continue;
+        auto it = pair.second.begin();
+        const auto *previous_arg = GetDeclFromArg(call->getArg(it->second));
+        assert(previous_arg != nullptr);
+        Lifetime &previous = State.GetLifetime(previous_arg, (it->first));
+        while (++it != pair.second.end()) {
+          const auto *current_arg = GetDeclFromArg(call->getArg(it->second));
+          assert(current_arg != nullptr);
+          Lifetime &current = State.GetLifetime(current_arg, (it->first));
+          if (previous != current) {
+            // TODO show error
+            debugWarn("Param lifetimes do not match");
+            return std::nullopt;
+          }
+        }
+      }
+      // check lifetimes of current indirection level
+      // TODO make sure all of the params with the same lifetime as those in
+
+      // for (const auto &param_pair : params_by_type[num_indirections]) {
+      //   // param_lifetimes.reserve(params_set.size());
+      //   debugLifetimes("Iterate through params set");
+      //   if (params_set.empty()) continue;
+      //   // the set are called by params with a shorter lifetime
+      // }
+      debugLifetimes("Size of params set BEFORE", params_set.size());
+      // insert params for the next indirection level
+      for (const auto &param_pair : params_by_type[num_indirections]) {
+        params_set[param_pair.first] =
+            std::pair(param_pair.first->getType().getCanonicalType(), param_pair.second);
+      }
+      debugLifetimes("Size of params set AFTER", params_set.size());
+    }
   }
   return std::nullopt;
 }

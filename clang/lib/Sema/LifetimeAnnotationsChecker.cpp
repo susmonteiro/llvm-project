@@ -68,7 +68,7 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 
     // DEBUG
     // debugLifetimes(func_lifetimes.DebugString());
-
+    func_lifetimes.ProcessParams();
     FunctionInfo[func] = func_lifetimes;
     // TODO maybe keep track of analyzed functions
     // TODO need to check if the lifetimes in the declaration and definition are
@@ -215,7 +215,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 // statements and the attributions are correct
 void LifetimeAnnotationsChecker::CheckLifetimes(const clang::FunctionDecl *func,
                                                 Sema &S) {
-  LifetimesCheckerVisitor visitor(func, State, S);
+  LifetimesCheckerVisitor visitor(func, State, S, FunctionInfo);
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
 

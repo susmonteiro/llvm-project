@@ -432,6 +432,21 @@ LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
 
 FunctionLifetimes::FunctionLifetimes() : FuncId(INVALID) {}
 
+void FunctionLifetimes::ProcessParams() {
+  unsigned int idx = 0;
+  for (const auto& param : Params) {
+    clang::QualType type = param->getType().getCanonicalType();
+    unsigned int num_indirections = Lifetime::GetNumberIndirections(type);
+    if (num_indirections > 0) {
+      if (num_indirections >= ParamsByType.size()) {
+        ParamsByType.resize(num_indirections);
+      }
+      ParamsByType[num_indirections - 1].emplace_back(std::pair(param, idx++));
+    }
+  }
+  debugLifetimes(DebugParamsByType());
+}
+
 std::string FunctionLifetimes::DebugParams() {
   std::string res;
   res += "> Parameters Lifetimes:\n";
@@ -441,6 +456,25 @@ std::string FunctionLifetimes::DebugParams() {
            pair.second.DebugString() + '\n';
   }
   return res;
+}
+
+std::string FunctionLifetimes::DebugParamsByType() {
+  std::string res;
+  res += "> Parameters by Type:\n";
+  if (ParamsByType.empty()) {
+    res += "Empty\n";
+    return res;
+  }
+
+  unsigned int num_indirections = 1;
+  for (const auto& params : ParamsByType) {
+    res += "[" + std::to_string(num_indirections++) + " indirections]: ";
+    for (const auto& pair : params) {
+      res += pair.first->getNameAsString() + ", ";
+    }
+    res += '\n';
+  }
+  return res + '\n';
 }
 
 std::string FunctionLifetimes::DebugReturn() {

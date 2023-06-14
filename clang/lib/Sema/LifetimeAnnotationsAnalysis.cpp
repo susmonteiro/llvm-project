@@ -28,6 +28,7 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
     // TODO error
     CreateVariable(var_decl, Lifetime(type));
   }
+  debugLifetimes("Inside GetLifetime", DebugString());
   return VariableLifetimes[var_decl].GetLifetime(type);
 }
 
@@ -172,7 +173,7 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
   str += "\n>> Dependencies\n\n";
   for (const auto &pair : LifetimeDependencies) {
     str += pair.first.first->getNameAsString() + ": ";
-    str += "[type] " + pair.first.second.getAsString() + "\t[var] ";
+    str += "[type] " + pair.first.second.getAsString() + "\t\t[vars] ";
     for (const auto &stmt : pair.second) {
       for (const auto &var : StmtDependencies[stmt]) {
         if (pair.first.first == var) continue;
