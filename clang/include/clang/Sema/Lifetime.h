@@ -1,6 +1,7 @@
 #ifndef LIFETIME_ANNOTATIONS_LIFETIME_H_
 #define LIFETIME_ANNOTATIONS_LIFETIME_H_
 
+#include <set>
 #include <string>
 
 #include "clang/Sema/DebugLifetimes.h"
@@ -21,18 +22,11 @@ constexpr char OFFSET = 5;
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
  public:
-  Lifetime();
-  Lifetime(const Lifetime &other)
-      : LifetimeType(other.GetType()), Id(other.GetId()) {
-    // ReserveShortestLifetimes();
-  }
+  Lifetime() = default;
   Lifetime(llvm::StringRef name, clang::QualType type);
   Lifetime(char id);
   Lifetime(char id, clang::QualType type);
-  Lifetime(clang::QualType &type)
-      : LifetimeType(std::optional<clang::QualType>(type)), Id(NOTSET) {
-    // ReserveShortestLifetimes();
-  }
+  Lifetime(clang::QualType &type) : LifetimeType(type) {}
 
   // Returns whether this lifetime is valid
   bool IsNotSet() const;
@@ -61,10 +55,8 @@ class Lifetime {
   char GetId() const { return Id; }
   char GetIdNoOffset() const { return Id - OFFSET; }
   void SetId(char id) { Id = id; }
-  std::optional<clang::QualType> GetType() const { return LifetimeType; }
-  void SetType(clang::QualType type) {
-    LifetimeType = std::optional<clang::QualType>(type);
-  }
+  clang::QualType GetType() const { return LifetimeType; }
+  void SetType(clang::QualType type) { LifetimeType = type; }
 
   void ProcessShortestLifetimes();
   void ReserveShortestLifetimes() {
@@ -159,7 +151,6 @@ class Lifetime {
 
   bool CompareShortestLifetimes(const Lifetime &other) const;
 
-  Lifetime &operator=(const Lifetime &other);
   bool operator==(const Lifetime &Other) const;
   bool operator!=(const Lifetime &Other) const;
   bool operator>=(const Lifetime &Other) const;
@@ -173,8 +164,8 @@ class Lifetime {
 
   // TODO also store a vector with the lifetime ids that it depends on
   LifetimesVector ShortestLifetimes;
-  std::optional<clang::QualType> LifetimeType;
-  char Id;
+  clang::QualType LifetimeType;
+  char Id = NOTSET;
 };
 }  // namespace clang
 

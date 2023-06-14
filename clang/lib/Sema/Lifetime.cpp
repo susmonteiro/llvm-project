@@ -5,13 +5,7 @@ namespace clang {
 constexpr llvm::StringRef STATIC_NAME = "static";
 constexpr llvm::StringRef LOCAL_NAME = "local";
 
-Lifetime::Lifetime() : Id(NOTSET) { 
-  // ReserveShortestLifetimes(); 
-  }
-
 Lifetime::Lifetime(char id) {
-  // ReserveShortestLifetimes();
-
   if (id == NOTSET || id == LOCAL || id == STATIC) {
     Id = id;
   } else if (id >= 'a' && id <= 'z') {
@@ -25,9 +19,7 @@ Lifetime::Lifetime(char id) {
 
 // TODO change this
 Lifetime::Lifetime(char id, clang::QualType type)
-    : LifetimeType(std::optional<clang::QualType>(type)) {
-  // ReserveShortestLifetimes();
-
+    : LifetimeType(type) {
   if (id == NOTSET || id == LOCAL || id == STATIC) {
     Id = id;
   } else if (id >= 'a' && id <= 'z') {
@@ -40,19 +32,17 @@ Lifetime::Lifetime(char id, clang::QualType type)
 }
 
 Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
-    : LifetimeType(std::optional<clang::QualType>(type)) {
-  // ReserveShortestLifetimes();
-
+    : LifetimeType(type) {
   if (name.equals(STATIC_NAME)) {
-    *this = Lifetime(STATIC);
+    Id = STATIC;
   } else if (name.equals(LOCAL_NAME)) {
-    *this = Lifetime(LOCAL);
+    Id = LOCAL;
   } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
-    *this = Lifetime(name.front());
+    Id = CharToId(name.front());
   } else {
     // TODO error
     // TODO change this
-    *this = Lifetime(NOTSET);
+    Id = NOTSET;
   }
 }
 
@@ -121,8 +111,7 @@ std::string Lifetime::GetLifetimeName(char id) const {
 
 std::string Lifetime::DebugString() const {
   std::string res = "[Type]: ";
-  res += LifetimeType.has_value() ? LifetimeType.value().getAsString()
-                                  : "unknown type";
+  res += LifetimeType.getAsString();
   res += "\t\t[Lifetime] -> " + GetLifetimeName() + "; ";
 
   if (IsNotSet()) {
@@ -195,11 +184,6 @@ bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
     if (!largest_vec[i].empty()) return false;
   }
   return true;
-}
-
-Lifetime &Lifetime::operator=(const Lifetime &Other) {
-  Id = Other.GetId();
-  return *this;
 }
 
 bool Lifetime::operator==(const Lifetime &Other) const {

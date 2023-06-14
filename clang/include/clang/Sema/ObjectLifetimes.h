@@ -18,13 +18,7 @@ class ObjectLifetimes {
   Lifetime& GetLifetime(clang::QualType& type) {
     type = type.getCanonicalType();
     for (auto& pointee : PointeeObjects) {
-      auto tmp = pointee.GetType();
-      if (!tmp.has_value()) {
-        debugWarn("The type is not set\n");
-        continue;
-      }
-      auto& tmp_type = tmp.value();
-      if (tmp_type == type) {
+      if (pointee.GetType() == type) {
         return pointee;
       }
     }
@@ -35,13 +29,7 @@ class ObjectLifetimes {
   Lifetime& GetLifetimeOrLocal(clang::QualType& type) {
     type = type.getCanonicalType();
     for (auto& pointee : PointeeObjects) {
-      auto tmp = pointee.GetType();
-      if (!tmp.has_value()) {
-        debugWarn("The type is not set\n");
-        continue;
-      }
-      auto& tmp_type = tmp.value();
-      if (tmp_type == type) {
+      if (pointee.GetType() == type) {
         return pointee;
       }
     }
@@ -52,8 +40,7 @@ class ObjectLifetimes {
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
-    assert(lifetime.GetType().has_value());
-    clang::QualType type = lifetime.GetType().value();
+    clang::QualType type = lifetime.GetType();
     debugLifetimes("Before emplace", DebugString());
     PointeeObjects.emplace_back(lifetime);
     debugLifetimes("After emplace", DebugString());
