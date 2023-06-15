@@ -113,11 +113,11 @@ void var_decl_with_annot(int *$a x, int *$b y) {
           // expected-note@-2 {{declared with lifetime '$a' here}} \
           // expected-note@-3 {{declared with lifetime '$b' here}}
   int *$a q = x;  // no warn
-  int *$a r = y;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+  int *$a r = y;  // expected-warning {{initialization requires that '$b' outlives '$a'}} \
                   // expected-note@-7 {{declared with lifetime '$b' here}}
   int *t = x;
   t = y;
-  int *$a s = t;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+  int *$a s = t;  // expected-warning {{initialization requires that '$b' outlives '$a'}} \
                   // expected-note@-1 {{declared with lifetime '$b' here}}
 }
 
@@ -205,7 +205,7 @@ int *$a incorrect_function_call_two_args_3(int* $a x, int *$b y) {
   p = constraint_simple_return(x, y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
     // expected-note@-1 {{declared with lifetime '$a' here}} \
     // expected-note@-2 {{declared with lifetime '$b' here}}
-  int *$a q = constraint_simple_return(x, y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+  int *$a q = constraint_simple_return(x, y); // expected-warning {{initialization requires that '$b' outlives '$a'}} \
     // expected-note@-5 {{declared with lifetime '$b' here}}
   return p; // ? no warning
 }
@@ -278,11 +278,11 @@ void static_lifetime_function_call(int *$static x, int *$a y, int *$b z) {
 
 void address_of_operator(int *$a x) {
   int i = 0;
-  int *$a p = &i; // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+  int *$a p = &i; // expected-warning {{initialization requires that '$local' outlives '$a'}} \
                 // expected-note@-1 {{declared with lifetime '$local' here}}
-  int *$b *$a q = &x; // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+  int *$b *$a q = &x; // expected-warning {{initialization requires that '$local' outlives '$a'}} \
                 // expected-note@-4 {{declared with lifetime '$local' here}} \
-                // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-warning {{initialization requires that '$a' outlives '$b'}} \
                 // expected-note@-4 {{declared with lifetime '$a' here}}
 }
 

@@ -104,11 +104,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
     clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
-    // ignore if return type does not have a Lifetime
-    if (!func_type->isPointerType() && !func_type->isReferenceType()) {
-      debugWarn("Return type is not pointer type");
-      return std::nullopt;
-    }
 
     auto it = FuncInfo.find(direct_callee);
     if (it == FuncInfo.end()) {
@@ -118,6 +113,24 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     }
 
     auto &func_info = FuncInfo[direct_callee];
+
+    // ignore if return type does not have a Lifetime
+    if (!func_type->isPointerType() && !func_type->isReferenceType()) {
+      debugWarn("Return type is not pointer type");
+      unsigned int i = -1;
+      while (++i < func_info.GetNumParams()) {
+        const clang::ParmVarDecl *param = func_info.GetParam(i);
+        if (!param->getType()->isPointerType() &&
+            !param->getType()->isReferenceType()) {
+          debugWarn("Param type is not pointer type");
+          continue;
+        }
+        const Expr *arg = call->getArg(i)->IgnoreParens();
+        Visit(const_cast<clang::Expr *>(arg));
+      }
+      return std::nullopt;
+    }
+
     const Lifetime &return_lifetime = func_info.GetReturnLifetime(func_type);
 
     unsigned int i = -1;
@@ -128,11 +141,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
         debugWarn("Param type is not pointer type");
         continue;
       }
+      const Expr *arg = call->getArg(i)->IgnoreParens();
+      Visit(const_cast<clang::Expr *>(arg));
+
       const auto &param_lifetime =
           func_info.GetParamLifetime(param, param->getType());
+
       if (param_lifetime == return_lifetime) {
-        const Expr *arg = call->getArg(i)->IgnoreParens();
-        Visit(const_cast<clang::Expr *>(arg));
         PointsTo.InsertExprLifetimes(call, arg);
       }
     }

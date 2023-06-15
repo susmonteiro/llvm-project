@@ -28,7 +28,6 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
     // TODO error
     CreateVariable(var_decl, Lifetime(type));
   }
-  debugLifetimes("Inside GetLifetime", DebugString());
   return VariableLifetimes[var_decl].GetLifetime(type);
 }
 

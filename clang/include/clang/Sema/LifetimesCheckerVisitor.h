@@ -66,6 +66,8 @@ class LifetimesCheckerVisitor
   // TODO delete this
   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
+  const clang::VarDecl *GetDeclFromArg(const clang::Expr *arg) const;
+
   void VerifyBinAssign(
       clang::QualType lhs_type, const clang::Expr *rhs, const clang::Expr *expr,
       const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,

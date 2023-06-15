@@ -11828,6 +11828,14 @@ def warn_return_lifetimes_differ : Warning<
   "function should return data with lifetime '%0' but it is returning data with lifetime '%1'">;
 def warn_assign_lifetimes_differ : Warning<
   "assignment requires that '%1' outlives '%0'">;
+def warn_decl_lifetimes_differ : Warning<
+  "initialization requires that '%1' outlives '%0'">;
+def warn_func_params_lifetimes_equal : Warning<
+  "when calling function %0, the lifetimes of arguments %1 and %2 should be the same">;
+def warn_func_params_lifetimes_shorter : Warning<
+  "when calling function %0, the lifetime of %1 cannot be shorter then the lifetime of %2">;
+def note_lifetime_of : Note<
+  "lifetime of %0 is '%1'">;
 def note_lifetime_declared_here : Note<"declared with lifetime '%0' here">;
 
 } // end of sema component.

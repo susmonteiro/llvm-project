@@ -67,7 +67,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
           continue;
 
         S.Diag(lhs_var_decl->getInit()->getExprLoc(),
-               diag::warn_assign_lifetimes_differ)
+               diag::warn_decl_lifetimes_differ)
             << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName(i)
             << lhs_var_decl->getInit()->getSourceRange();
         PrintNotes(rhs_lifetime, rhs_var_decl,
@@ -77,7 +77,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
       // TODO maybe change warning to "declaration" instead of "assign"
       // (also above)
       S.Diag(lhs_var_decl->getInitializingDeclaration()->getLocation(),
-             diag::warn_assign_lifetimes_differ)
+             diag::warn_decl_lifetimes_differ)
           << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
           << lhs_var_decl->getInitializingDeclaration()->getSourceRange();
       PrintNotes(rhs_lifetime, rhs_var_decl, diag::note_lifetime_declared_here);
@@ -252,14 +252,19 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   return std::nullopt;
 }
 
-const clang::VarDecl *GetDeclFromArg(const clang::Expr *arg) {
-  if (const auto *decl_ref_expr = dyn_cast<clang::DeclRefExpr>(arg)) {
-    return dyn_cast<clang::VarDecl>(decl_ref_expr->getDecl());
-  } else if (const auto *member_expr = dyn_cast<clang::MemberExpr>(arg)) {
-    return dyn_cast<clang::VarDecl>(member_expr->getMemberDecl());
-  } else {
-    return nullptr;
+const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
+    const clang::Expr *arg) const {
+  const auto &arg_points_to = PointsTo.GetExprPointsTo(arg->IgnoreParens());
+  for (const auto &expr : arg_points_to) {
+    if (expr == nullptr) continue;
+    if (const auto *decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr)) {
+      return dyn_cast<clang::VarDecl>(decl_ref_expr->getDecl());
+    } else if (const auto *member_expr = dyn_cast<clang::MemberExpr>(arg)) {
+      return dyn_cast<clang::VarDecl>(member_expr->getMemberDecl());
+    }
   }
+  debugWarn("Arg is not a declrefexpr or memberexpr");
+  return nullptr;
 }
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
@@ -295,7 +300,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         debugLifetimes("Found param set");
         clang::QualType param_type = pair.second.first->getPointeeType();
         params_set[pair.first].first = param_type;
-        Lifetime &param_lifetime = func_info.GetParamLifetime(pair.first, param_type);
+        Lifetime &param_lifetime =
+            func_info.GetParamLifetime(pair.first, param_type);
         param_lifetimes[param_lifetime.GetIdNoOffset()].insert(pair.second);
       }
       // check lifetimes of higher indirections
@@ -311,26 +317,58 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           assert(current_arg != nullptr);
           Lifetime &current = State.GetLifetime(current_arg, (it->first));
           if (previous != current) {
-            // TODO show error
-            debugWarn("Param lifetimes do not match");
+            // TODO change notes
+            S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_equal)
+                << direct_callee << previous_arg << current_arg << call->getSourceRange();
+            S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
+                << previous_arg << previous.GetLifetimeName();
+            S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
+                << current_arg << current.GetLifetimeName();
             return std::nullopt;
           }
         }
       }
       // check lifetimes of current indirection level
       // TODO make sure all of the params with the same lifetime as those in
+      if (!param_lifetimes.empty()) {
+        for (const auto &param_pair : params_by_type[num_indirections]) {
+          debugLifetimes("Found new param");
+          Lifetime &current_lifetime = func_info.GetParamLifetime(
+              param_pair.first, param_pair.first->getType());
 
-      // for (const auto &param_pair : params_by_type[num_indirections]) {
-      //   // param_lifetimes.reserve(params_set.size());
-      //   debugLifetimes("Iterate through params set");
-      //   if (params_set.empty()) continue;
-      //   // the set are called by params with a shorter lifetime
-      // }
+          auto it = param_lifetimes.find(current_lifetime.GetIdNoOffset());
+          debugLifetimes("Get param lifetime");
+          if (it == param_lifetimes.end()) continue;
+          debugLifetimes("Param lifetime not empty");
+
+          const auto &filtered_params = it->second;
+          const auto *current_arg =
+              GetDeclFromArg(call->getArg(param_pair.second));
+          clang::QualType type = current_arg->getType().getCanonicalType();
+          Lifetime &current_arg_lifetime =
+              State.GetLifetimeOrLocal(current_arg, type);
+
+          for (const auto &pair : filtered_params) {
+            debugLifetimes("Inside loop of filtered params");
+            const auto *arg = call->getArg(pair.second);
+            const auto *arg_decl = GetDeclFromArg(arg);
+            assert(arg_decl != nullptr);
+            Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
+            debugLifetimes("Before if");
+            if (current_arg_lifetime < arg_lifetime) {
+              // TODO change this
+              S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_shorter)
+                  << direct_callee << current_arg << arg_decl << call->getSourceRange();
+            }
+          }
+          //   // the set are called by params with a shorter lifetime
+        }
+      }
       debugLifetimes("Size of params set BEFORE", params_set.size());
       // insert params for the next indirection level
       for (const auto &param_pair : params_by_type[num_indirections]) {
-        params_set[param_pair.first] =
-            std::pair(param_pair.first->getType().getCanonicalType(), param_pair.second);
+        params_set[param_pair.first] = std::pair(
+            param_pair.first->getType().getCanonicalType(), param_pair.second);
       }
       debugLifetimes("Size of params set AFTER", params_set.size());
     }
@@ -349,8 +387,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
         continue;
       }
       clang::QualType var_decl_type = var_decl->getType().getCanonicalType();
-      Lifetime &var_decl_lifetime =
-          State.GetLifetime(var_decl, var_decl_type);
+      Lifetime &var_decl_lifetime = State.GetLifetime(var_decl, var_decl_type);
       // no initializer, nothing to check
       if (!var_decl->hasInit() || var_decl_lifetime.IsNotSet())
         return std::nullopt;
