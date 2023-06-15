@@ -282,22 +282,18 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
     auto &func_info = FuncInfo[direct_callee];
     const auto &params_by_type = func_info.GetParamsByType();
-    // llvm::SmallVector<const clang::ParmVarDecl *> params_set;
     llvm::DenseMap<const clang::ParmVarDecl *,
                    std::pair<clang::QualType, unsigned int>>
         params_set;
-    // params_set.reserve(func_info.GetNumParams());
 
     unsigned int num_indirections = params_by_type.size();
 
     while (num_indirections-- != 0) {
-      debugLifetimes("Num indirections", num_indirections);
       llvm::DenseMap<char,
                      llvm::DenseSet<std::pair<clang::QualType, unsigned int>>>
           param_lifetimes;
       // get lifetimes for the current indirection level
       for (const auto &pair : params_set) {
-        debugLifetimes("Found param set");
         clang::QualType param_type = pair.second.first->getPointeeType();
         params_set[pair.first].first = param_type;
         Lifetime &param_lifetime =
@@ -306,7 +302,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
       // check lifetimes of higher indirections
       for (const auto &pair : param_lifetimes) {
-        debugLifetimes("Found param lifetimes");
         if (pair.second.size() < 2) continue;
         auto it = pair.second.begin();
         const auto *previous_arg = GetDeclFromArg(call->getArg(it->second));
@@ -329,17 +324,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         }
       }
       // check lifetimes of current indirection level
-      // TODO make sure all of the params with the same lifetime as those in
       if (!param_lifetimes.empty()) {
         for (const auto &param_pair : params_by_type[num_indirections]) {
-          debugLifetimes("Found new param");
           Lifetime &current_lifetime = func_info.GetParamLifetime(
               param_pair.first, param_pair.first->getType());
 
           auto it = param_lifetimes.find(current_lifetime.GetIdNoOffset());
-          debugLifetimes("Get param lifetime");
           if (it == param_lifetimes.end()) continue;
-          debugLifetimes("Param lifetime not empty");
 
           const auto &filtered_params = it->second;
           const auto *current_arg =
@@ -349,28 +340,27 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               State.GetLifetimeOrLocal(current_arg, type);
 
           for (const auto &pair : filtered_params) {
-            debugLifetimes("Inside loop of filtered params");
             const auto *arg = call->getArg(pair.second);
             const auto *arg_decl = GetDeclFromArg(arg);
             assert(arg_decl != nullptr);
             Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
-            debugLifetimes("Before if");
             if (current_arg_lifetime < arg_lifetime) {
               // TODO change this
               S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_shorter)
                   << direct_callee << current_arg << arg_decl << call->getSourceRange();
+              S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
+                << current_arg << current_arg_lifetime.GetLifetimeName();
+            S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
+                << arg_decl << arg_lifetime.GetLifetimeName();
             }
           }
-          //   // the set are called by params with a shorter lifetime
         }
       }
-      debugLifetimes("Size of params set BEFORE", params_set.size());
       // insert params for the next indirection level
       for (const auto &param_pair : params_by_type[num_indirections]) {
         params_set[param_pair.first] = std::pair(
             param_pair.first->getType().getCanonicalType(), param_pair.second);
       }
-      debugLifetimes("Size of params set AFTER", params_set.size());
     }
   }
   return std::nullopt;
