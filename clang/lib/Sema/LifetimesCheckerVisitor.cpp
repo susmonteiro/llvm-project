@@ -191,7 +191,7 @@ void LifetimesCheckerVisitor::CompareAndCheck(
               return_lifetime ? State.GetReturnLifetime(current_type)
                               : State.GetLifetime(lhs_var_decl, current_type);
           Lifetime &rhs_lifetime =
-              State.GetLifetime(rhs_var_decl, current_type);
+              State.GetLifetimeOrLocal(rhs_var_decl, current_type);
           if (rhs_lifetime < lhs_lifetime) {
             factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                     rhs_lifetime);
@@ -346,12 +346,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
       if (!var_decl->getType()->isPointerType() &&
           !var_decl->getType()->isReferenceType()) {
-        debugWarn("Var decl is not pointer type");
         continue;
       }
       clang::QualType var_decl_type = var_decl->getType().getCanonicalType();
       Lifetime &var_decl_lifetime =
-          State.GetLifetime(var_decl, var_decl->getType());
+          State.GetLifetime(var_decl, var_decl_type);
       // no initializer, nothing to check
       if (!var_decl->hasInit() || var_decl_lifetime.IsNotSet())
         return std::nullopt;

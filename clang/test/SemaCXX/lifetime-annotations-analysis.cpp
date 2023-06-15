@@ -276,6 +276,16 @@ void static_lifetime_function_call(int *$static x, int *$a y, int *$b z) {
   z = static_lifetime_return(x); // TODO should be incorrect
 }
 
+void address_of_operator(int *$a x) {
+  int i = 0;
+  int *$a p = &i; // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+                // expected-note@-1 {{declared with lifetime '$local' here}}
+  int *$b *$a q = &x; // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+                // expected-note@-4 {{declared with lifetime '$local' here}} \
+                // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-4 {{declared with lifetime '$a' here}}
+}
+
 // TODO uncomment after implementing '&' operator
 // void local_lifetime_assign_and_return(int *$a x) {
 //   int i = 1;
