@@ -66,8 +66,7 @@ unsigned int Lifetime::GetNumberIndirections(clang::QualType type) {
   type = type.getCanonicalType();
   while (type->isPointerType() || type->isReferenceType()) {
     ++num_indirections_lhs;
-    // TODO uncomment or delete comment
-    type = type->getPointeeType()/* .getCanonicalType() */;
+    type = type->getPointeeType();
   }
   return num_indirections_lhs;
 }

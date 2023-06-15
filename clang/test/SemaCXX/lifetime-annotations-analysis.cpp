@@ -31,6 +31,16 @@ int *$b incorrect_simple_return(int *$a x) {
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
+int *$a no_params_one_indirection(int *x) {
+        return x; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
+}
+
+int *$a *$b no_params_two_indirections(int *$a *x) {
+        return x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
+}
+
 int *$a correct_simple_return(int *$a x, int *$b y) {
   return x; // no warning
 }

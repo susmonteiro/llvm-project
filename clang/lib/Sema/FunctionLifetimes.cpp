@@ -331,32 +331,17 @@ LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
     // clang::QualType expr_type = name->getType().getCanonicalType();
     // Lifetime lifetime(expr_type);
     clang::QualType canonical_type = type.getCanonicalType();
-    Lifetime lifetime(canonical_type);
     if (name) {
+      Lifetime lifetime;
       if (llvm::Error err =
               LifetimeFromName(name, canonical_type).moveInto(lifetime)) {
         return std::move(err);
       }
       return lifetime;
     }
-
-    // As a special-case, lifetime is always inferred for the `this`
-    // parameter for destructors. The obvious lifetime is definitionally
-    // correct in this case: the object must be valid for the duration
-    // of the call, or else the behavior is undefined. So we can infer
-    // safely even if elision is disabled.
-    if (/* !elision_enabled && */ Func->getDeclName().getNameKind() !=
-        clang::DeclarationName::CXXDestructorName) {
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "Lifetime elision not enabled for function"
-          // TODO abseil
-          // absl::StrCat("Lifetime elision not enabled for '",
-          //              func->getNameAsString(), "'")
-      );
-    }
-    // TODO change me
-    return lifetime;
+    // lifetime elision is not implemented
+    // params with no lifetime will have lifetime $local
+    return Lifetime(LOCAL, canonical_type);
   };
 }
 

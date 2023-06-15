@@ -59,11 +59,6 @@ class Lifetime {
   void SetType(clang::QualType type) { LifetimeType = type; }
 
   void ProcessShortestLifetimes();
-  void ReserveShortestLifetimes() {
-    // TODO change this
-    ShortestLifetimes.reserve(32);
-    ShortestLifetimes.resize(32);
-  }
 
   std::string DebugString() const;
 
@@ -107,33 +102,13 @@ class Lifetime {
         ->insert(stmt);
   }
 
-  // static void InsertShortestLifetimes(
-  //     char id,
-  //     llvm::DenseMap<clang::QualType, llvm::DenseSet<const clang::Stmt *>>
-  //         stmts,
-  //     LifetimesVector &shortest_lifetimes) {
-  //   Lifetime::GetAndResizeShortestLifetime(id,
-  //   shortest_lifetimes)->insert(stmts.begin(), stmts.end());
-  // }
-
   void InsertShortestLifetimes(char id, const clang::Stmt *stmt) {
     InsertShortestLifetimes(id, stmt, ShortestLifetimes);
   }
 
-  // void InsertShortestLifetimes(
-  //     char id,
-  //     llvm::DenseMap<clang::QualType, llvm::DenseSet<const clang::Stmt *>>
-  //         stmts) {
-  //   InsertShortestLifetimes(id, stmts, ShortestLifetimes);
-  // }
-
   void InsertShortestLifetimes(LifetimesVector shortest_lifetimes) {
-    debugLifetimes("Size of shortest lifetimes before resize",
-                   ShortestLifetimes.size());
     if (shortest_lifetimes.size() > ShortestLifetimes.size())
       ShortestLifetimes.resize(shortest_lifetimes.size());
-    debugLifetimes("Size of shortest lifetimes after resize",
-                   ShortestLifetimes.size());
     for (unsigned int i = 0; i < shortest_lifetimes.size(); i++) {
       GetShortestLifetime(i)->insert(
           GetShortestLifetime(i, shortest_lifetimes)->begin(),
@@ -162,7 +137,6 @@ class Lifetime {
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
-  // TODO also store a vector with the lifetime ids that it depends on
   LifetimesVector ShortestLifetimes;
   clang::QualType LifetimeType;
   char Id = NOTSET;
