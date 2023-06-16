@@ -39,6 +39,13 @@ class ObjectLifetimes {
 
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
+  bool HasLifetimeLocal() {
+    for (Lifetime &lifetime : PointeeObjects) {
+      if (lifetime.IsLocal()) return true;
+    }
+    return false;
+  }
+
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
     clang::QualType type = lifetime.GetType();
     debugLifetimes("Before emplace", DebugString());

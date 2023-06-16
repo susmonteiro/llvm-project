@@ -91,6 +91,11 @@ class FunctionLifetimes {
     return ReturnLifetime.GetLifetime(type);
   }
 
+  bool IsReturnLifetimeLocal() {
+    ObjectLifetimes return_ol = GetReturnLifetime(); 
+    return return_ol.HasLifetimeLocal();
+  }
+
   void InsertParamLifetime(const clang::ParmVarDecl *param,
                            ObjectLifetimes &objectsLifetimes) {
     Params.emplace_back(param);

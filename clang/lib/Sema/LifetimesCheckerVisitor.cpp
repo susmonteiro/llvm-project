@@ -318,6 +318,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           }
         }
       }
+      
       // check lifetimes of current indirection level
       if (!param_lifetimes.empty()) {
         for (const auto &param_pair : params_by_type[num_indirections]) {

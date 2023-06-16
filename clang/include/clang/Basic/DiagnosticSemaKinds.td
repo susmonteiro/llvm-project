@@ -11834,6 +11834,8 @@ def warn_func_params_lifetimes_equal : Warning<
   "when calling function %0, the lifetimes of arguments %1 and %2 should be the same">;
 def warn_func_params_lifetimes_shorter : Warning<
   "when calling function %0, the lifetime of %1 cannot be shorter then the lifetime of %2">;
+def warn_func_return_lifetime_local : Warning<
+  "the return lifetime cannot be '$local'">;
 def note_lifetime_of : Note<
   "lifetime of %0 is '%1'">;
 def note_lifetime_declared_here : Note<"declared with lifetime '%0' here">;

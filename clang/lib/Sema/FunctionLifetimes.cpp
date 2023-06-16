@@ -328,8 +328,6 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
 LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
   return [this](const clang::Expr* name,
                 clang::QualType type) -> llvm::Expected<Lifetime> {
-    // clang::QualType expr_type = name->getType().getCanonicalType();
-    // Lifetime lifetime(expr_type);
     clang::QualType canonical_type = type.getCanonicalType();
     if (name) {
       Lifetime lifetime;
@@ -348,12 +346,9 @@ LifetimeFactory FunctionLifetimeFactory::ParamLifetimeFactory() const {
 LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
   return [this](const clang::Expr* name, clang::QualType type
                 /*,&input_lifetime */) -> llvm::Expected<Lifetime> {
-    // TODO change me
-    // clang::QualType expr_type = name->getType().getCanonicalType();
-    // Lifetime lifetime(expr_type);
     clang::QualType canonical_type = type.getCanonicalType();
-    Lifetime lifetime(canonical_type);
     if (name) {
+      Lifetime lifetime;
       if (llvm::Error err =
               LifetimeFromName(name, canonical_type).moveInto(lifetime)) {
         return std::move(err);
@@ -389,7 +384,7 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
     // }
     // });
     // TODO remove this
-    return lifetime;
+    return Lifetime(LOCAL, canonical_type);;
   };
 }
 

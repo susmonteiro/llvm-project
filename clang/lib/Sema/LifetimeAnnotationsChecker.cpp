@@ -65,6 +65,10 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
 
   if (expected_func_lifetimes) {
     FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
+    if (func_lifetimes.IsReturnLifetimeLocal()) {
+      S.Diag(func->getLocation(), diag::warn_func_return_lifetime_local)
+          << func->getSourceRange();
+    }
 
     // DEBUG
     // debugLifetimes(func_lifetimes.DebugString());
