@@ -19,6 +19,8 @@
 
 #define $a $(a)
 #define $b $(b)
+#define $c $(c)
+#define $d $(d)
 
 #define $static $(static)
 
@@ -27,6 +29,11 @@ int *$a correct_simple_return(int *$a x) {
 }
 
 int *$b incorrect_simple_return(int *$a x) {
+  return x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
+            // expected-note@-1 {{declared with lifetime '$a' here}}
+}
+
+int &$b incorrect_simple_return_references(int &$a x) {
   return x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
@@ -286,12 +293,39 @@ void address_of_operator(int *$a x) {
                 // expected-note@-4 {{declared with lifetime '$a' here}}
 }
 
-// TODO uncomment after implementing '&' operator
-// void local_lifetime_assign_and_return(int *$a x) {
-//   int i = 1;
-//   x = &i;       // TODO should be incorrect
-//   int *p = &i;  // p has local lifetime
-//   x = p;        // 'expected-warning {{assignment requires that '$local' outlives '$a'}} \
-//                 // 'expected-note@-3 {{declared with lifetime '$a' here}} \
-//                 // 'expected-note@-1 {{declared with lifetime '$local' here}}
-// }
+void local_lifetime_assign_and_return(int *$a x) {
+  int i = 1;
+  x = &i;       // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+                // expected-note@-1 {{declared with lifetime '$local' here}} \
+                // expected-note@-2 {{declared with lifetime '$a' here}}
+  int *p = &i;  // p has local lifetime
+  x = p;        // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+                // expected-note@-6 {{declared with lifetime '$a' here}} \
+                // expected-note@-1 {{declared with lifetime '$local' here}}
+}
+
+void multiple_indirections(int *$a *$b *$c *$d x) {
+        int ****p;
+        p = x;
+        *p = *x;
+        **p = **x;
+        ***p = ***x;
+        ****p = ****x;
+        *(&p) = *(&x);
+}
+
+void simple_unary_operator(int *$a p) {
+        int *$c *$b pp = &p;  // expected-warning {{initialization requires that '$local' outlives '$b'}} \
+                // expected-note@-1 {{declared with lifetime '$local' here}} \
+                // expected-warning {{initialization requires that '$a' outlives '$c'}} \
+                // expected-note@-1 {{declared with lifetime '$a' here}}
+        int i = 0;
+        int *$a x = &i; // expected-warning {{initialization requires that '$local' outlives '$a'}} \
+                // expected-note@-1 {{declared with lifetime '$local' here}}
+}
+
+int *$a unary_op_1(int *$a p) {
+        int **pp = &p;
+        p = *pp;
+        return *pp;
+}
