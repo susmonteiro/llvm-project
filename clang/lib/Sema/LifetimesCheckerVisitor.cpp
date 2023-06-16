@@ -59,13 +59,46 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
                 const clang::Stmt *stmt, Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
     assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr);
-    if (rhs_lifetime.IsNotSet()) {
+    if (lhs_lifetime.IsNotSet() && rhs_lifetime.IsNotSet()) {
+      const auto &lhs_shortest_lifetimes = lhs_lifetime.GetShortestLifetimes();
+      const auto &rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
+      for (unsigned int i = 0; i < lhs_shortest_lifetimes.size(); i++) {
+        if (lhs_shortest_lifetimes[i].empty()) continue;
+        for (unsigned int j = 0; j < rhs_shortest_lifetimes.size(); j++) {
+          if (rhs_shortest_lifetimes[i].empty() || (char)j == i) continue;
+          S.Diag(lhs_var_decl->getInit()->getExprLoc(),
+                 diag::warn_decl_lifetimes_differ)
+              << lhs_lifetime.GetLifetimeName(i)
+              << rhs_lifetime.GetLifetimeName(j)
+              << lhs_var_decl->getInit()->getSourceRange();
+          PrintNotes(lhs_lifetime, lhs_var_decl,
+                     diag::note_lifetime_declared_here, i);
+          PrintNotes(rhs_lifetime, rhs_var_decl,
+                     diag::note_lifetime_declared_here, j);
+        }
+      }
+    } else if (lhs_lifetime.IsNotSet()) {
+      const auto &var_decl_shortest_lifetimes =
+          lhs_lifetime.GetShortestLifetimes();
+      for (unsigned int i = 0; i < var_decl_shortest_lifetimes.size(); i++) {
+        if (var_decl_shortest_lifetimes[i].empty() ||
+            (char)i == rhs_lifetime.GetId())
+          continue;
+        S.Diag(lhs_var_decl->getInit()->getExprLoc(),
+               diag::warn_decl_lifetimes_differ)
+            << lhs_lifetime.GetLifetimeName(i) << rhs_lifetime.GetLifetimeName()
+            << lhs_var_decl->getInit()->getSourceRange();
+        PrintNotes(lhs_lifetime, lhs_var_decl,
+                   diag::note_lifetime_declared_here, i);
+      }
+      PrintNotes(rhs_lifetime, rhs_var_decl, diag::note_lifetime_declared_here);
+
+    } else if (rhs_lifetime.IsNotSet()) {
       const auto &init_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
       for (unsigned int i = 0; i < init_shortest_lifetimes.size(); i++) {
         if (init_shortest_lifetimes[i].empty() ||
             (char)i == lhs_lifetime.GetId())
           continue;
-
         S.Diag(lhs_var_decl->getInit()->getExprLoc(),
                diag::warn_decl_lifetimes_differ)
             << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName(i)
@@ -74,8 +107,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
                    diag::note_lifetime_declared_here, i);
       }
     } else {
-      // TODO maybe change warning to "declaration" instead of "assign"
-      // (also above)
+      debugLifetimes("Inside else");
       S.Diag(lhs_var_decl->getInitializingDeclaration()->getLocation(),
              diag::warn_decl_lifetimes_differ)
           << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
