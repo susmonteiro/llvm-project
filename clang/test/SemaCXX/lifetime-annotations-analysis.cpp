@@ -23,6 +23,7 @@
 #define $d $(d)
 
 #define $static $(static)
+#define $local $(local)
 
 int *$a correct_simple_return(int *$a x) {
   return x; // no warning
@@ -304,11 +305,23 @@ void local_lifetime_assign_and_return(int *$a x) {
                 // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
-int *$a return_local_lifetime() {
+int *$a return_local_lifetime_1() {
   int i = 0;
   int *p = &i;
   return p; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$local'}} \
             // expected-note@-1 {{declared with lifetime '$local' here}}
+}
+
+int *$local return_local_lifetime_2() { // expected-warning {{the return lifetime cannot be '$local'}}
+        int i = 0;
+        int *p = &i;
+        return p; 
+}
+
+int *return_local_lifetime_3() {  // expected-warning {{the return lifetime cannot be '$local'}}
+        int i = 0;
+        int *p = &i;
+        return p; 
 }
 
 void multiple_indirections(int *$a *$b *$c *$d x) {
