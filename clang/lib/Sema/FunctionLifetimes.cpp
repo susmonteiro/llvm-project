@@ -487,6 +487,11 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
   const clang::FunctionProtoType* type =
       func->getType()->getAs<clang::FunctionProtoType>();
   FunctionLifetimes ret(func->getID());
+    if (type == nullptr) {
+    debugWarn("FunctionProtoType is null");
+    return ret;
+  }
+
   clang::FunctionTypeLoc func_type_loc;
   if (type_loc) {
     func_type_loc = type_loc.getAsAdjusted<clang::FunctionTypeLoc>();
