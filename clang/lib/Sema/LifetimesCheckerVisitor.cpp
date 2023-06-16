@@ -163,41 +163,35 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
   if (const auto *lhs_var_decl =
           dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-    CompareAndCheck(lhs_var_decl, lhs_type, rhs, nullptr, rhs_points_to, op,
-                    false, factory);
+    for (const auto &expr : rhs_points_to) {
+      CompareAndCheck(lhs_var_decl, lhs_type, expr, rhs, nullptr, op, false,
+                      factory);
+    }
   }
 }
 
 void LifetimesCheckerVisitor::CompareAndCheck(
     const clang::VarDecl *lhs_var_decl, clang::QualType lhs_type,
-    const clang::Expr *rhs, const clang::Stmt *stmt,
-    const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
+    const clang::Expr *expr, const clang::Expr *rhs, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool return_lifetime,
     PrintNotesFactory factory) const {
-  for (const auto &expr : rhs_points_to) {
-    if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-      const auto *rhs_decl_ref_expr = clang::dyn_cast<clang::DeclRefExpr>(expr);
-      clang::QualType rhs_type = rhs->getType();
-      if (!rhs_type->isPointerType() && !rhs_type->isReferenceType()) {
-        continue;
-      }
-      // there can only be one pointer/reference variable
-      if (const auto *rhs_var_decl =
-              dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
-        clang::QualType current_type = lhs_type;
-        while (current_type->isPointerType() ||
-               current_type->isReferenceType()) {
-          Lifetime &lhs_lifetime =
-              return_lifetime ? State.GetReturnLifetime(current_type)
-                              : State.GetLifetime(lhs_var_decl, current_type);
-          Lifetime &rhs_lifetime =
-              State.GetLifetimeOrLocal(rhs_var_decl, current_type);
-          if (rhs_lifetime < lhs_lifetime) {
-            factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
-                    rhs_lifetime);
-          }
-          current_type = current_type->getPointeeType();
+  if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+    const auto *rhs_decl_ref_expr = clang::dyn_cast<clang::DeclRefExpr>(expr);
+    // there can only be one pointer/reference variable
+    if (const auto *rhs_var_decl =
+            dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
+      clang::QualType current_type = lhs_type;
+      while (current_type->isPointerType() || current_type->isReferenceType()) {
+        Lifetime &lhs_lifetime =
+            return_lifetime ? State.GetReturnLifetime(current_type)
+                            : State.GetLifetime(lhs_var_decl, current_type);
+        Lifetime &rhs_lifetime =
+            State.GetLifetimeOrLocal(rhs_var_decl, current_type);
+        if (rhs_lifetime < lhs_lifetime) {
+          factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
+                  rhs_lifetime);
         }
+        current_type = current_type->getPointeeType();
       }
     }
   }
@@ -314,7 +308,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           if (previous != current) {
             // TODO change notes
             S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_equal)
-                << direct_callee << previous_arg << current_arg << call->getSourceRange();
+                << direct_callee << previous_arg << current_arg
+                << call->getSourceRange();
             S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
                 << previous_arg << previous.GetLifetimeName();
             S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
@@ -346,12 +341,14 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
             if (current_arg_lifetime < arg_lifetime) {
               // TODO change this
-              S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_shorter)
-                  << direct_callee << current_arg << arg_decl << call->getSourceRange();
+              S.Diag(call->getExprLoc(),
+                     diag::warn_func_params_lifetimes_shorter)
+                  << direct_callee << current_arg << arg_decl
+                  << call->getSourceRange();
               S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                << current_arg << current_arg_lifetime.GetLifetimeName();
-            S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
-                << arg_decl << arg_lifetime.GetLifetimeName();
+                  << current_arg << current_arg_lifetime.GetLifetimeName();
+              S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
+                  << arg_decl << arg_lifetime.GetLifetimeName();
             }
           }
         }
@@ -391,8 +388,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
         return std::nullopt;
       }
 
-      CompareAndCheck(var_decl, var_decl_type, init, nullptr, init_points_to,
-                      nullptr, false, Factory.DeclStmtFactory());
+      CompareAndCheck(var_decl, var_decl_type, init, init, nullptr, nullptr,
+                      false, Factory.DeclStmtFactory());
+
+      for (const auto &expr : init_points_to) {
+        CompareAndCheck(var_decl, var_decl_type, expr, init, nullptr, nullptr,
+                        false, Factory.DeclStmtFactory());
+      }
     }
   }
   return std::nullopt;
@@ -426,9 +428,14 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     Visit(const_cast<clang::Expr *>(return_value));
   }
 
-  const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
-  CompareAndCheck(nullptr, return_type, return_value, return_stmt, return_expr,
+  CompareAndCheck(nullptr, return_type, return_value, return_value, return_stmt,
                   nullptr, true, Factory.ReturnStmtFactory());
+
+  const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
+  for (const auto &expr : return_expr) {
+    CompareAndCheck(nullptr, return_type, expr, return_value, return_stmt,
+                    nullptr, true, Factory.ReturnStmtFactory());
+  }
   return std::nullopt;
 }
 

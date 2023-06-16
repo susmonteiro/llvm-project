@@ -73,12 +73,11 @@ class LifetimesCheckerVisitor
       const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
       const clang::BinaryOperator *op, PrintNotesFactory factory) const;
 
-  void CompareAndCheck(
-      const clang::VarDecl *lhs_var_decl, clang::QualType lhs_type,
-      const clang::Expr *rhs, const clang::Stmt *stmt,
-      const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
-      const clang::BinaryOperator *op, bool return_lifetime,
-      PrintNotesFactory factory) const;
+  void CompareAndCheck(const clang::VarDecl *lhs_var_decl,
+                       clang::QualType lhs_type, const clang::Expr *expr,
+                       const clang::Expr *rhs, const clang::Stmt *stmt,
+                       const clang::BinaryOperator *op, bool return_lifetime,
+                       PrintNotesFactory factory) const;
 
  private:
   const clang::FunctionDecl *Func;
