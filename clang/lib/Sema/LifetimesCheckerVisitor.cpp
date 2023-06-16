@@ -299,11 +299,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         if (pair.second.size() < 2) continue;
         auto it = pair.second.begin();
         const auto *previous_arg = GetDeclFromArg(call->getArg(it->second));
-        assert(previous_arg != nullptr);
+        if (previous_arg == nullptr) continue;
         Lifetime &previous = State.GetLifetime(previous_arg, (it->first));
         while (++it != pair.second.end()) {
           const auto *current_arg = GetDeclFromArg(call->getArg(it->second));
-          assert(current_arg != nullptr);
+          if (current_arg == nullptr) continue;
           Lifetime &current = State.GetLifetime(current_arg, (it->first));
           if (previous != current) {
             // TODO change notes
@@ -318,7 +318,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           }
         }
       }
-      
+
       // check lifetimes of current indirection level
       if (!param_lifetimes.empty()) {
         for (const auto &param_pair : params_by_type[num_indirections]) {
@@ -331,6 +331,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           const auto &filtered_params = it->second;
           const auto *current_arg =
               GetDeclFromArg(call->getArg(param_pair.second));
+          if (current_arg == nullptr) continue;
           clang::QualType type = current_arg->getType().getCanonicalType();
           Lifetime &current_arg_lifetime =
               State.GetLifetimeOrLocal(current_arg, type);
@@ -338,7 +339,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           for (const auto &pair : filtered_params) {
             const auto *arg = call->getArg(pair.second);
             const auto *arg_decl = GetDeclFromArg(arg);
-            assert(arg_decl != nullptr);
+            if (arg_decl == nullptr) continue;
             Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
             if (current_arg_lifetime < arg_lifetime) {
               // TODO change this
@@ -444,6 +445,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   if (debugEnabled) debugLifetimes("[VisitStmt]");
   for (const auto &child : stmt->children()) {
+    if (child == nullptr) continue;
     Visit(const_cast<clang::Stmt *>(child));
   }
   return std::nullopt;

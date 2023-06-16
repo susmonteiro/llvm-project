@@ -95,23 +95,24 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
   auto function_info = FunctionInfo[func];
   State = LifetimeAnnotationsAnalysis(function_info);
+  std::string func_name = func->getNameAsString();
 
   // step 1
-  debugInfo("\n====== START STEP 1 ======\n");
+  debugInfo("\n====== START STEP 1 - " + func_name + " ======\n");
   GetLifetimeDependencies(func);
-  debugInfo("\n====== FINISH STEP 1 ======\n");
+  debugInfo("\n====== FINISH STEP 1 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 
   // step 2
-  debugInfo("\n====== START STEP 2 ======\n");
+  debugInfo("\n====== START STEP 2 - " + func_name + " ======\n");
   LifetimeAnnotationsChecker::PropagateLifetimes();
-  debugInfo("\n====== FINISH STEP 2 ======\n");
+  debugInfo("\n====== FINISH STEP 2 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 
   // step 3
-  debugInfo("\n====== START STEP 3 ======\n");
+  debugInfo("\n====== START STEP 3 - " + func_name + " ======\n");
   LifetimeAnnotationsChecker::CheckLifetimes(func, S);
-  debugInfo("\n====== FINISH STEP 3 ======\n");
+  debugInfo("\n====== FINISH STEP 3 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 }
 

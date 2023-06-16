@@ -91,7 +91,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   for (const auto &expr : lhs_points_to) {
     PropagateBinAssign(lhs, rhs, expr, op);
   }
-
   return std::nullopt;
 }
 
@@ -326,6 +325,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
     const clang::Stmt *stmt) {
   if (debugEnabled) debugLifetimes("[VisitStmt]");
   for (const auto &child : stmt->children()) {
+    if (child == nullptr) continue;
     Visit(const_cast<clang::Stmt *>(child));
   }
   return std::nullopt;

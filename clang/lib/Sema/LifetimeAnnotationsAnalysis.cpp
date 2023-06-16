@@ -165,10 +165,10 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
   std::string str = "[LifetimeAnnotationsAnalysis] - STATE\n\n";
   str += ">> VariableLifetimes\n\n";
   for (const auto &pair : VariableLifetimes) {
+    if (pair.first == nullptr) continue;
     str +=
         pair.first->getNameAsString() + ": " + pair.second.DebugString() + '\n';
   }
-
   str += "\n>> Dependencies\n\n";
   for (const auto &pair : LifetimeDependencies) {
     str += pair.first.first->getNameAsString() + ": ";
