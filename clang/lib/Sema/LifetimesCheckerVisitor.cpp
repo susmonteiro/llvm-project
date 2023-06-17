@@ -174,7 +174,8 @@ void LifetimesCheckerVisitor::CompareAndCheck(
                             : State.GetLifetime(lhs_var_decl, current_type);
         Lifetime &rhs_lifetime =
             State.GetLifetimeOrLocal(rhs_var_decl, current_type);
-        if (rhs_lifetime < lhs_lifetime) {
+        // TODO is the first part of the condition true?
+        if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
           factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                   rhs_lifetime);
         }
