@@ -15,21 +15,8 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
                 const clang::Stmt *stmt, clang::Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
     assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr && op != nullptr);
-    if (lhs_lifetime.IsNotSet()) {
-      debugWarn("LHS LIFETIME IS NOT SET");
-      // TODO should this case exist?
-      // ! if LHS lifetime is not set then it will have all
-      // lifetimes from ! rhs because of the propagation
-      //   for (char l : lhs_lifetime.GetShortestLifetimes()) {
-      //     if (l == rhs_lifetime.GetId()) continue;
-      //     S.Diag(op->getExprLoc(),
-      //     diag::warn_assign_lifetimes_differ)
-      //         << rhs_lifetime.GetLifetimeName()
-      //         << lhs_lifetime.GetLifetimeName(l) <<
-      //         op->getSourceRange();
-      //   }
-      //   // TODO implement the notes in this case
-    } else if (rhs_lifetime.IsNotSet()) {
+    assert(lhs_lifetime.IsSet());
+    if (rhs_lifetime.IsNotSet()) {
       const auto &rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
       for (unsigned int i = 0; i < rhs_shortest_lifetimes.size(); i++) {
         if (rhs_shortest_lifetimes[i].empty() ||
@@ -59,9 +46,8 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
                 const clang::Stmt *stmt, Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
     assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr);
-    if (lhs_lifetime.IsNotSet()) {
-
-    } else if (rhs_lifetime.IsNotSet()) {
+    assert(lhs_lifetime.IsSet());
+    if (rhs_lifetime.IsNotSet()) {
       const auto &init_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
       for (unsigned int i = 0; i < init_shortest_lifetimes.size(); i++) {
         if (init_shortest_lifetimes[i].empty() ||
@@ -92,6 +78,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
                 const clang::Stmt *return_stmt, Lifetime &return_lifetime,
                 Lifetime &var_lifetime) {
     assert(var_decl != nullptr && expr != nullptr && return_stmt != nullptr);
+    assert(return_lifetime.IsSet());
     if (var_lifetime.IsNotSet()) {
       const auto &var_shortest_lifetimes = var_lifetime.GetShortestLifetimes();
       for (unsigned int i = 0; i < var_shortest_lifetimes.size(); i++) {

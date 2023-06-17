@@ -436,10 +436,9 @@ int *$a *$b pointer_aliasing_3(int *$a *$b x, int *$c *$d y, int num) {
   p06 = x;
   if (num == 6) return p06; 
 
-  int **p07 = x;  // expected-warning {{initialization requires that '$a' outlives '$c'}} \
-                  // expected-note@-23 {{declared with lifetime '$a' here}} \
-                  // expected-note@+5 {{declared with lifetime '$c' here}}
-  if (num == 7) return p07;
+  int **p07 = x;
+  if (num == 7) return p07; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$c'}} \
+                // expected-note@+2 {{declared with lifetime '$c' here}}
   *p07 = *y;
   return x;
 }
