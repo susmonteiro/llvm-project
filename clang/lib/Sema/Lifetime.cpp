@@ -45,6 +45,7 @@ Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
   }
 }
 
+bool Lifetime::IsSet() const { return Id >= LOCAL; }
 bool Lifetime::IsNotSet() const { return Id == NOTSET; }
 bool Lifetime::IsStatic() const { return Id == STATIC; }
 bool Lifetime::ContainsStatic() const {
@@ -165,19 +166,30 @@ std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
 }
 
 bool Lifetime::operator==(const Lifetime &Other) const {
-  if (!IsNotSet()) {
-    return Id == Other.GetId();
+  if (Id != Other.GetId()) return false;
+  if (IsSet()) return true;
+
+  unsigned int min_size =
+      std::min(ShortestLifetimes.size(), Other.GetShortestLifetimes().size());
+  const auto &larger_vec = ShortestLifetimes.size() > min_size
+                               ? ShortestLifetimes
+                               : Other.GetShortestLifetimes();
+  unsigned int max_size = larger_vec.size();
+  unsigned int i = -1;
+
+  while (++i < min_size) {
+    if (ShortestLifetimes[i].empty() != Other.GetShortestLifetimes()[i].empty())
+      return false;
   }
-  return Id == Other.GetId() &&
-         ShortestLifetimes == Other.GetShortestLifetimes();
+  i--;
+  while (++i < max_size) {
+    if (!larger_vec[i].empty()) return false;
+  }
+  return true;
 }
 
 bool Lifetime::operator!=(const Lifetime &Other) const {
   return !operator==(Other);
-}
-
-bool Lifetime::operator>=(const Lifetime &Other) const {
-  return !operator<(Other);
 }
 
 bool Lifetime::operator<(const Lifetime &Other) const {
@@ -189,12 +201,12 @@ bool Lifetime::operator<(const Lifetime &Other) const {
 
   const auto &other_shortest_lifetimes = Other.GetShortestLifetimes();
 
-  if (!IsNotSet() && !Other.IsNotSet()) {
+  if (IsSet() && Other.IsSet()) {
     return Id != Other.GetId();
-  } else if (!IsNotSet()) {
+  } else if (IsSet()) {
     return (unsigned int)Id >= other_shortest_lifetimes.size() &&
            other_shortest_lifetimes[Id].empty();
-  } else if (!Other.IsNotSet()) {
+  } else if (Other.IsSet()) {
     return true;
   }
 

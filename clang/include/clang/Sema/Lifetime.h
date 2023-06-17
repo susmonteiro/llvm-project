@@ -29,6 +29,7 @@ class Lifetime {
   Lifetime(clang::QualType &type) : LifetimeType(type) {}
 
   // Returns whether this lifetime is valid
+  bool IsSet() const;
   bool IsNotSet() const;
 
   // Returns whether this lifetime is a static lifetime.
@@ -126,7 +127,6 @@ class Lifetime {
 
   bool operator==(const Lifetime &Other) const;
   bool operator!=(const Lifetime &Other) const;
-  bool operator>=(const Lifetime &Other) const;
   bool operator<(const Lifetime &Other) const;
 
  private:
