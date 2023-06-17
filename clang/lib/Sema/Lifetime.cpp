@@ -193,8 +193,6 @@ bool Lifetime::operator!=(const Lifetime &Other) const {
 }
 
 bool Lifetime::operator<(const Lifetime &Other) const {
-  debugInfo("Inside operator<");
-
   // $static outlives all lifetimes and all lifetimes outlive $local
   if (IsStatic() || Other.IsLocal()) return false;
   if (IsLocal() || Other.IsStatic()) return true;
@@ -214,12 +212,9 @@ bool Lifetime::operator<(const Lifetime &Other) const {
   unsigned int min_size =
       std::min(ShortestLifetimes.size(), other_shortest_lifetimes.size());
   unsigned int i = -1;
-  bool equal = true;
   while (++i < min_size) {
     if (!ShortestLifetimes[i].empty() && other_shortest_lifetimes[i].empty())
       return true;
-    equal &=
-        ShortestLifetimes[i].empty() == other_shortest_lifetimes[i].empty();
   }
 
   if (ShortestLifetimes.size() > other_shortest_lifetimes.size()) {
@@ -229,8 +224,7 @@ bool Lifetime::operator<(const Lifetime &Other) const {
     }
   }
 
-  // if they are the same, then this <= other
-  return !equal;
+  return false;
 }
 
 }  // namespace clang

@@ -247,6 +247,15 @@ int *$a warn_on_assignment(int *$a x, int *$b y) {
           // expected-note@-2 {{declared with lifetime '$b' here}}
 }
 
+void no_warn_assignments(int *$a x, int *$b y, int *$c z, int *$d w) {
+	int *p = x;
+  p = y;
+	int *q = z;
+  q = w;
+  p = q;
+	p = q;
+	p = x;
+}
 
 // === Static and Local lifetimes ===
 
