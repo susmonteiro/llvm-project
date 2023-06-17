@@ -18,8 +18,7 @@ Lifetime::Lifetime(char id) {
 }
 
 // TODO change this
-Lifetime::Lifetime(char id, clang::QualType type)
-    : LifetimeType(type) {
+Lifetime::Lifetime(char id, clang::QualType type) : LifetimeType(type) {
   if (id == NOTSET || id == LOCAL || id == STATIC) {
     Id = id;
   } else if (id >= 'a' && id <= 'z') {
@@ -71,15 +70,15 @@ unsigned int Lifetime::GetNumberIndirections(clang::QualType type) {
   return num_indirections_lhs;
 }
 
-clang::QualType Lifetime::GetTypeFromNumberIndirections(clang::QualType type, unsigned int number_indirections) {
-  while(number_indirections > 0) {
+clang::QualType Lifetime::GetTypeFromNumberIndirections(
+    clang::QualType type, unsigned int number_indirections) {
+  while (number_indirections > 0) {
     assert(type->isPointerType() || type->isReferenceType());
     type = type->getPointeeType();
     --number_indirections;
   }
   return type;
 }
-
 
 Lifetime Lifetime::InvalidEmpty() { return Lifetime(INVALID_EMPTY); }
 
@@ -165,26 +164,6 @@ std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
              : std::optional(ShortestLifetimes[id]);
 }
 
-// TODO do test that checks this
-bool Lifetime::CompareShortestLifetimes(const Lifetime &Other) const {
-  const auto &other_shortest_lifetimes = Other.GetShortestLifetimes();
-  const auto &largest_vec =
-      ShortestLifetimes.size() > other_shortest_lifetimes.size()
-          ? ShortestLifetimes
-          : other_shortest_lifetimes;
-  const auto &shortest_vec =
-      ShortestLifetimes.size() > other_shortest_lifetimes.size()
-          ? other_shortest_lifetimes
-          : ShortestLifetimes;
-  for (unsigned int i = 0; i < shortest_vec.size(); i++) {
-    if (largest_vec[i].empty() != shortest_vec[i].empty()) return false;
-  }
-  for (unsigned int i = shortest_vec.size(); i < largest_vec.size(); i++) {
-    if (!largest_vec[i].empty()) return false;
-  }
-  return true;
-}
-
 bool Lifetime::operator==(const Lifetime &Other) const {
   if (!IsNotSet()) {
     return Id == Other.GetId();
@@ -198,19 +177,48 @@ bool Lifetime::operator!=(const Lifetime &Other) const {
 }
 
 bool Lifetime::operator>=(const Lifetime &Other) const {
-  // $static outlives all lifetimes
-  // all lifetimes outlive $local
-  if (IsStatic() || Other.IsLocal()) return true;
-  if (IsLocal() || Other.IsStatic()) return false;
-
-  if (!IsNotSet()) return Id == Other.GetId();
-
-  // TODO == or subset or shortest lifetimes?
-  return Id == Other.GetId() && CompareShortestLifetimes(Other);
+  return !operator<(Other);
 }
 
 bool Lifetime::operator<(const Lifetime &Other) const {
-  return !operator>=(Other);
+  debugInfo("Inside operator<");
+
+  // $static outlives all lifetimes and all lifetimes outlive $local
+  if (IsStatic() || Other.IsLocal()) return false;
+  if (IsLocal() || Other.IsStatic()) return true;
+
+  const auto &other_shortest_lifetimes = Other.GetShortestLifetimes();
+
+  if (!IsNotSet() && !Other.IsNotSet()) {
+    return Id != Other.GetId();
+  } else if (!IsNotSet()) {
+    return (unsigned int)Id >= other_shortest_lifetimes.size() &&
+           other_shortest_lifetimes[Id].empty();
+  } else if (!Other.IsNotSet()) {
+    return true;
+  }
+
+  // if both this and other are not set
+  unsigned int min_size =
+      std::min(ShortestLifetimes.size(), other_shortest_lifetimes.size());
+  unsigned int i = -1;
+  bool equal = true;
+  while (++i < min_size) {
+    if (!ShortestLifetimes[i].empty() && other_shortest_lifetimes[i].empty())
+      return true;
+    equal &=
+        ShortestLifetimes[i].empty() == other_shortest_lifetimes[i].empty();
+  }
+
+  if (ShortestLifetimes.size() > other_shortest_lifetimes.size()) {
+    i--;
+    while (++i < ShortestLifetimes.size()) {
+      if (!ShortestLifetimes[i].empty()) return true;
+    }
+  }
+
+  // if they are the same, then this <= other
+  return !equal;
 }
 
 }  // namespace clang
