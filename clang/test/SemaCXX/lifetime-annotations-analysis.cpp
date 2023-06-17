@@ -350,7 +350,102 @@ int *$a unary_op_1(int *$a p) {
         return *pp;
 }
 
-int *$a *$c *$a multiple_indirections_1(int *$a *$b *$c *$d x, int *$a y) {
+void pointer_aliasing_1(int *$a *$b x) {
+  int **p01 = x;
+  int *$a *p02 = x;
+  int *$b *p03 = x; // expected-warning {{initialization requires that '$a' outlives '$b'}} \
+                // expected-note@-3 {{declared with lifetime '$a' here}}
+  int **$a p04 = x; // expected-warning {{initialization requires that '$b' outlives '$a'}} \
+                // expected-note@-5 {{declared with lifetime '$b' here}}
+  int **$b p05 = x;
+  int *$a *$b p06 = x;
+  int *$b *$a p07 = x; // expected-warning {{initialization requires that '$b' outlives '$a'}} \
+                // expected-note@-9 {{declared with lifetime '$a' here}} \
+                // expected-warning {{initialization requires that '$a' outlives '$b'}} \
+                // expected-note@-9 {{declared with lifetime '$b' here}}
+  int *$a *$a p08 = x;  // expected-warning {{initialization requires that '$b' outlives '$a'}} \
+                // expected-note@-13 {{declared with lifetime '$b' here}}
+  int *$b *$b p09 = x;  // expected-warning {{initialization requires that '$a' outlives '$b'}} \
+                // expected-note@-15 {{declared with lifetime '$a' here}}
+}
+
+void pointer_aliasing_2(int *$a *$b x) {
+  int **p01;
+  p01 = x;
+  *p01 = *x;
+  int *$a *p02;
+  p02 = x;
+  *p02 = *x;
+  int *$b *p03;
+  p03 = x; // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-8 {{declared with lifetime '$a' here}} \
+                // expected-note@-1 {{declared with lifetime '$b' here}}
+  *p03 = *x;  // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-11 {{declared with lifetime '$a' here}} \
+                // expected-note@-4 {{declared with lifetime '$b' here}}
+  int **$b p05;
+  p05 = x;
+  *p05 = *x;
+  int *$a *$b p06;
+  p06 = x;
+  *p06 = *x;
+  int *$b *$a p07;
+  p07 = x; // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+                // expected-note@-21 {{declared with lifetime '$b' here}} \
+                // expected-note@-1 {{declared with lifetime '$a' here}} \
+                // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-21 {{declared with lifetime '$a' here}} \
+                // expected-note@-1 {{declared with lifetime '$b' here}}
+  *p07 = *x;    // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-27 {{declared with lifetime '$a' here}} \
+                // expected-note@-7 {{declared with lifetime '$b' here}}
+  int *$a *$a p08;
+  p08 = x;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+                // expected-note@-31 {{declared with lifetime '$b' here}}\
+                // expected-note@-1 {{declared with lifetime '$a' here}}
+  *p08 = *x;
+  int *$b *$b p09;
+  p09 = x;  // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-36 {{declared with lifetime '$a' here}}\
+                // expected-note@-1 {{declared with lifetime '$b' here}}
+  *p09 = *x;  // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-39 {{declared with lifetime '$a' here}}\
+                // expected-note@-4 {{declared with lifetime '$b' here}}
+}
+
+int *$a *$b pointer_aliasing_3(int *$a *$b x, int *$c *$d y, int num) {
+  int **p01 = x;
+  if (num == 1) return p01;
+  int **p02 = y;
+  if (num == 2) return p02; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$d'}} \
+                // expected-note@-1 {{declared with lifetime '$d' here}} \
+                // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$c'}} \
+                // expected-note@-1 {{declared with lifetime '$c' here}}
+  int *$a *p03 = x;
+  if (num == 3) return p03;
+  int **p04;
+  p04 = x;
+  if (num == 4) return p04;
+  int **p05;
+  p05 = y;
+  if (num == 5) return p05; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$d'}} \
+                // expected-note@-1 {{declared with lifetime '$d' here}} \
+                // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$c'}} \
+                // expected-note@-1 {{declared with lifetime '$c' here}}
+  int *$a *p06;
+  p06 = x;
+  if (num == 6) return p06; 
+
+  int **p07 = x;  // expected-warning {{initialization requires that '$a' outlives '$c'}} \
+                  // expected-note@-23 {{declared with lifetime '$a' here}} \
+                  // expected-note@+5 {{declared with lifetime '$c' here}}
+  if (num == 7) return p07;
+  *p07 = *y;
+  return x;
+}
+
+
+int *$a *$c *$a pointer_aliasing_4(int *$a *$b *$c *$d x, int *$a y) {
         int * *$a **p;  
         p = x;    // expected-warning {{assignment requires that '$b' outlives '$a'}} \
                   // expected-note@-1 {{declared with lifetime '$a' here}} \
