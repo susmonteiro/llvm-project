@@ -322,41 +322,41 @@ int *$a return_local_lifetime_1() {
 }
 
 int *$local return_local_lifetime_2() { // expected-warning {{the return lifetime cannot be '$local'}}
-        int i = 0;
-        int *p = &i;
-        return p; 
+  int i = 0;
+  int *p = &i;
+  return p; 
 }
 
 int *return_local_lifetime_3() {  // expected-warning {{the return lifetime cannot be '$local'}}
-        int i = 0;
-        int *p = &i;
-        return p; 
+  int i = 0;
+  int *p = &i;
+  return p; 
 }
 
 void multiple_indirections(int *$a *$b *$c *$d x) {
-        int ****p;
-        p = x;
-        *p = *x;
-        **p = **x;
-        ***p = ***x;
-        ****p = ****x;
-        *(&p) = *(&x);
+  int ****p;
+  p = x;
+  *p = *x;
+  **p = **x;
+  ***p = ***x;
+  ****p = ****x;
+  *(&p) = *(&x);
 }
 
 void simple_unary_operator(int *$a p) {
-        int *$c *$b pp = &p;  // expected-warning {{initialization requires that '$local' outlives '$b'}} \
-                // expected-note@-1 {{declared with lifetime '$local' here}} \
-                // expected-warning {{initialization requires that '$a' outlives '$c'}} \
-                // expected-note@-1 {{declared with lifetime '$a' here}}
-        int i = 0;
-        int *$a x = &i; // expected-warning {{initialization requires that '$local' outlives '$a'}} \
-                // expected-note@-1 {{declared with lifetime '$local' here}}
+  int *$c *$b pp = &p;  // expected-warning {{initialization requires that '$local' outlives '$b'}} \
+          // expected-note@-1 {{declared with lifetime '$local' here}} \
+          // expected-warning {{initialization requires that '$a' outlives '$c'}} \
+          // expected-note@-1 {{declared with lifetime '$a' here}}
+  int i = 0;
+  int *$a x = &i; // expected-warning {{initialization requires that '$local' outlives '$a'}} \
+          // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int *$a unary_op_1(int *$a p) {
-        int **pp = &p;
-        p = *pp;
-        return *pp;
+  int **pp = &p;
+  p = *pp;
+  return *pp;
 }
 
 void pointer_aliasing_1(int *$a *$b x) {
@@ -454,16 +454,16 @@ int *$a *$b pointer_aliasing_3(int *$a *$b x, int *$c *$d y, int num) {
 
 
 int *$a *$c *$a pointer_aliasing_4(int *$a *$b *$c *$d x, int *$a y) {
-        int * *$a **p;  
-        p = x;    // expected-warning {{assignment requires that '$b' outlives '$a'}} \
-                  // expected-note@-1 {{declared with lifetime '$a' here}} \
-                  // expected-note@-2 {{declared with lifetime '$b' here}}
-        int **q = &y;
-        int ***xx = *x;
-        int **$b *$a r = *x;  // expected-warning {{initialization requires that '$c' outlives '$a'}} \
-                // expected-note@-7 {{declared with lifetime '$c' here}}
-        return *p;  // expected-warning {{function should return data with lifetime '$c' but it is returning data with lifetime '$a'}} \
-            // expected-note@-8 {{declared with lifetime '$a' here}} \
-            // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$c'}} \
-            // expected-note@-7 {{declared with lifetime '$c' here}}
+  int * *$a **p;  
+  p = x;    // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+            // expected-note@-1 {{declared with lifetime '$a' here}} \
+            // expected-note@-2 {{declared with lifetime '$b' here}}
+  int **q = &y;
+  int ***xx = *x;
+  int **$b *$a r = *x;  // expected-warning {{initialization requires that '$c' outlives '$a'}} \
+          // expected-note@-7 {{declared with lifetime '$c' here}}
+  return *p;  // expected-warning {{function should return data with lifetime '$c' but it is returning data with lifetime '$a'}} \
+      // expected-note@-8 {{declared with lifetime '$a' here}} \
+      // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$c'}} \
+      // expected-note@-7 {{declared with lifetime '$c' here}}
 }

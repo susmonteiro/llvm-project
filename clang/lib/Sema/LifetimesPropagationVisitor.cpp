@@ -261,6 +261,19 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
   return std::nullopt;
 }
 
+std::optional<std::string>
+LifetimesPropagationVisitor::VisitConditionalOperator(
+    const clang::ConditionalOperator *op) {
+  if (debugEnabled) debugLifetimes("[VisitConditionalOperator]");
+  const auto *true_expr = op->getTrueExpr();
+  const auto *false_expr = op->getFalseExpr();
+  Visit(const_cast<clang::Expr *>(true_expr));
+  Visit(const_cast<clang::Expr *>(false_expr));
+  PointsTo.InsertExprLifetimes(op, true_expr);
+  PointsTo.InsertExprLifetimes(op, false_expr);
+  return std::nullopt;
+}
+
 std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
     const clang::DeclRefExpr *decl_ref) {
   if (debugEnabled) debugLifetimes("[VisitDeclRefExpr]");
