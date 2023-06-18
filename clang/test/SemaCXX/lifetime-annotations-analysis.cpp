@@ -103,6 +103,18 @@ int *$a incorrect_simple_control_flow(int *$a x, int *$b y, int num) {
             // expected-note@-2 {{declared with lifetime '$b' here}}
 }
 
+int *$a ternary_conditions(int *$a x, int *$b y, int *$a z, bool b) {
+  int *$a p = b ? x : z;
+  int *$a q = b ? z : y;  // expected-warning {{initialization requires that '$b' outlives '$a'}} \
+                  // expected-note@-2 {{declared with lifetime '$b' here}}
+  if (b) {
+    return b ? x : y; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
+            // expected-note@-5 {{declared with lifetime '$b' here}}
+  } else {
+    return b ? x : z;
+  }
+}
+
 int *$b incorrect_simple_control_flow_2(int *$a x, int *$b y, int num) {
   int *p;
   if (num > 0) {

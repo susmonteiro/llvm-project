@@ -262,7 +262,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       return std::nullopt;
     }
 
-    auto &func_info = FuncInfo[direct_callee];
+    auto &func_info = it->second;
     const auto &params_by_type = func_info.GetParamsByType();
     llvm::DenseMap<const clang::ParmVarDecl *,
                    std::pair<clang::QualType, unsigned int>>
@@ -280,8 +280,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         params_set[pair.first].first = param_type;
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(pair.first, param_type);
-        param_lifetimes[param_lifetime.GetIdNoOffset()].insert(pair.second);
+        param_lifetimes[param_lifetime.GetId()].insert(pair.second);
       }
+
       // check lifetimes of higher indirections
       for (const auto &pair : param_lifetimes) {
         if (pair.second.size() < 2) continue;
@@ -313,7 +314,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           Lifetime &current_lifetime = func_info.GetParamLifetime(
               param_pair.first, param_pair.first->getType());
 
-          auto it = param_lifetimes.find(current_lifetime.GetIdNoOffset());
+          auto it = param_lifetimes.find(current_lifetime.GetId());
           if (it == param_lifetimes.end()) continue;
 
           const auto &filtered_params = it->second;

@@ -54,7 +54,6 @@ class Lifetime {
 
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }
-  char GetIdNoOffset() const { return Id - OFFSET; }
   void SetId(char id) { Id = id; }
   clang::QualType GetType() const { return LifetimeType; }
   void SetType(clang::QualType type) { LifetimeType = type; }
