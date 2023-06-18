@@ -34,14 +34,37 @@ int *$b incorrect_simple_return(int *$a x) {
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
+int &$a correct_simple_return_references(int &$a x) {
+  return x;
+}
+
 int &$b incorrect_simple_return_references(int &$a x) {
   return x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
+// TODO
+// int *$a correct_simple_return_pointers_and_references(int &$a x) {
+//   return &x;
+// }
+
+// TODO
+// int &$a correct_simple_return_references_and_pointers(int *$a x) {
+//   return *x;
+// }
+
 int *$a no_params_one_indirection(int *x) {
         return x; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$local'}} \
             // expected-note@-1 {{declared with lifetime '$local' here}}
+}
+
+int *$a no_params_two_indirections_1(int *$a *$b x) {
+        return *x;
+}
+
+int *$b no_params_two_indirections_2(int *$a *$b x) {
+        return *x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
+            // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
 int *$a *$b no_params_two_indirections(int *$a *x) {
@@ -76,8 +99,19 @@ int *$a correct_simple_dependencies(int *$a x) {
   return p;  // no warning
 }
 
+int &$a correct_simple_dependencies_references(int &$a x) {
+  int &p = x;
+  return p;  // no warning
+}
+
 int *$b incorrect_simple_dependencies(int *$a x) {
   int *p = x;
+  return p;  // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
+            // expected-note@-1 {{declared with lifetime '$a' here}}
+}
+
+int &$b incorrect_simple_dependencies_references(int &$a x) {
+  int &p = x;
   return p;  // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
@@ -478,4 +512,32 @@ int *$a *$c *$a pointer_aliasing_4(int *$a *$b *$c *$d x, int *$a y) {
       // expected-note@-8 {{declared with lifetime '$a' here}} \
       // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$c'}} \
       // expected-note@-7 {{declared with lifetime '$c' here}}
+}
+
+void pointer_aliasing_5(int *$a x, int *$a *$b y) {
+  int **p = &x;
+  int i = 0;
+  *p = &i;
+
+  int *$a *q = y;
+  *q = &i;  // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+            // expected-note@-1 {{declared with lifetime '$a' here}} \
+            // expected-note@-4 {{declared with lifetime '$local' here}}
+
+  int **r = y;
+  *r = &i;
+}
+
+void pointer_aliasing_6(int *$a *$c x, int *$a *$b y, int *$b *$b z) {
+  int *p = *y;
+  *y = *x;
+  *x = p;
+
+  int *q = *y;
+  *y = *z;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+            // expected-note@-6 {{declared with lifetime '$a' here}} \
+            // expected-note@-6 {{declared with lifetime '$b' here}}
+  *z = q;   // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+            // expected-note@-4 {{declared with lifetime '$a' here}} \
+            // expected-note@-9 {{declared with lifetime '$b' here}}
 }
