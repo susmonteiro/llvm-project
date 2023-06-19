@@ -87,8 +87,8 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
             (char)i == return_lifetime.GetId())
           continue;
         S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
-            << return_lifetime.GetLifetimeName()
-            << Lifetime::GetLifetimeName(i) << return_stmt->getSourceRange();
+            << return_lifetime.GetLifetimeName() << Lifetime::GetLifetimeName(i)
+            << return_stmt->getSourceRange();
         PrintNotes(var_lifetime, var_decl, diag::note_lifetime_declared_here,
                    (char)i);
       }
@@ -271,10 +271,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     unsigned int num_indirections = params_by_type.size();
 
     while (num_indirections-- != 0) {
+      debugLifetimes("Number indirections", num_indirections);
       llvm::DenseMap<char,
                      llvm::DenseSet<std::pair<clang::QualType, unsigned int>>>
           param_lifetimes;
       // get lifetimes for the current indirection level
+      debugLifetimes("<< Step 1 >>");
       for (const auto &pair : params_set) {
         clang::QualType param_type = pair.second.first->getPointeeType();
         params_set[pair.first].first = param_type;
@@ -284,30 +286,40 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of higher indirections
+      debugLifetimes("<< Step 2 >>");
       for (const auto &pair : param_lifetimes) {
         if (pair.second.size() < 2) continue;
+        unsigned int first_arg = 0;
+        for (const auto &arg_pair : pair.second) {
+          first_arg = std::min(first_arg, arg_pair.second);
+        }
         auto it = pair.second.begin();
-        const auto *previous_arg = GetDeclFromArg(call->getArg(it->second));
+        const auto *previous_arg = GetDeclFromArg(call->getArg(first_arg));
         if (previous_arg == nullptr) continue;
+
         Lifetime &previous = State.GetLifetime(previous_arg, (it->first));
-        while (++it != pair.second.end()) {
-          const auto *current_arg = GetDeclFromArg(call->getArg(it->second));
-          if (current_arg == nullptr) continue;
-          Lifetime &current = State.GetLifetime(current_arg, (it->first));
-          if (previous != current) {
-            // TODO change notes
-            S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_equal)
-                << direct_callee << previous_arg << current_arg
-                << call->getSourceRange();
-            S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
-                << previous_arg << previous.GetLifetimeName();
-            S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                << current_arg << current.GetLifetimeName();
-            return std::nullopt;
+        while (it != pair.second.end()) {
+          if (it->second != first_arg) {
+            const auto *current_arg = GetDeclFromArg(call->getArg(it->second));
+            if (current_arg == nullptr) continue;
+            Lifetime &current = State.GetLifetime(current_arg, (it->first));
+            if (previous != current) {
+              // TODO change notes
+              S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_equal)
+                  << direct_callee << previous_arg << current_arg
+                  << call->getSourceRange();
+              S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
+                  << previous_arg << previous.GetLifetimeName();
+              S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
+                  << current_arg << current.GetLifetimeName();
+              return std::nullopt;
+            }
           }
+          it++;
         }
       }
 
+      debugLifetimes("<< Step 3 >>");
       // check lifetimes of current indirection level
       if (!param_lifetimes.empty()) {
         for (const auto &param_pair : params_by_type[num_indirections]) {

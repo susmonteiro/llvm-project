@@ -544,7 +544,7 @@ void pointer_aliasing_6(int *$a *$c x, int *$a *$b y, int *$b *$b z) {
             // expected-note@-9 {{declared with lifetime '$b' here}}
 }
 
-void pointer_aliasing_7(int *$a *$b x, int *$c *$d y, int *$e *$f z) {
+int *$e *$d pointer_aliasing_7(int *$a *$b x, int *$c *$d y, int *$e *$f z) {
   int **p;
   int **q;
   int **r;
@@ -556,7 +556,104 @@ void pointer_aliasing_7(int *$a *$b x, int *$c *$d y, int *$e *$f z) {
   r = z;
   y = q;  // expected-warning {{assignment requires that '$a' outlives '$c'}} \
           // expected-note@-6 {{declared with lifetime '$a' here}} \
+          // expected-note@-10 {{declared with lifetime '$c' here}} \
           // expected-warning {{assignment requires that '$e' outlives '$c'}} \
-          // expected-note@-6 {{declared with lifetime '$e' here}} \
-          // expected-notes@10 {{declared with lifetime '$c' here}}
+          // expected-note@-6 {{declared with lifetime '$e' here}} 
+  x = p;  // expected-warning {{assignment requires that '$c' outlives '$a'}} \
+          // expected-note@-11 {{declared with lifetime '$c' here}} \
+          // expected-note@-10 {{declared with lifetime '$c' here}} \
+          // expected-note@-15 {{declared with lifetime '$a' here}} \
+          // expected-warning {{assignment requires that '$e' outlives '$a'}} \
+          // expected-note@-10 {{declared with lifetime '$e' here}} \
+          // expected-note@-11 {{declared with lifetime '$e' here}} \
+          // expected-warning {{assignment requires that '$d' outlives '$b'}} \
+          // expected-note@-11 {{declared with lifetime '$d' here}} \
+          // expected-note@-15 {{declared with lifetime '$b' here}}
+  int *$e *$f zz = r;  // expected-warning {{initialization requires that '$a' outlives '$e'}} \
+          // expected-note@-20 {{declared with lifetime '$a' here}} \
+          // expected-warning {{initialization requires that '$c' outlives '$e'}} \
+          // expected-note@-20 {{declared with lifetime '$c' here}} \
+          // expected-warning {{initialization requires that '$b' outlives '$f'}} \
+          // expected-note@-20 {{declared with lifetime '$b' here}} \
+          // expected-warning {{initialization requires that '$d' outlives '$f'}} \
+          // expected-note@-20 {{declared with lifetime '$d' here}}
+  return p; // expected-warning {{function should return data with lifetime '$e' but it is returning data with lifetime '$a'}} \
+            // expected-note@-26 {{declared with lifetime '$a' here}} \
+            // expected-note@-29 {{declared with lifetime '$a' here}} \
+            // expected-note@-28 {{declared with lifetime '$a' here}} \
+            // expected-note@-18 {{declared with lifetime '$a' here}} \
+            // expected-warning {{function should return data with lifetime '$e' but it is returning data with lifetime '$c'}} \
+            // expected-note@-29 {{declared with lifetime '$c' here}} \
+            // expected-note@-28 {{declared with lifetime '$c' here}} \
+            // expected-warning {{function should return data with lifetime '$d' but it is returning data with lifetime '$b'}} \
+            // expected-note@-26 {{declared with lifetime '$b' here}}
 }
+
+// === FUNCTION CALLS ===
+
+void fn11(int *$a x, int *$b y);
+void fn12(int *$a x, int *$a y);
+void fn21(int *$a *$b x);
+void fn22(int *$a *$a x);
+void fn31(int *$a *$b x, int *$static y);
+void fn32(int *$a *$b x, int *$b y);
+void fn33(int *$a *$b x, int *$a y);
+void fn34(int *$a *$b x, int *$local y);
+void fn41(int *$a *$b x, int *$c *$b y);
+void fn42(int *$a *$b x, int *$a *$b y);
+void fn43(int *$a *$b x, int *$a *$c y);
+void fn44(int *$a *$b x, int *$b *$a y);
+void fn51(int *$a x, int *$a *$a y, int *$a *$a z);
+void fn52(int *$a *$a x, int *$b *$a y, int *$b *$a z);
+void fn61(int *$a *$b *$c x, int *$b *$a y);
+
+void function_calls() {
+  int *$a p;
+  int *$b q;
+  fn11(p, p);
+  fn11(p, q);
+  fn12(p, p);
+  fn12(p, q);
+
+  int *$a *$a pp;
+  int *$a *$b qq;
+  int *$b *$b rr;
+  int *$b *$a ss;
+  fn21(pp);
+  fn21(qq);
+  fn22(pp);
+  fn22(qq);
+
+  // TODO call fn31
+  fn32(pp, p);
+  fn32(pp, q);
+  fn32(qq, p);
+  fn32(qq, q);
+  fn33(pp, p);
+  fn33(pp, q);  // expected-warning {{when calling function 'fn33', the lifetime of 'q' cannot be shorter than the lifetime of 'pp'}} \
+                // expected-note@-21 {{lifetime of 'q' is '$b'}} \
+                // expected-note@-15 {{lifetime of 'pp' is '$a'}}
+  fn33(qq, p);
+  fn33(qq, q);  // expected-warning {{when calling function 'fn33', the lifetime of 'q' cannot be shorter than the lifetime of 'qq'}} \
+                // expected-note@-25 {{lifetime of 'q' is '$b'}} \
+                // expected-note@-18 {{lifetime of 'qq' is '$a'}}
+  // TODO call fn34
+  fn41(pp, pp);
+  fn41(pp, qq); 
+  fn41(pp, rr);
+  fn42(pp, qq); 
+  fn42(pp, rr); // expected-warning {{when calling function 'fn42', the lifetimes of arguments 'pp' and 'rr' should be the same}} \
+                // expected-note@-27 {{lifetime of 'pp' is '$a}} \
+                // expected-note@-25 {{lifetime of 'rr' is '$b}}
+  fn42(pp, ss); // expected-warning {{when calling function 'fn42', the lifetimes of arguments 'pp' and 'ss' should be the same}} \
+                // expected-note@-30 {{lifetime of 'pp' is '$a}} \
+                // expected-note@-27 {{lifetime of 'ss' is '$b}}
+  // TODO call fn43
+  // TODO call fn44
+  // TODO call fn51
+  fn51(p, rr, ss); 
+  // TODO call fn52
+  // fn52(qq, pp, ss);
+  // TODO call fn61
+}
+
