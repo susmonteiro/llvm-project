@@ -85,7 +85,7 @@ Lifetime Lifetime::InvalidEmpty() { return Lifetime(INVALID_EMPTY); }
 
 Lifetime Lifetime::InvalidTombstone() { return Lifetime(INVALID_ID_TOMBSTONE); }
 
-std::string Lifetime::GetLifetimeName(char id) const {
+std::string Lifetime::GetLifetimeName(char id) {
   id = IdToChar(id);
   switch (id) {
     case NOTSET:

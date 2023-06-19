@@ -24,9 +24,9 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
           continue;
         debugLifetimes("Showing notes", (char)Lifetime::IdToChar(i));
         S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-            << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName(i)
+            << lhs_lifetime.GetLifetimeName() << Lifetime::GetLifetimeName(i)
             << op->getSourceRange();
-        PrintNotes(lhs_lifetime, lhs_var_decl,
+        PrintNotes(rhs_lifetime, rhs_var_decl,
                    diag::note_lifetime_declared_here, i);
       }
       PrintNotes(lhs_lifetime, lhs_var_decl, diag::note_lifetime_declared_here);
@@ -56,7 +56,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
           continue;
         S.Diag(lhs_var_decl->getInit()->getExprLoc(),
                diag::warn_decl_lifetimes_differ)
-            << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName(i)
+            << lhs_lifetime.GetLifetimeName() << Lifetime::GetLifetimeName(i)
             << lhs_var_decl->getInit()->getSourceRange();
         PrintNotes(rhs_lifetime, rhs_var_decl,
                    diag::note_lifetime_declared_here, i);
@@ -88,7 +88,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
           continue;
         S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
             << return_lifetime.GetLifetimeName()
-            << var_lifetime.GetLifetimeName(i) << return_stmt->getSourceRange();
+            << Lifetime::GetLifetimeName(i) << return_stmt->getSourceRange();
         PrintNotes(var_lifetime, var_decl, diag::note_lifetime_declared_here,
                    (char)i);
       }
@@ -127,15 +127,12 @@ void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
                                                 clang::SourceLocation loc,
                                                 clang::SourceRange range,
                                                 int msg, char id) const {
-  debugLifetimes("Printing notes", id);
-  debugLifetimes("Lifetime name", lifetime.GetLifetimeName(id));
-  // FIXME problem here
   const auto &maybe_stmts = lifetime.GetStmts(id);
   if (maybe_stmts.has_value()) {
     const auto &stmts = maybe_stmts.value();
     for (const auto &stmt : stmts) {
       S.Diag(stmt->getBeginLoc(), msg)
-          << lifetime.GetLifetimeName(id) << stmt->getSourceRange();
+          << Lifetime::GetLifetimeName(id) << stmt->getSourceRange();
     }
   } else {
     S.Diag(loc, msg) << lifetime.GetLifetimeName() << range;

@@ -63,7 +63,7 @@ class Lifetime {
   std::string DebugString() const;
 
   // Returns the name of the lifetime
-  std::string GetLifetimeName(char id) const;
+  static std::string GetLifetimeName(char id);
   std::string GetLifetimeName() const { return GetLifetimeName(Id); }
 
   static StmtDenseSet *GetAndResizeShortestLifetime(
