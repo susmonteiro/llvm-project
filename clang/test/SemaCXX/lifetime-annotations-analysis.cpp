@@ -21,6 +21,8 @@
 #define $b $(b)
 #define $c $(c)
 #define $d $(d)
+#define $e $(e)
+#define $f $(f)
 
 #define $static $(static)
 #define $local $(local)
@@ -540,4 +542,21 @@ void pointer_aliasing_6(int *$a *$c x, int *$a *$b y, int *$b *$b z) {
   *z = q;   // expected-warning {{assignment requires that '$a' outlives '$b'}} \
             // expected-note@-4 {{declared with lifetime '$a' here}} \
             // expected-note@-9 {{declared with lifetime '$b' here}}
+}
+
+void pointer_aliasing_7(int *$a *$b x, int *$c *$d y, int *$e *$f z) {
+  int **p;
+  int **q;
+  int **r;
+  p = q;
+  r = p;
+
+  p = x;
+  q = y;
+  r = z;
+  y = q;  // expected-warning {{assignment requires that '$a' outlives '$c'}} \
+          // expected-note@-6 {{declared with lifetime '$a' here}} \
+          // expected-warning {{assignment requires that '$e' outlives '$c'}} \
+          // expected-note@-6 {{declared with lifetime '$e' here}} \
+          // expected-notes@10 {{declared with lifetime '$c' here}}
 }

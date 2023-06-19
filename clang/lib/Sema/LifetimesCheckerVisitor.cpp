@@ -22,6 +22,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
         if (rhs_shortest_lifetimes[i].empty() ||
             (char)i == lhs_lifetime.GetId())
           continue;
+        debugLifetimes("Showing notes", (char)Lifetime::IdToChar(i));
         S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
             << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName(i)
             << op->getSourceRange();
@@ -126,11 +127,13 @@ void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
                                                 clang::SourceLocation loc,
                                                 clang::SourceRange range,
                                                 int msg, char id) const {
+  debugLifetimes("Printing notes", id);
+  debugLifetimes("Lifetime name", lifetime.GetLifetimeName(id));
+  // FIXME problem here
   const auto &maybe_stmts = lifetime.GetStmts(id);
   if (maybe_stmts.has_value()) {
     const auto &stmts = maybe_stmts.value();
     for (const auto &stmt : stmts) {
-      // TODO try to print in a better place
       S.Diag(stmt->getBeginLoc(), msg)
           << lifetime.GetLifetimeName(id) << stmt->getSourceRange();
     }
