@@ -298,18 +298,22 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         while (it != pair.second.end()) {
           if (it->second != first_arg) {
             const auto *current_arg = GetDeclFromArg(call->getArg(it->second));
-            if (current_arg == nullptr) continue;
-            Lifetime &current = State.GetLifetime(current_arg, (it->first));
-            if (previous != current) {
-              // TODO change notes
-              S.Diag(call->getExprLoc(), diag::warn_func_params_lifetimes_equal)
-                  << direct_callee << previous_arg << current_arg
-                  << call->getSourceRange();
-              S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
-                  << previous_arg << previous.GetLifetimeName() << previous_arg->getSourceRange();
-              S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                  << current_arg << current.GetLifetimeName() << current_arg->getSourceRange();
-              return std::nullopt;
+            if (current_arg != nullptr) {
+              Lifetime &current = State.GetLifetime(current_arg, (it->first));
+              if (previous != current) {
+                // TODO change notes
+                S.Diag(call->getExprLoc(),
+                       diag::warn_func_params_lifetimes_equal)
+                    << direct_callee << previous_arg << current_arg
+                    << call->getSourceRange();
+                S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
+                    << previous_arg << previous.GetLifetimeName()
+                    << previous_arg->getSourceRange();
+                S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
+                    << current_arg << current.GetLifetimeName()
+                    << current_arg->getSourceRange();
+                return std::nullopt;
+              }
             }
           }
           it++;
@@ -345,9 +349,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                   << direct_callee << current_arg << arg_decl
                   << call->getSourceRange();
               S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                  << current_arg << current_arg_lifetime.GetLifetimeName() << current_arg->getSourceRange();
+                  << current_arg << current_arg_lifetime.GetLifetimeName()
+                  << current_arg->getSourceRange();
               S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
-                  << arg_decl << arg_lifetime.GetLifetimeName() << arg_decl->getSourceRange();
+                  << arg_decl << arg_lifetime.GetLifetimeName()
+                  << arg_decl->getSourceRange();
             }
           }
         }
