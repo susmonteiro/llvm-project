@@ -9646,11 +9646,9 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
 
     if (!Diags.isIgnored(diag::print_lifetime_annotations,
                              NewFD->getLocation())) {
-      // TODO remove this
-      if (!LAChecker) {
-        debugWarn("No LAChecker...");
+      if (LAChecker) {
+        LAChecker->GetLifetimes(NewFD, *this);
       }
-      LAChecker->GetLifetimes(NewFD, *this);
     }
 
   if (OriginalLexicalContext && OriginalLexicalContext->isObjCContainer())

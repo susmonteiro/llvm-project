@@ -17,7 +17,7 @@ void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
 void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  clang::QualType lhs_type, const clang::Stmt *loc,
                  PointsToMap &PointsTo, LifetimeAnnotationsAnalysis &state) {
-  debugLifetimes("\t[TransferRHS]");
+  // debugLifetimes("\t[TransferRHS]");
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
   CreateDependency(rhs, lhs, lhs_type, loc, state);
   for (const auto &expr : points_to) {
@@ -43,8 +43,6 @@ ObjectLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
     return ObjectLifetimes();
     // return std::move(err);
   }
-  debugLifetimes("Variable " + var_decl->getNameAsString() + ":\n" +
-                 objectsLifetimes.DebugString());
   return objectsLifetimes;
 }
 
@@ -71,7 +69,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   // non-reference-like field in a struct might still produce lifetimes. We
   // don't want to change points-to sets in those cases.
   if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
-    debugWarn("LHS of bin_op is not pointer type");
+    // debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
 
@@ -115,13 +113,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     // ignore if return type does not have a Lifetime
     if (!func_type->isPointerType() && !func_type->isReferenceType()) {
-      debugWarn("Return type is not pointer type");
+      // debugWarn("Return type is not pointer type");
       unsigned int i = -1;
       while (++i < func_info.GetNumParams()) {
         const clang::ParmVarDecl *param = func_info.GetParam(i);
         if (!param->getType()->isPointerType() &&
             !param->getType()->isReferenceType()) {
-          debugWarn("Param type is not pointer type");
+          // debugWarn("Param type is not pointer type");
           continue;
         }
         const Expr *arg = call->getArg(i)->IgnoreParens();
@@ -137,7 +135,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       const clang::ParmVarDecl *param = func_info.GetParam(i);
       if (!param->getType()->isPointerType() &&
           !param->getType()->isReferenceType()) {
-        debugWarn("Param type is not pointer type");
+        // debugWarn("Param type is not pointer type");
         continue;
       }
       const Expr *arg = call->getArg(i)->IgnoreParens();
@@ -150,8 +148,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
         PointsTo.InsertExprLifetimes(call, arg);
       }
     }
-  } else {
-    debugWarn("No direct callee");
   }
   return std::nullopt;
 }
@@ -162,7 +158,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
   switch (cast->getCastKind()) {
     case clang::CK_LValueToRValue: {
       // TODO
-      debugLight("> Case LValueToRValue");
+      // debugLight("> Case LValueToRValue");
       if (cast->getType()->isPointerType()) {
         // Converting from a glvalue to a prvalue means that we need to
         // perform a dereferencing operation because the objects associated
@@ -190,7 +186,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     }
     case clang::CK_NullToPointer: {
       // TODO
-      debugLight("> Case NullToPointer");
+      // debugLight("> Case NullToPointer");
 
       // PointsTo.SetExprObjectSet(cast, {});
       break;
@@ -206,7 +202,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // user-defined conversion; it's therefore a no-op for our purposes.
     case clang::CK_NoOp: {
       // TODO
-      debugLight("> Case No-ops");
+      // debugLight("> Case No-ops");
 
       // clang::QualType type = cast->getType().getCanonicalType();
       // if (type->isPointerType() || cast->isGLValue()) {
@@ -220,7 +216,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     case clang::CK_BaseToDerived:
     case clang::CK_Dynamic: {
       // TODO
-      debugLight("> Case SubExpressions");
+      // debugLight("> Case SubExpressions");
 
       // These need to be mapped to what the subexpr points to.
       // (Simple cases just work okay with this; may need to be revisited when
@@ -237,7 +233,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // We don't support analyzing functions that perform a reinterpret_cast.
 
       // TODO
-      debugLight("> Case Reinterpret cast");
+      // debugLight("> Case Reinterpret cast");
 
       // diag_reporter_(
       //     Func->getBeginLoc(),
@@ -306,7 +302,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
       clang::QualType type = var_decl->getType().getCanonicalType();
       if (!type->isPointerType() && !type->isReferenceType()) {
-        debugWarn("Var decl is not pointer type");
+        // debugWarn("Var decl is not pointer type");
         continue;
       }
 
@@ -350,7 +346,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
 
   if (!op->isGLValue() && !op->getType()->isPointerType() &&
       !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
-    debugWarn("Skipped...");
+    // debugWarn("Skipped...");
     return std::nullopt;
   }
 
@@ -372,7 +368,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryDeref(
 
   if (!op->isGLValue() && !op->getType()->isPointerType() &&
       !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
-    debugWarn("Skipped...");
+    // debugWarn("Skipped...");
     return std::nullopt;
   }
 

@@ -48,7 +48,7 @@ class LifetimesPropagationVisitor
   llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &FuncInfo;
   PointsToMap &PointsTo;
   FunctionLifetimeFactory Factory;
-  bool debugEnabled = true;  // TODO delete this
+  bool debugEnabled = false;  // TODO delete this
 };
 
 }  // namespace clang

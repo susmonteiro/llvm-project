@@ -22,7 +22,6 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
         if (rhs_shortest_lifetimes[i].empty() ||
             (char)i == lhs_lifetime.GetId())
           continue;
-        debugLifetimes("Showing notes", (char)Lifetime::IdToChar(i));
         S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
             << lhs_lifetime.GetLifetimeName() << Lifetime::GetLifetimeName(i)
             << op->getSourceRange();
@@ -62,7 +61,6 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
                    diag::note_lifetime_declared_here, i);
       }
     } else {
-      debugLifetimes("Inside else");
       S.Diag(lhs_var_decl->getInitializingDeclaration()->getLocation(),
              diag::warn_decl_lifetimes_differ)
           << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
@@ -197,7 +195,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   // We don't want to change points-to sets in those cases.
   // TODO need to check for references?
   if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
-    debugWarn("LHS of bin_op is not pointer type");
+    // debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
 
@@ -245,7 +243,7 @@ const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
       return dyn_cast<clang::VarDecl>(member_expr->getMemberDecl());
     }
   }
-  debugWarn("Arg is not a declrefexpr or memberexpr");
+  // debugWarn("Arg is not a declrefexpr or memberexpr");
   return nullptr;
 }
 

@@ -75,11 +75,7 @@ class LifetimeAnnotationsAnalysis {
   void PropagateShortestLifetimes(const clang::VarDecl *target,
                                   const LifetimesVector &shortest_lifetimes,
                                   clang::QualType type) {
-    debugLifetimes("Inserting shortest lifetimes into",
-                   GetLifetime(target, type).DebugString());
     GetLifetime(target, type).InsertShortestLifetimes(shortest_lifetimes);
-    debugLifetimes("After inserting shortest lifetimes into",
-                   GetLifetime(target, type).DebugString());
   }
 
   void PropagateShortestLifetimes(const clang::VarDecl *to,

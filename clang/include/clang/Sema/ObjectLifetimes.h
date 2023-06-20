@@ -48,16 +48,12 @@ class ObjectLifetimes {
 
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
     clang::QualType type = lifetime.GetType();
-    debugLifetimes("Before emplace", DebugString());
     PointeeObjects.emplace_back(lifetime);
-    debugLifetimes("After emplace", DebugString());
     return GetLifetime(type);
   }
 
   Lifetime& InsertPointeeObject(clang::QualType type) {
-    debugLifetimes("Before emplace", DebugString());
     PointeeObjects.emplace_back(type);
-    debugLifetimes("After emplace", DebugString());
     return GetLifetime(type);
 
   }

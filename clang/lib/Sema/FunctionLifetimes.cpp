@@ -424,7 +424,6 @@ void FunctionLifetimes::ProcessParams() {
       ParamsByType[num_indirections - 1].emplace_back(std::pair(param, idx++));
     }
   }
-  debugLifetimes(DebugParamsByType());
 }
 
 std::string FunctionLifetimes::DebugParams() {
@@ -488,7 +487,8 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
       func->getType()->getAs<clang::FunctionProtoType>();
   FunctionLifetimes ret(func->getID());
     if (type == nullptr) {
-    debugWarn("FunctionProtoType is null");
+      // DEBUG
+    // debugWarn("FunctionProtoType is null");
     return ret;
   }
 
@@ -532,8 +532,6 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
         return std::move(err);
       }
 
-      debugLifetimes("Lifetimes of param " + param->getNameAsString() + ":\n" +
-                     tmpObjectLifetimes.DebugString() + "\n");
       ret.InsertParamLifetime(param, tmpObjectLifetimes);
     }
   }
@@ -552,9 +550,6 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
                 .moveInto(ret.ReturnLifetime)) {
       return std::move(err);
     }
-    // DEBUG
-    debugLifetimes("Lifetimes of return value:\n" +
-                   ret.ReturnLifetime.DebugString() + "\n");
   }
 
   return ret;

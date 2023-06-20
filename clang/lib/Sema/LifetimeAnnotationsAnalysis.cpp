@@ -36,7 +36,8 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
     // TODO error
-    debugWarn("Lifetime not found in VariableLifetimes");
+    // DEBUG
+    // debugWarn("Lifetime not found in VariableLifetimes");
     CreateVariable(var_decl, Lifetime(LOCAL, type));
   }
   return VariableLifetimes[var_decl].GetLifetimeOrLocal(type);
@@ -90,7 +91,6 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
 
   from_type = from_type->getPointeeType();
 
-  debugLifetimes("Type of lhs", from_type.getAsString());
   while (from_type->isPointerType() || from_type->isReferenceType()) {
     if (IsLifetimeNotset(from, from_type)) {
       CreateLifetimeDependency(from, from_type, loc);
