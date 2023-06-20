@@ -678,3 +678,15 @@ void function_calls() {
 
 }
 
+int *$a arrays(int *$b *$c arr) {
+  int *p = arr[0];
+  int *q = arr[1];
+  int *$a r = arr[2]; // expected-warning {{initialization requires that '$b' outlives '$a'}} \
+                      // expected-note@-3 {{declared with lifetime '$b' here}}
+  int *$b s = arr[3];
+  p = q;
+  return p;  // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$b'}} \
+            // expected-note@-6 {{declared with lifetime '$b' here}} \
+            // expected-note@-1 {{declared with lifetime '$b' here}}
+}
+
