@@ -637,23 +637,44 @@ void function_calls() {
   fn33(qq, q);  // expected-warning {{when calling function 'fn33', the lifetime of 'q' cannot be shorter than the lifetime of 'qq'}} \
                 // expected-note@-25 {{lifetime of 'q' is '$b'}} \
                 // expected-note@-18 {{lifetime of 'qq' is '$a'}}
-  // TODO call fn34
+  fn34(pp, p);
+  fn34(pp, q);
+  fn34(qq, p);
+  fn34(qq, q);
+
   fn41(pp, pp);
   fn41(pp, qq); 
   fn41(pp, rr);
   fn42(pp, qq); 
   fn42(pp, rr); // expected-warning {{when calling function 'fn42', the lifetimes of arguments 'pp' and 'rr' should be the same}} \
-                // expected-note@-27 {{lifetime of 'pp' is '$a}} \
-                // expected-note@-25 {{lifetime of 'rr' is '$b}}
+                // expected-note@-31 {{lifetime of 'pp' is '$a}} \
+                // expected-note@-29 {{lifetime of 'rr' is '$b}}
   fn42(pp, ss); // expected-warning {{when calling function 'fn42', the lifetimes of arguments 'pp' and 'ss' should be the same}} \
-                // expected-note@-30 {{lifetime of 'pp' is '$a}} \
-                // expected-note@-27 {{lifetime of 'ss' is '$b}}
-  // TODO call fn43
-  // TODO call fn44
-  // TODO call fn51
-  fn51(p, rr, ss); 
-  // TODO call fn52
-  // fn52(qq, pp, ss);
+                // expected-note@-34 {{lifetime of 'pp' is '$a}} \
+                // expected-note@-31 {{lifetime of 'ss' is '$b}}
+  fn43(pp, qq); 
+  fn43(pp, rr); // expected-warning {{when calling function 'fn43', the lifetimes of arguments 'pp' and 'rr' should be the same}} \
+                // expected-note@-38 {{lifetime of 'pp' is '$a}} \
+                // expected-note@-36 {{lifetime of 'rr' is '$b}}
+  fn43(pp, ss); // expected-warning {{when calling function 'fn43', the lifetimes of arguments 'pp' and 'ss' should be the same}} \
+                // expected-note@-41 {{lifetime of 'pp' is '$a}} \
+                // expected-note@-38 {{lifetime of 'ss' is '$b}}
+  fn44(pp, pp);
+  fn44(pp, qq); 
+  fn44(pp, rr);
+  fn44(pp, ss);
+  
+  fn51(p, rr, ss); // expected-warning {{when calling function 'fn51', the lifetime of 'p' cannot be shorter than the lifetime of 'rr'}} \
+                   // expected-warning {{when calling function 'fn51', the lifetime of 'p' cannot be shorter than the lifetime of 'ss'}} \
+                   // expected-note@-56 {{lifetime of 'p' is '$a'}} \
+                   // expected-note@-47 {{lifetime of 'rr' is '$b'}} \
+                   // expected-note@-56 {{lifetime of 'p' is '$a'}} \
+                   // expected-note@-46 {{lifetime of 'ss' is '$b'}}
+
+  fn52(qq, pp, ss); // expected-warning {{when calling function 'fn52', the lifetimes of arguments 'pp' and 'ss' should be the same}} \
+                    // expected-note@-56 {{lifetime of 'pp' is '$a}} \
+                    // expected-note@-53 {{lifetime of 'ss' is '$b}}
   // TODO call fn61
+
 }
 

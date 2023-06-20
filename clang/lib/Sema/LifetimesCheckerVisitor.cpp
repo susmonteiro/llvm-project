@@ -271,12 +271,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     unsigned int num_indirections = params_by_type.size();
 
     while (num_indirections-- != 0) {
-      debugLifetimes("Number indirections", num_indirections);
       llvm::DenseMap<char,
                      llvm::DenseSet<std::pair<clang::QualType, unsigned int>>>
           param_lifetimes;
       // get lifetimes for the current indirection level
-      debugLifetimes("<< Step 1 >>");
       for (const auto &pair : params_set) {
         clang::QualType param_type = pair.second.first->getPointeeType();
         params_set[pair.first].first = param_type;
@@ -286,10 +284,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of higher indirections
-      debugLifetimes("<< Step 2 >>");
       for (const auto &pair : param_lifetimes) {
         if (pair.second.size() < 2) continue;
-        unsigned int first_arg = 0;
+        unsigned int first_arg = pair.second.begin()->second;
         for (const auto &arg_pair : pair.second) {
           first_arg = std::min(first_arg, arg_pair.second);
         }
@@ -319,7 +316,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         }
       }
 
-      debugLifetimes("<< Step 3 >>");
       // check lifetimes of current indirection level
       if (!param_lifetimes.empty()) {
         for (const auto &param_pair : params_by_type[num_indirections]) {
