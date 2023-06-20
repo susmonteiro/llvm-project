@@ -306,9 +306,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                   << direct_callee << previous_arg << current_arg
                   << call->getSourceRange();
               S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
-                  << previous_arg << previous.GetLifetimeName();
+                  << previous_arg << previous.GetLifetimeName() << previous_arg->getSourceRange();
               S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                  << current_arg << current.GetLifetimeName();
+                  << current_arg << current.GetLifetimeName() << current_arg->getSourceRange();
               return std::nullopt;
             }
           }
@@ -345,9 +345,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                   << direct_callee << current_arg << arg_decl
                   << call->getSourceRange();
               S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                  << current_arg << current_arg_lifetime.GetLifetimeName();
+                  << current_arg << current_arg_lifetime.GetLifetimeName() << current_arg->getSourceRange();
               S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
-                  << arg_decl << arg_lifetime.GetLifetimeName();
+                  << arg_decl << arg_lifetime.GetLifetimeName() << arg_decl->getSourceRange();
             }
           }
         }
