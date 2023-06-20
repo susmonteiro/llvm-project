@@ -26,17 +26,20 @@ class LifetimesPropagationVisitor
         PointsTo(state.GetPointsTo()),
         Factory(func) {}
 
+  std::optional<std::string> VisitArraySubscriptExpr(
+      const clang::ArraySubscriptExpr *expr);
   std::optional<std::string> VisitBinAssign(const clang::BinaryOperator *op);
   std::optional<std::string> VisitCallExpr(const clang::CallExpr *call);
   std::optional<std::string> VisitCastExpr(const clang::CastExpr *cast);
-  std::optional<std::string> VisitConditionalOperator(const clang::ConditionalOperator *op);
+  std::optional<std::string> VisitConditionalOperator(
+      const clang::ConditionalOperator *op);
   std::optional<std::string> VisitDeclRefExpr(
       const clang::DeclRefExpr *decl_ref);
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
   std::optional<std::string> VisitUnaryAddrOf(const clang::UnaryOperator *op);
-  std::optional<std::string> VisitUnaryDeref(const clang::UnaryOperator *op);  
+  std::optional<std::string> VisitUnaryDeref(const clang::UnaryOperator *op);
 
   void PropagateBinAssign(const clang::Expr *lhs, const clang::Expr *rhs,
                           const clang::Expr *expr,
@@ -48,7 +51,7 @@ class LifetimesPropagationVisitor
   llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &FuncInfo;
   PointsToMap &PointsTo;
   FunctionLifetimeFactory Factory;
-  bool debugEnabled = false;  // TODO delete this
+  bool debugEnabled = true;  // TODO delete this
 };
 
 }  // namespace clang

@@ -86,7 +86,7 @@ class LifetimesCheckerVisitor
   PointsToMap &PointsTo;
   Sema &S;
   LifetimesCheckerVisitorFactory Factory;
-  bool debugEnabled = false;  // TODO delete this
+  bool debugEnabled = true;  // TODO delete this
 };
 
 }  // namespace clang

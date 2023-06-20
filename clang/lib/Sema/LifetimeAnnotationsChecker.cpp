@@ -101,19 +101,19 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
   debugInfo("\n====== START STEP 1 - " + func_name + " ======\n");
   GetLifetimeDependencies(func);
   debugInfo("\n====== FINISH STEP 1 - " + func_name + " ======\n");
-  // debugLifetimes(State.DebugString());
+  debugLifetimes(State.DebugString());
 
   // step 2
   debugInfo("\n====== START STEP 2 - " + func_name + " ======\n");
   LifetimeAnnotationsChecker::PropagateLifetimes();
   debugInfo("\n====== FINISH STEP 2 - " + func_name + " ======\n");
-  // debugLifetimes(State.DebugString());
+  debugLifetimes(State.DebugString());
 
   // step 3
   debugInfo("\n====== START STEP 3 - " + func_name + " ======\n");
   LifetimeAnnotationsChecker::CheckLifetimes(func, S);
   debugInfo("\n====== FINISH STEP 3 - " + func_name + " ======\n");
-  // debugLifetimes(State.DebugString());
+  debugLifetimes(State.DebugString());
 }
 
 void LifetimeAnnotationsChecker::GetLifetimeDependencies(
@@ -129,11 +129,11 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
   auto parents = std::move(State.TransposeDependencies());
 
   // DEBUG
-  // debugLifetimes("=== dependencies_ ===");
-  // for (const auto &pair : children) {
-  //   debugLifetimes(pair.first.first, pair.first.second, pair.second,
-  //                  stmt_dependencies);
-  // }
+  debugLifetimes("=== dependencies_ ===");
+  for (const auto &pair : children) {
+    debugLifetimes(pair.first.first, pair.first.second, pair.second,
+                   stmt_dependencies);
+  }
 
   // debugLifetimes("State at the beginning of step 2", State.DebugString());
 
@@ -157,8 +157,8 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     auto *current_var = el.first;
     auto current_type = el.second;
     // DEBUG
-    // debugLifetimes("\nPropagation of", current_type.getAsString() + ' ' +
-    //                                        current_var->getNameAsString());
+    debugLifetimes("\nPropagation of", current_type.getAsString() + ' ' +
+                                           current_var->getNameAsString());
 
     // each entry of the vector corresponds to a lifetime char
     llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> shortest_lifetimes;
@@ -206,11 +206,11 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
     }
 
     // DEBUG
-    // debugLifetimes("=== children ===");
-    // for (const auto &pair : new_children) {
-    //   debugLifetimes(pair.first.first, pair.first.second, pair.second,
-    //                  stmt_dependencies);
-    // }
+    debugLifetimes("=== children ===");
+    for (const auto &pair : new_children) {
+      debugLifetimes(pair.first.first, pair.first.second, pair.second,
+                     stmt_dependencies);
+    }
   }
 
   State.SetDependencies(new_children);

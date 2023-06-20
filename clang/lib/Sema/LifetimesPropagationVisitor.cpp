@@ -21,8 +21,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
   CreateDependency(rhs, lhs, lhs_type, loc, state);
   for (const auto &expr : points_to) {
-    // debugInfo("Found expr in points_to");
-    // expr->dump();
     if (expr != nullptr) {
       CreateDependency(expr, lhs, lhs_type, loc, state);
     }
@@ -56,6 +54,14 @@ void LifetimesPropagationVisitor::PropagateBinAssign(
     TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op,
                 PointsTo, State);
   }
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
+    const clang::ArraySubscriptExpr *expr) {
+  if (debugEnabled) debugLifetimes("[VisitArraySubscriptExpr]");
+  Visit(const_cast<clang::Expr *>(expr->getBase()));
+  PointsTo.InsertExprLifetimes(expr, expr->getBase());
+  return std::nullopt;
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
@@ -315,7 +321,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
-        debugInfo("The vardecl has init");
         TransferRHS(var_decl, init, type, decl_stmt, PointsTo, State);
       }
     }
@@ -352,9 +357,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
 
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
-    debugInfo("Visited addrof child");
     if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-      debugInfo("Insert addrof in PointsTo because it is expr");
       PointsTo.InsertExprLifetimes(op, child_expr);
     }
   }
@@ -368,14 +371,12 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryDeref(
 
   if (!op->isGLValue() && !op->getType()->isPointerType() &&
       !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
-    // debugWarn("Skipped...");
     return std::nullopt;
   }
 
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
     if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-      debugInfo("Insert deref in PointsTo because it is expr");
       PointsTo.InsertExprLifetimes(op, child_expr);
     }
   }
