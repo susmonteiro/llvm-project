@@ -80,6 +80,12 @@ class LifetimesCheckerVisitor
                        PrintNotesFactory factory) const;
 
  private:
+  struct ParamInfo {
+    clang::QualType type;
+    unsigned int index;
+    unsigned int num_indirections;
+  };
+
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;
   llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &FuncInfo;

@@ -262,47 +262,46 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
     auto &func_info = it->second;
     const auto &params_by_type = func_info.GetParamsByType();
-    llvm::DenseMap<const clang::ParmVarDecl *,
-                   std::pair<clang::QualType, unsigned int>>
-        params_set;
+    llvm::DenseMap<const clang::ParmVarDecl *, ParamInfo> params_set;
 
     unsigned int num_indirections = params_by_type.size();
 
     while (num_indirections-- != 0) {
       llvm::DenseMap<char,
-                     llvm::DenseSet<std::pair<clang::QualType, unsigned int>>>
+                     llvm::SmallVector<ParamInfo>>
           param_lifetimes;
       // get lifetimes for the current indirection level
       for (const auto &pair : params_set) {
-        clang::QualType param_type = pair.second.first->getPointeeType();
-        params_set[pair.first].first = param_type;
+        clang::QualType param_type = pair.second.type->getPointeeType();
+        params_set[pair.first].type = param_type;
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(pair.first, param_type);
-        param_lifetimes[param_lifetime.GetId()].insert(pair.second);
+        param_lifetimes[param_lifetime.GetId()].emplace_back(pair.second);
       }
 
       // check lifetimes of higher indirections
       for (const auto &pair : param_lifetimes) {
         if (pair.second.size() < 2) continue;
-        unsigned int first_arg = pair.second.begin()->second;
+        unsigned int first_arg = pair.second.begin()->index;
+        // TODO do the iteration through the idxs
         for (const auto &arg_pair : pair.second) {
-          first_arg = std::min(first_arg, arg_pair.second);
+          first_arg = std::min(first_arg, arg_pair.index);
         }
         auto it = pair.second.begin();
         const auto *previous_arg = GetDeclFromArg(call->getArg(first_arg));
         if (previous_arg == nullptr) continue;
 
-        Lifetime &previous = State.GetLifetime(previous_arg, (it->first));
+        Lifetime &previous = State.GetLifetime(previous_arg, (it->type));
         while (it != pair.second.end()) {
-          if (it->second != first_arg) {
-            const auto *current_arg = GetDeclFromArg(call->getArg(it->second));
+          if (it->index != first_arg) {
+            const auto *current_arg = GetDeclFromArg(call->getArg(it->index));
             if (current_arg != nullptr) {
-              Lifetime &current = State.GetLifetime(current_arg, (it->first));
+              Lifetime &current = State.GetLifetime(current_arg, (it->type));
               if (previous != current) {
                 // TODO change notes
                 S.Diag(call->getExprLoc(),
                        diag::warn_func_params_lifetimes_equal)
-                    << direct_callee << previous_arg << current_arg
+                    << direct_callee << previous_arg << std::string(it->num_indirections - num_indirections, '*') + current_arg->getNameAsString() 
                     << call->getSourceRange();
                 S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
                     << previous_arg << previous.GetLifetimeName()
@@ -335,8 +334,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           Lifetime &current_arg_lifetime =
               State.GetLifetimeOrLocal(current_arg, type);
 
-          for (const auto &pair : filtered_params) {
-            const auto *arg = call->getArg(pair.second);
+          for (const auto &param_info : filtered_params) {
+            const auto *arg = call->getArg(param_info.index);
             const auto *arg_decl = GetDeclFromArg(arg);
             if (arg_decl == nullptr) continue;
             Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
@@ -358,8 +357,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
       // insert params for the next indirection level
       for (const auto &param_pair : params_by_type[num_indirections]) {
-        params_set[param_pair.first] = std::pair(
-            param_pair.first->getType().getCanonicalType(), param_pair.second);
+        params_set[param_pair.first] = {param_pair.first->getType().getCanonicalType(),
+                      param_pair.second, num_indirections};
       }
     }
   }
