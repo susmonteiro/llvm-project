@@ -418,11 +418,12 @@ void FunctionLifetimes::ProcessParams() {
     clang::QualType type = param->getType().getCanonicalType();
     unsigned int num_indirections = Lifetime::GetNumberIndirections(type);
     if (num_indirections > 0) {
-      if (num_indirections >= ParamsByType.size()) {
-        ParamsByType.resize(num_indirections);
+      if (num_indirections >= ParamsInfo.size()) {
+        ParamsInfo.resize(num_indirections);
       }
-      ParamsByType[num_indirections - 1].emplace_back(std::pair(param, idx++));
+      ParamsInfo[num_indirections - 1].emplace_back(ParamInfo{type, param, idx, num_indirections - 1});
     }
+    idx++;
   }
 }
 
@@ -440,16 +441,16 @@ std::string FunctionLifetimes::DebugParams() {
 std::string FunctionLifetimes::DebugParamsByType() {
   std::string res;
   res += "> Parameters by Type:\n";
-  if (ParamsByType.empty()) {
+  if (ParamsInfo.empty()) {
     res += "Empty\n";
     return res;
   }
 
   unsigned int num_indirections = 1;
-  for (const auto& params : ParamsByType) {
+  for (const auto& params : ParamsInfo) {
     res += "[" + std::to_string(num_indirections++) + " indirections]: ";
     for (const auto& pair : params) {
-      res += pair.first->getNameAsString() + ", ";
+      res += pair.param->getNameAsString() + ", ";
     }
     res += '\n';
   }

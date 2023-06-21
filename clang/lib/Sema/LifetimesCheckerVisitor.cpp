@@ -247,6 +247,12 @@ const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
   return nullptr;
 }
 
+std::string GenerateArgName(const clang::VarDecl *arg,
+                            unsigned int num_indirections) {
+  return '\'' + std::string(num_indirections, '*') + arg->getNameAsString() +
+         '\'';
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     const clang::CallExpr *call) {
   if (debugEnabled) debugLifetimes("[VisitCallExpr]");
@@ -261,53 +267,66 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     }
 
     auto &func_info = it->second;
-    const auto &params_by_type = func_info.GetParamsByType();
-    llvm::DenseMap<const clang::ParmVarDecl *, ParamInfo> params_set;
+    const auto &params_info_vec = func_info.GetParamsInfo();
 
-    unsigned int num_indirections = params_by_type.size();
+    unsigned int num_args = call->getNumArgs();
+
+    llvm::SmallVector<ParamInfo> params_set;
+    params_set.resize(num_args);
+
+    unsigned int num_indirections = params_info_vec.size();
 
     while (num_indirections-- != 0) {
-      llvm::DenseMap<char,
-                     llvm::SmallVector<ParamInfo>>
-          param_lifetimes;
+      llvm::DenseMap<char, llvm::SmallVector<ParamInfo>> param_lifetimes;
       // get lifetimes for the current indirection level
-      for (const auto &pair : params_set) {
-        clang::QualType param_type = pair.second.type->getPointeeType();
-        params_set[pair.first].type = param_type;
+      for (const auto &param_info : params_set) {
+        if (param_info.type.isNull()) continue;
+        clang::QualType param_type = param_info.type->getPointeeType();
+        params_set[param_info.index].type = param_type;
         Lifetime &param_lifetime =
-            func_info.GetParamLifetime(pair.first, param_type);
-        param_lifetimes[param_lifetime.GetId()].emplace_back(pair.second);
+            func_info.GetParamLifetime(param_info.param, param_type);
+        param_lifetimes[param_lifetime.GetId()].emplace_back(param_info);
       }
 
       // check lifetimes of higher indirections
       for (const auto &pair : param_lifetimes) {
         if (pair.second.size() < 2) continue;
-        unsigned int first_arg = pair.second.begin()->index;
-        // TODO do the iteration through the idxs
-        for (const auto &arg_pair : pair.second) {
-          first_arg = std::min(first_arg, arg_pair.index);
-        }
-        auto it = pair.second.begin();
-        const auto *previous_arg = GetDeclFromArg(call->getArg(first_arg));
-        if (previous_arg == nullptr) continue;
 
-        Lifetime &previous = State.GetLifetime(previous_arg, (it->type));
+        // ! param_lifetimes should have ParamInfo sorted
+        auto it = pair.second.begin();
+        const ParamInfo *first_param_info = it++;
+        const auto *first_arg =
+            GetDeclFromArg(call->getArg(first_param_info->index));
+        if (first_arg == nullptr) continue;
+
+        Lifetime &first_arg_lifetime = State.GetLifetime(first_arg, (it->type));
+
         while (it != pair.second.end()) {
-          if (it->index != first_arg) {
+          if (it->index != first_param_info->index) {
             const auto *current_arg = GetDeclFromArg(call->getArg(it->index));
             if (current_arg != nullptr) {
-              Lifetime &current = State.GetLifetime(current_arg, (it->type));
-              if (previous != current) {
-                // TODO change notes
+              Lifetime &current_arg_lifetime =
+                  State.GetLifetime(current_arg, (it->type));
+              if (first_arg_lifetime != current_arg_lifetime) {
                 S.Diag(call->getExprLoc(),
                        diag::warn_func_params_lifetimes_equal)
-                    << direct_callee << previous_arg << std::string(it->num_indirections - num_indirections, '*') + current_arg->getNameAsString() 
+                    << direct_callee
+                    << GenerateArgName(first_arg,
+                                       first_param_info->num_indirections -
+                                           num_indirections)
+                    << GenerateArgName(current_arg,
+                                       it->num_indirections - num_indirections)
                     << call->getSourceRange();
-                S.Diag(previous_arg->getLocation(), diag::note_lifetime_of)
-                    << previous_arg << previous.GetLifetimeName()
-                    << previous_arg->getSourceRange();
+                S.Diag(first_arg->getLocation(), diag::note_lifetime_of)
+                    << GenerateArgName(first_arg,
+                                       first_param_info->num_indirections -
+                                           num_indirections)
+                    << first_arg_lifetime.GetLifetimeName()
+                    << first_arg->getSourceRange();
                 S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                    << current_arg << current.GetLifetimeName()
+                    << GenerateArgName(current_arg,
+                                       it->num_indirections - num_indirections)
+                    << current_arg_lifetime.GetLifetimeName()
                     << current_arg->getSourceRange();
                 return std::nullopt;
               }
@@ -319,46 +338,55 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
       // check lifetimes of current indirection level
       if (!param_lifetimes.empty()) {
-        for (const auto &param_pair : params_by_type[num_indirections]) {
-          Lifetime &current_lifetime = func_info.GetParamLifetime(
-              param_pair.first, param_pair.first->getType());
+        for (const auto &param_info : params_info_vec[num_indirections]) {
+          Lifetime &current_lifetime =
+              func_info.GetParamLifetime(param_info.param, param_info.type);
 
           auto it = param_lifetimes.find(current_lifetime.GetId());
           if (it == param_lifetimes.end()) continue;
 
           const auto &filtered_params = it->second;
           const auto *current_arg =
-              GetDeclFromArg(call->getArg(param_pair.second));
+              GetDeclFromArg(call->getArg(param_info.index));
           if (current_arg == nullptr) continue;
           clang::QualType type = current_arg->getType().getCanonicalType();
           Lifetime &current_arg_lifetime =
               State.GetLifetimeOrLocal(current_arg, type);
 
-          for (const auto &param_info : filtered_params) {
-            const auto *arg = call->getArg(param_info.index);
+          for (const auto &other_param_info : filtered_params) {
+            const auto *arg = call->getArg(other_param_info.index);
             const auto *arg_decl = GetDeclFromArg(arg);
             if (arg_decl == nullptr) continue;
             Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
             if (current_arg_lifetime < arg_lifetime) {
-              // TODO change this
               S.Diag(call->getExprLoc(),
                      diag::warn_func_params_lifetimes_shorter)
-                  << direct_callee << current_arg << arg_decl
+                  << direct_callee
+                  << GenerateArgName(current_arg, param_info.num_indirections -
+                                                      num_indirections)
+                  << GenerateArgName(
+                         arg_decl,
+                         other_param_info.num_indirections - num_indirections)
                   << call->getSourceRange();
               S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                  << current_arg << current_arg_lifetime.GetLifetimeName()
+                  << GenerateArgName(current_arg, param_info.num_indirections -
+                                                      num_indirections)
+                  << current_arg_lifetime.GetLifetimeName()
                   << current_arg->getSourceRange();
               S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
-                  << arg_decl << arg_lifetime.GetLifetimeName()
+                  << GenerateArgName(
+                         arg_decl,
+                         other_param_info.num_indirections - num_indirections)
+                  << arg_lifetime.GetLifetimeName()
                   << arg_decl->getSourceRange();
             }
           }
         }
       }
       // insert params for the next indirection level
-      for (const auto &param_pair : params_by_type[num_indirections]) {
-        params_set[param_pair.first] = {param_pair.first->getType().getCanonicalType(),
-                      param_pair.second, num_indirections};
+      for (const auto &param_info : params_info_vec[num_indirections]) {
+        assert(param_info.index < params_set.size());
+        params_set[param_info.index] = param_info;
       }
     }
   }

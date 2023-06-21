@@ -11,17 +11,22 @@
 
 namespace clang {
 
+struct ParamInfo {
+  clang::QualType type;
+  const clang::ParmVarDecl *param;
+  unsigned int index;
+  unsigned int num_indirections;
+};
+
 using LifetimeFactory = std::function<llvm::Expected<Lifetime>(
     const clang::Expr *, clang::QualType type)>;
 
 using ParamsLifetimesMap =
     llvm::DenseMap<const clang::ParmVarDecl *, ObjectLifetimes>;
 
-using ParamIdxPair = std::pair<const clang::ParmVarDecl *, unsigned int>;
-
 // for each level of indirections, store the params with that level of
 // indirection idx = 0, int*; idx = 1, int**; etc
-using ParamsByTypeVector = llvm::SmallVector<llvm::SmallVector<ParamIdxPair>>;
+using ParamsInfoVector = llvm::SmallVector<llvm::SmallVector<ParamInfo>>;
 
 class FunctionLifetimeFactory {
  public:
@@ -70,7 +75,7 @@ class FunctionLifetimes {
     return Params;
   }
 
-  ParamsByTypeVector GetParamsByType() const { return ParamsByType; }
+  ParamsInfoVector GetParamsInfo() const { return ParamsInfo; }
 
   const clang::ParmVarDecl *GetParam(unsigned int i) const { return Params[i]; }
 
@@ -92,7 +97,7 @@ class FunctionLifetimes {
   }
 
   bool IsReturnLifetimeLocal() {
-    ObjectLifetimes return_ol = GetReturnLifetime(); 
+    ObjectLifetimes return_ol = GetReturnLifetime();
     return return_ol.HasLifetimeLocal();
   }
 
@@ -119,8 +124,8 @@ class FunctionLifetimes {
 
   // stores param lifetimes in order
   std::vector<const clang::ParmVarDecl *> Params;
+  ParamsInfoVector ParamsInfo;
   ParamsLifetimesMap ParamsLifetimes;
-  ParamsByTypeVector ParamsByType;
   ObjectLifetimes ReturnLifetime;
   int FuncId;
 
