@@ -277,7 +277,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     unsigned int num_indirections = params_info_vec.size();
 
     while (num_indirections-- != 0) {
-      llvm::DenseMap<char, llvm::SmallVector<ParamInfo>> param_lifetimes;
+      llvm::SmallVector<llvm::SmallVector<ParamInfo>> param_lifetimes;
+
       // get lifetimes for the current indirection level
       for (const auto &param_info : params_set) {
         if (param_info.type.isNull()) continue;
@@ -285,23 +286,27 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         params_set[param_info.index].type = param_type;
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, param_type);
-        param_lifetimes[param_lifetime.GetId()].emplace_back(param_info);
+        char lifetime_id = param_lifetime.GetId();
+        if ((unsigned int)lifetime_id >= param_lifetimes.size()) {
+          param_lifetimes.resize(lifetime_id + 1);
+        }
+        param_lifetimes[lifetime_id].emplace_back(param_info);
       }
 
       // check lifetimes of higher indirections
-      for (const auto &pair : param_lifetimes) {
-        if (pair.second.size() < 2) continue;
+      for (const auto &params : param_lifetimes) {
+        if (params.size() < 2) continue;
 
         // ! param_lifetimes should have ParamInfo sorted
-        auto it = pair.second.begin();
-        const ParamInfo *first_param_info = it++;
+        auto it = params.begin();
+        const ParamInfo *first_param_info = it;
         const auto *first_arg =
             GetDeclFromArg(call->getArg(first_param_info->index));
         if (first_arg == nullptr) continue;
 
         Lifetime &first_arg_lifetime = State.GetLifetime(first_arg, (it->type));
 
-        while (it != pair.second.end()) {
+        while (++it != params.end()) {
           if (it->index != first_param_info->index) {
             const auto *current_arg = GetDeclFromArg(call->getArg(it->index));
             if (current_arg != nullptr) {
@@ -332,7 +337,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               }
             }
           }
-          it++;
         }
       }
 
@@ -341,11 +345,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         for (const auto &param_info : params_info_vec[num_indirections]) {
           Lifetime &current_lifetime =
               func_info.GetParamLifetime(param_info.param, param_info.type);
+          char current_id = current_lifetime.GetId();
 
-          auto it = param_lifetimes.find(current_lifetime.GetId());
-          if (it == param_lifetimes.end()) continue;
+          if (param_lifetimes.size() <= (unsigned int)current_id) {
+            continue;
+          }
 
-          const auto &filtered_params = it->second;
+          const auto &filtered_params = param_lifetimes[current_id];
           const auto *current_arg =
               GetDeclFromArg(call->getArg(param_info.index));
           if (current_arg == nullptr) continue;
