@@ -11830,6 +11830,8 @@ def warn_assign_lifetimes_differ : Warning<
   "assignment requires that '%1' outlives '%0'">;
 def warn_decl_lifetimes_differ : Warning<
   "initialization requires that '%1' outlives '%0'">;
+def arg_lifetimes_differ : Warning<
+  "argument %0 requires that '%2' outlives '%1'">;
 def warn_func_params_lifetimes_equal : Warning<
   "when calling function %0, the lifetimes of arguments %1 and %2 should be the same">;
 def warn_func_params_lifetimes_shorter : Warning<

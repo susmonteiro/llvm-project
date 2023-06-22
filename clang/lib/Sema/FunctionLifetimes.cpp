@@ -419,9 +419,9 @@ void FunctionLifetimes::ProcessParams() {
     unsigned int num_indirections = Lifetime::GetNumberIndirections(type);
     if (num_indirections > 0) {
       if (num_indirections >= ParamsInfo.size()) {
-        ParamsInfo.resize(num_indirections);
+        ParamsInfo.resize(num_indirections + 1);
       }
-      ParamsInfo[num_indirections - 1].emplace_back(ParamInfo{type, param, idx, num_indirections - 1});
+      ParamsInfo[num_indirections].emplace_back(ParamInfo{type, param, idx, num_indirections});
     }
     idx++;
   }

@@ -276,7 +276,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
     unsigned int num_indirections = params_info_vec.size();
 
-    while (num_indirections-- != 0) {
+    while (num_indirections-- > 0) {
       llvm::SmallVector<llvm::SmallVector<ParamInfo>> param_lifetimes;
 
       // get lifetimes for the current indirection level
@@ -389,11 +389,60 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           }
         }
       }
+
+
+
       // insert params for the next indirection level
       for (const auto &param_info : params_info_vec[num_indirections]) {
         assert(param_info.index < params_set.size());
         params_set[param_info.index] = param_info;
       }
+
+            llvm::SmallVector<llvm::SmallVector<ParamInfo>> aux_vector_param_lifetimes;
+
+
+      for (const auto &param_info : params_set) {
+        if (param_info.type.isNull()) continue;
+        Lifetime &param_lifetime =
+            func_info.GetParamLifetime(param_info.param, param_info.type);
+        char lifetime_id = param_lifetime.GetId();
+        if ((unsigned int)lifetime_id >= aux_vector_param_lifetimes.size()) {
+          aux_vector_param_lifetimes.resize(lifetime_id + 1);
+        }
+        aux_vector_param_lifetimes[lifetime_id].emplace_back(param_info);
+      }
+
+      if (STATIC < aux_vector_param_lifetimes.size()) {
+        for (const auto &param_info : aux_vector_param_lifetimes[STATIC]) {
+          const auto *arg = call->getArg(param_info.index);
+            const auto *arg_decl = GetDeclFromArg(arg);
+            if (arg_decl == nullptr) continue;
+            Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, param_info.type);
+            if (!arg_lifetime.IsStatic()) {
+              S.Diag(arg->getExprLoc(),
+                     diag::arg_lifetimes_differ)
+                  << GenerateArgName(arg_decl, param_info.num_indirections -
+                                                      num_indirections)
+                  << Lifetime::GetLifetimeName(STATIC)
+                  << arg_lifetime.GetLifetimeName()
+                  << call->getSourceRange();
+              S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
+                  << GenerateArgName(arg_decl, param_info.num_indirections -
+                                                      num_indirections)
+                  << arg_lifetime.GetLifetimeName()
+                  << arg_decl->getSourceRange();
+              S.Diag(param_info.param->getLocation(), diag::note_lifetime_of)
+                  << GenerateArgName(
+                         param_info.param,
+                         param_info.num_indirections - num_indirections)
+                  << Lifetime::GetLifetimeName(STATIC)
+                  << param_info.param->getSourceRange();
+            }
+
+        }
+      }
+
+
     }
   }
   return std::nullopt;
