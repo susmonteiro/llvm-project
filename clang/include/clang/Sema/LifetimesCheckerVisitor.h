@@ -79,6 +79,14 @@ class LifetimesCheckerVisitor
                        const clang::BinaryOperator *op, bool return_lifetime,
                        PrintNotesFactory factory) const;
 
+  void CallExprChecker(const clang::CallExpr *call,
+                       const clang::FunctionDecl *direct_callee,
+                       const clang::VarDecl *first_arg,
+                       const clang::VarDecl *second_arg,
+                       Lifetime &first_lifetime, Lifetime &second_lifetime,
+                       unsigned int first_num_indirections,
+                       unsigned int second_num_indirections, int msg) const;
+
   void PrintNotes(const clang::VarDecl *var_decl, Lifetime &lifetime,
                   unsigned int num_indirections) const;
   void PrintNotes(const clang::VarDecl *var_decl, Lifetime &lifetime, char id,

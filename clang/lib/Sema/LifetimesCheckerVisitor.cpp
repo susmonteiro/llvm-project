@@ -284,6 +284,62 @@ const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
   return nullptr;
 }
 
+void LifetimesCheckerVisitor::CallExprChecker(
+    const clang::CallExpr *call, const clang::FunctionDecl *direct_callee,
+    const clang::VarDecl *first_arg, const clang::VarDecl *second_arg,
+    Lifetime &first_lifetime, Lifetime &second_lifetime,
+    unsigned int first_num_indirections, unsigned int second_num_indirections,
+    int msg) const {
+  S.Diag(call->getExprLoc(), msg)
+      << direct_callee << GenerateArgName(first_arg, first_num_indirections)
+      << GenerateArgName(second_arg, second_num_indirections)
+      << call->getSourceRange();
+  if (first_lifetime.IsNotSet() && second_lifetime.IsNotSet()) {
+    const auto &first_arg_shortest_lifetimes =
+        first_lifetime.GetShortestLifetimes();
+    const auto &second_arg_shortest_lifetimes =
+        second_lifetime.GetShortestLifetimes();
+    unsigned int max_size = std::max(first_arg_shortest_lifetimes.size(),
+                                     second_arg_shortest_lifetimes.size());
+    for (unsigned int i = 0; i < max_size; i++) {
+      if ((i >= second_arg_shortest_lifetimes.size() ||
+           second_arg_shortest_lifetimes[i].empty()) &&
+          (i < first_arg_shortest_lifetimes.size() &&
+           !first_arg_shortest_lifetimes[i].empty())) {
+        PrintNotes(first_arg, first_lifetime, i, first_num_indirections);
+      } else if ((i >= first_arg_shortest_lifetimes.size() ||
+                  first_arg_shortest_lifetimes[i].empty()) &&
+                 (i < second_arg_shortest_lifetimes.size() &&
+                  !second_arg_shortest_lifetimes[i].empty())) {
+        PrintNotes(second_arg, second_lifetime, i, second_num_indirections);
+      }
+    }
+  } else if (first_lifetime.IsNotSet()) {
+    const auto &first_arg_shortest_lifetimes =
+        first_lifetime.GetShortestLifetimes();
+    for (unsigned int i = 0; i < first_arg_shortest_lifetimes.size(); i++) {
+      if ((char)i == second_lifetime.GetId() ||
+          first_arg_shortest_lifetimes[i].empty())
+        continue;
+      PrintNotes(first_arg, first_lifetime, i, first_num_indirections);
+    }
+    PrintNotes(second_arg, second_lifetime, second_num_indirections);
+  } else if (second_lifetime.IsNotSet()) {
+    const auto &second_arg_shortest_lifetimes =
+        second_lifetime.GetShortestLifetimes();
+    for (unsigned int i = 0; i < second_arg_shortest_lifetimes.size(); i++) {
+      if ((char)i == first_lifetime.GetId() ||
+          second_arg_shortest_lifetimes[i].empty())
+        continue;
+      PrintNotes(second_arg, second_lifetime, i, second_num_indirections);
+    }
+    PrintNotes(first_arg, first_lifetime, first_num_indirections);
+  } else {
+    PrintNotes(second_arg, second_lifetime, second_num_indirections);
+    PrintNotes(first_arg, first_lifetime, first_num_indirections);
+  }
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     const clang::CallExpr *call) {
   if (debugEnabled) debugLifetimes("[VisitCallExpr]");
@@ -347,79 +403,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               Lifetime &current_arg_lifetime =
                   State.GetLifetime(current_arg, (it->type));
               if (first_arg_lifetime != current_arg_lifetime) {
-                S.Diag(call->getExprLoc(),
-                       diag::warn_func_params_lifetimes_equal)
-                    << direct_callee
-                    << GenerateArgName(first_arg,
-                                       first_param_info->num_indirections -
-                                           num_indirections)
-                    << GenerateArgName(current_arg,
-                                       it->num_indirections - num_indirections)
-                    << call->getSourceRange();
-                if (first_arg_lifetime.IsNotSet() &&
-                    current_arg_lifetime.IsNotSet()) {
-                  const auto &first_arg_shortest_lifetimes =
-                      first_arg_lifetime.GetShortestLifetimes();
-                  const auto &current_arg_shortest_lifetimes =
-                      current_arg_lifetime.GetShortestLifetimes();
-                  unsigned int max_size =
-                      std::max(first_arg_shortest_lifetimes.size(),
-                               current_arg_shortest_lifetimes.size());
-                  for (unsigned int i = 0; i < max_size; i++) {
-                    if ((i >= current_arg_shortest_lifetimes.size() ||
-                         current_arg_shortest_lifetimes[i].empty()) &&
-                        (i < first_arg_shortest_lifetimes.size() &&
-                         !first_arg_shortest_lifetimes[i].empty())) {
-                      PrintNotes(first_arg, first_arg_lifetime, i,
-                                 first_param_info->num_indirections -
-                                     num_indirections);
-                    } else if ((i >= first_arg_shortest_lifetimes.size() ||
-                                first_arg_shortest_lifetimes[i].empty()) &&
-                               (i < current_arg_shortest_lifetimes.size() &&
-                                !current_arg_shortest_lifetimes[i].empty())) {
-                      PrintNotes(current_arg, current_arg_lifetime, i,
-                                 first_param_info->num_indirections -
-                                     num_indirections);
-                    }
-                  }
-                } else if (first_arg_lifetime.IsNotSet()) {
-                  const auto &first_arg_shortest_lifetimes =
-                      first_arg_lifetime.GetShortestLifetimes();
-                  for (unsigned int i = 0;
-                       i < first_arg_shortest_lifetimes.size(); i++) {
-                    if ((char)i == current_arg_lifetime.GetId() ||
-                        first_arg_shortest_lifetimes[i].empty())
-                      continue;
-                    PrintNotes(
-                        first_arg, first_arg_lifetime, i,
-                        first_param_info->num_indirections - num_indirections);
-                  }
-                  PrintNotes(
-                      current_arg, current_arg_lifetime,
-                      first_param_info->num_indirections - num_indirections);
-                } else if (current_arg_lifetime.IsNotSet()) {
-                  const auto &current_arg_shortest_lifetimes =
-                      current_arg_lifetime.GetShortestLifetimes();
-                  for (unsigned int i = 0;
-                       i < current_arg_shortest_lifetimes.size(); i++) {
-                    if ((char)i == first_arg_lifetime.GetId() ||
-                        current_arg_shortest_lifetimes[i].empty())
-                      continue;
-                    PrintNotes(
-                        current_arg, current_arg_lifetime, i,
-                        first_param_info->num_indirections - num_indirections);
-                  }
-                  PrintNotes(
-                      first_arg, first_arg_lifetime,
-                      first_param_info->num_indirections - num_indirections);
-                } else {
-                  PrintNotes(
-                      current_arg, current_arg_lifetime,
-                      first_param_info->num_indirections - num_indirections);
-                  PrintNotes(
-                      first_arg, first_arg_lifetime,
-                      first_param_info->num_indirections - num_indirections);
-                }
+                CallExprChecker(
+                    call, direct_callee, first_arg, current_arg,
+                    first_arg_lifetime, current_arg_lifetime,
+                    first_param_info->num_indirections - num_indirections,
+                    it->num_indirections - num_indirections,
+                    diag::warn_func_params_lifetimes_equal);
                 return std::nullopt;
               }
             }
@@ -452,74 +441,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             if (arg_decl == nullptr) continue;
             Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
             if (current_arg_lifetime < arg_lifetime) {
-              S.Diag(call->getExprLoc(),
-                     diag::warn_func_params_lifetimes_shorter)
-                  << direct_callee
-                  << GenerateArgName(current_arg, param_info.num_indirections -
-                                                      num_indirections)
-                  << GenerateArgName(
-                         arg_decl,
-                         other_param_info.num_indirections - num_indirections)
-                  << call->getSourceRange();
-              if (arg_lifetime.IsNotSet() && current_arg_lifetime.IsNotSet()) {
-                const auto &arg_shortest_lifetimes =
-                    arg_lifetime.GetShortestLifetimes();
-                const auto &current_arg_shortest_lifetimes =
-                    current_arg_lifetime.GetShortestLifetimes();
-                unsigned int max_size =
-                    std::max(arg_shortest_lifetimes.size(),
-                             current_arg_shortest_lifetimes.size());
-                for (unsigned int i = 0; i < max_size; i++) {
-                  if ((i >= current_arg_shortest_lifetimes.size() ||
-                       current_arg_shortest_lifetimes[i].empty()) &&
-                      (i < arg_shortest_lifetimes.size() &&
-                       !arg_shortest_lifetimes[i].empty())) {
-                    PrintNotes(
-                        arg_decl, arg_lifetime, i,
-                        other_param_info.num_indirections - num_indirections);
-                  } else if ((i >= arg_shortest_lifetimes.size() ||
-                              arg_shortest_lifetimes[i].empty()) &&
-                             (i < current_arg_shortest_lifetimes.size() &&
-                              !current_arg_shortest_lifetimes[i].empty())) {
-                    PrintNotes(current_arg, current_arg_lifetime, i,
-                               param_info.num_indirections - num_indirections);
-                  }
-                }
-              } else if (arg_lifetime.IsNotSet()) {
-                const auto &arg_shortest_lifetimes =
-                    arg_lifetime.GetShortestLifetimes();
-                for (unsigned int i = 0; i < arg_shortest_lifetimes.size();
-                     i++) {
-                  if ((char)i == current_arg_lifetime.GetId() ||
-                      arg_shortest_lifetimes[i].empty())
-                    continue;
-                  PrintNotes(
-                      arg_decl, arg_lifetime, i,
-                      other_param_info.num_indirections - num_indirections);
-                }
-                PrintNotes(current_arg, current_arg_lifetime,
-                           param_info.num_indirections - num_indirections);
-              } else if (current_arg_lifetime.IsNotSet()) {
-                const auto &current_arg_shortest_lifetimes =
-                    current_arg_lifetime.GetShortestLifetimes();
-                for (unsigned int i = 0;
-                     i < current_arg_shortest_lifetimes.size(); i++) {
-                  if ((char)i == arg_lifetime.GetId() ||
-                      current_arg_shortest_lifetimes[i].empty())
-                    continue;
-                  PrintNotes(current_arg, current_arg_lifetime, i,
-                             param_info.num_indirections - num_indirections);
-                }
-                PrintNotes(
-                    arg_decl, arg_lifetime,
-                    other_param_info.num_indirections - num_indirections);
-              } else {
-                PrintNotes(current_arg, current_arg_lifetime,
-                           param_info.num_indirections - num_indirections);
-                PrintNotes(
-                    arg_decl, arg_lifetime,
-                    other_param_info.num_indirections - num_indirections);
-              }
+              CallExprChecker(
+                  call, direct_callee, current_arg, arg_decl,
+                  current_arg_lifetime, arg_lifetime,
+                  param_info.num_indirections - num_indirections,
+                  other_param_info.num_indirections - num_indirections,
+                  diag::warn_func_params_lifetimes_shorter);
             }
           }
         }
