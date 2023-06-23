@@ -79,6 +79,13 @@ class LifetimesCheckerVisitor
                        const clang::BinaryOperator *op, bool return_lifetime,
                        PrintNotesFactory factory) const;
 
+  void PrintNotes(const clang::VarDecl *var_decl, Lifetime &lifetime,
+                  unsigned int num_indirections) const;
+  void PrintNotes(const clang::VarDecl *var_decl, Lifetime &lifetime, char id,
+                  unsigned int num_indirections) const;
+  void PrintNotes(const clang::VarDecl *var_decl, char id,
+                  unsigned int num_indirections) const;
+
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalysis &State;

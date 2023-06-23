@@ -8,6 +8,12 @@
 
 namespace clang {
 
+std::string GenerateArgName(const clang::VarDecl *arg,
+                            unsigned int num_indirections) {
+  return '\'' + std::string(num_indirections, '*') + arg->getNameAsString() +
+         '\'';
+}
+
 PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
   return [this](const clang::VarDecl *lhs_var_decl,
                 const clang::VarDecl *rhs_var_decl,
@@ -183,6 +189,37 @@ void LifetimesCheckerVisitor::CompareAndCheck(
   }
 }
 
+void LifetimesCheckerVisitor::PrintNotes(const clang::VarDecl *var_decl,
+                                         Lifetime &lifetime,
+                                         unsigned int num_indirections) const {
+  char id = lifetime.GetId();
+  PrintNotes(var_decl, lifetime, id, num_indirections);
+}
+
+void LifetimesCheckerVisitor::PrintNotes(const clang::VarDecl *var_decl,
+                                         Lifetime &lifetime, char id,
+                                         unsigned int num_indirections) const {
+  const auto &maybe_stmts = lifetime.GetStmts(id);
+  if (maybe_stmts.has_value()) {
+    const auto &stmts = maybe_stmts.value();
+    for (const auto &stmt : stmts) {
+      S.Diag(stmt->getBeginLoc(), diag::note_lifetime_of)
+          << GenerateArgName(var_decl, num_indirections)
+          << Lifetime::GetLifetimeName(id) << stmt->getSourceRange();
+    }
+  } else {
+    PrintNotes(var_decl, id, num_indirections);
+  }
+}
+
+void LifetimesCheckerVisitor::PrintNotes(const clang::VarDecl *var_decl,
+                                         char id,
+                                         unsigned int num_indirections) const {
+  S.Diag(var_decl->getLocation(), diag::note_lifetime_of)
+      << GenerateArgName(var_decl, num_indirections)
+      << Lifetime::GetLifetimeName(id) << var_decl->getSourceRange();
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
@@ -245,12 +282,6 @@ const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
   }
   // debugWarn("Arg is not a declrefexpr or memberexpr");
   return nullptr;
-}
-
-std::string GenerateArgName(const clang::VarDecl *arg,
-                            unsigned int num_indirections) {
-  return '\'' + std::string(num_indirections, '*') + arg->getNameAsString() +
-         '\'';
 }
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
@@ -395,7 +426,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         assert(param_info.index < params_set.size());
         params_set[param_info.index] = param_info;
       }
-      
+
       // check static params
       for (const auto &param_info : params_set) {
         if (param_info.type.isNull()) continue;
@@ -413,16 +444,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                        arg_decl, param_info.num_indirections - num_indirections)
                 << Lifetime::GetLifetimeName(STATIC)
                 << arg_lifetime.GetLifetimeName() << call->getSourceRange();
-            S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
-                << GenerateArgName(
-                       arg_decl, param_info.num_indirections - num_indirections)
-                << arg_lifetime.GetLifetimeName() << arg_decl->getSourceRange();
-            S.Diag(param_info.param->getLocation(), diag::note_lifetime_of)
-                << GenerateArgName(
-                       param_info.param,
-                       param_info.num_indirections - num_indirections)
-                << Lifetime::GetLifetimeName(STATIC)
-                << param_info.param->getSourceRange();
+            PrintNotes(arg_decl, arg_lifetime,
+                       param_info.num_indirections - num_indirections);
+            PrintNotes(param_info.param, STATIC,
+                       param_info.num_indirections - num_indirections);
           }
         }
       }
