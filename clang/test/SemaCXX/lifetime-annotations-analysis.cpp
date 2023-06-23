@@ -631,7 +631,7 @@ void fn51(int *$a x, int *$a *$a y, int *$a *$a z);
 void fn52(int *$a *$a x, int *$b *$a y, int *$b *$a z);
 void fn61(int *$a *$b *$c x, int *$b *$a y);
 
-void function_calls() {
+void function_calls_1() {
   int *$a p;
   int *$b q;
   fn11(p, p);
@@ -699,6 +699,36 @@ void function_calls() {
                     // expected-note@-56 {{lifetime of '*pp' is '$a}} \
                     // expected-note@-53 {{lifetime of '*ss' is '$b}}
   // TODO call fn61
+
+}
+
+void function_calls_2(int *$a x, int *$b y, int *$a z) {
+  int **xx;
+  int **xy;
+  *xx = x;
+  *xx = z;
+  *xy = x;
+  *xy = y;
+
+  int *$a *$a pp;
+  int *$a *$b qq;
+  int *$b *$b rr;
+  int *$b *$a ss;
+  fn21(xx);
+  fn21(xy);
+  fn22(xx);
+  fn22(xy);
+
+  fn32(xx, x);
+  fn32(xx, y);
+  fn32(xy, x);
+  fn32(xy, y);
+
+  fn33(xx, x);
+  fn33(xx, y);  // expected-warning {{when calling function 'fn33', the lifetime of 'y' cannot be shorter than the lifetime of '*xx'}} \
+                // expected-note@-23 {{lifetime of 'y' is '$b'}} \
+                // expected-note@-20 {{lifetime of '*xx' is '$a'}} \
+                // expected-note@-19 {{lifetime of '*xx' is '$a'}}
 
 }
 

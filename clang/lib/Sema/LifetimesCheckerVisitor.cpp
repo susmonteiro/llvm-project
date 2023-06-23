@@ -405,17 +405,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                          arg_decl,
                          other_param_info.num_indirections - num_indirections)
                   << call->getSourceRange();
-              S.Diag(current_arg->getLocation(), diag::note_lifetime_of)
-                  << GenerateArgName(current_arg, param_info.num_indirections -
-                                                      num_indirections)
-                  << current_arg_lifetime.GetLifetimeName()
-                  << current_arg->getSourceRange();
-              S.Diag(arg_decl->getLocation(), diag::note_lifetime_of)
-                  << GenerateArgName(
-                         arg_decl,
-                         other_param_info.num_indirections - num_indirections)
-                  << arg_lifetime.GetLifetimeName()
-                  << arg_decl->getSourceRange();
+              PrintNotes(current_arg, current_arg_lifetime,
+                         param_info.num_indirections - num_indirections);
+              PrintNotes(arg_decl, arg_lifetime,
+                         other_param_info.num_indirections - num_indirections);
             }
           }
         }
