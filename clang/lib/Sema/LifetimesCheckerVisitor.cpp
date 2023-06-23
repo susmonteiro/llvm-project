@@ -439,13 +439,31 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           Lifetime &arg_lifetime =
               State.GetLifetimeOrLocal(arg_decl, param_info.type);
           if (!arg_lifetime.IsStatic()) {
-            S.Diag(arg->getExprLoc(), diag::arg_lifetimes_differ)
-                << GenerateArgName(
-                       arg_decl, param_info.num_indirections - num_indirections)
-                << Lifetime::GetLifetimeName(STATIC)
-                << arg_lifetime.GetLifetimeName() << call->getSourceRange();
-            PrintNotes(arg_decl, arg_lifetime,
-                       param_info.num_indirections - num_indirections);
+            if (arg_lifetime.IsNotSet()) {
+              const auto &arg_shortest_lifetimes =
+                  arg_lifetime.GetShortestLifetimes();
+              for (unsigned int i = 0; i < arg_shortest_lifetimes.size(); i++) {
+                if (arg_shortest_lifetimes[i].empty()) continue;
+                S.Diag(arg->getExprLoc(), diag::arg_lifetimes_differ)
+                    << GenerateArgName(arg_decl, param_info.num_indirections -
+                                                     num_indirections)
+                    << Lifetime::GetLifetimeName(STATIC)
+                    << Lifetime::GetLifetimeName(i) << call->getSourceRange();
+                PrintNotes(arg_decl, arg_lifetime, i,
+                           param_info.num_indirections - num_indirections);
+              }
+              PrintNotes(param_info.param, STATIC,
+                         param_info.num_indirections - num_indirections);
+
+            } else {
+              S.Diag(arg->getExprLoc(), diag::arg_lifetimes_differ)
+                  << GenerateArgName(arg_decl, param_info.num_indirections -
+                                                   num_indirections)
+                  << Lifetime::GetLifetimeName(STATIC)
+                  << arg_lifetime.GetLifetimeName() << call->getSourceRange();
+              PrintNotes(arg_decl, arg_lifetime,
+                         param_info.num_indirections - num_indirections);
+            }
             PrintNotes(param_info.param, STATIC,
                        param_info.num_indirections - num_indirections);
           }

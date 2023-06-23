@@ -345,8 +345,8 @@ void static_lifetime_function_call(int *$static x, int *$a y, int *$b z) {
 
 void aux_static_lifetimes(int *$static x1, int *$static *$a x2, int *$b *$static x3);
 
-void static_lifetime_function_call_2(int *$a p1, int *$a *$static p2, int *$static *$c p3) {
-        aux_static_lifetimes(p1, p2, p3); // expected-warning {{argument 'p3' requires that '$c' outlives '$static'}} \
+void static_lifetime_function_call_2(int *$a p1, int *$a *$static p2, int *$static *$c p3, int *$b p4) {
+  aux_static_lifetimes(p1, p2, p3); // expected-warning {{argument 'p3' requires that '$c' outlives '$static'}} \
                               // expected-note@-1 {{lifetime of 'p3' is '$c'}} \
                               // expected-note@-3 {{lifetime of 'x3' is '$static'}} \
                               // expected-warning {{argument 'p1' requires that '$a' outlives '$static'}} \
@@ -355,7 +355,15 @@ void static_lifetime_function_call_2(int *$a p1, int *$a *$static p2, int *$stat
                               // expected-warning {{argument '*p2' requires that '$a' outlives '$static'}} \
                               // expected-note@-1 {{lifetime of '*p2' is '$a'}} \
                               // expected-note@-3 {{lifetime of '*x2' is '$static'}}
-}
+  int *p = p1;
+  p = p4;
+  static_lifetime_return(p);  // expected-warning {{argument 'p' requires that '$a' outlives '$static'}} \
+                              // expected-note@-2 {{lifetime of 'p' is '$a'}} \
+                              // expected-note@-50 {{lifetime of 'x' is '$static'}} \
+                              // expected-warning {{argument 'p' requires that '$b' outlives '$static'}} \
+                              // expected-note@-1 {{lifetime of 'p' is '$b'}} \
+                              // expected-note@-50 {{lifetime of 'x' is '$static'}}
+} 
 
 void address_of_operator(int *$a x) {
   int i = 0;
