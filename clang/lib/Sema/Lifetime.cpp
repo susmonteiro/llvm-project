@@ -202,7 +202,7 @@ bool Lifetime::operator<(const Lifetime &Other) const {
   if (IsSet() && Other.IsSet()) {
     return Id != Other.GetId();
   } else if (IsSet()) {
-    return (unsigned int)Id >= other_shortest_lifetimes.size() &&
+    return (unsigned int)Id >= other_shortest_lifetimes.size() ||
            other_shortest_lifetimes[Id].empty();
   } else if (Other.IsSet()) {
     return true;
