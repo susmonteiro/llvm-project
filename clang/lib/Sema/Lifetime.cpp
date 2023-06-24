@@ -142,13 +142,6 @@ void Lifetime::ProcessPossibleLifetimes() {
     return;
   }
 
-  // TODO delete this
-  if (PossibleLifetimes.size() > 1 && ContainsStatic()) {
-    // static outlives all others; if there are others lifetimes, static should
-    // not belong to shortest lifetimes
-    RemoveFromPossibleLifetimes(STATIC);
-  }
-
   char unique_id = NOTSET;
   for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
     if (!PossibleLifetimes[i].empty()) {
