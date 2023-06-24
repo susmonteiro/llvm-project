@@ -161,7 +161,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
                                            current_var->getNameAsString());
 
     // each entry of the vector corresponds to a lifetime char
-    llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> shortest_lifetimes;
+    llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> possible_lifetimes;
     llvm::DenseSet<const clang::Stmt *> stmts;
 
     // ObjectLifetimes objectLifetimes = State.GetObjectLifetimes(el);
@@ -173,32 +173,32 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         if (var_decl == current_var) continue;
         Lifetime &rhs_lifetime =
             State.GetLifetimeOrLocal(var_decl, current_type);
-        auto &rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
+        auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
 
         // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
-          for (unsigned int i = 0; i < rhs_shortest_lifetimes.size(); i++) {
-            if (!rhs_shortest_lifetimes[i].empty()) {
-              Lifetime::InsertShortestLifetimes(i, stmt, shortest_lifetimes);
+          for (unsigned int i = 0; i < rhs_possible_lifetimes.size(); i++) {
+            if (!rhs_possible_lifetimes[i].empty()) {
+              Lifetime::InsertPossibleLifetimes(i, stmt, possible_lifetimes);
             }
           }
         } else {
           char vardecl_lifetime_id = rhs_lifetime.GetId();
-          Lifetime::InsertShortestLifetimes(vardecl_lifetime_id, stmt,
-                                            shortest_lifetimes);
+          Lifetime::InsertPossibleLifetimes(vardecl_lifetime_id, stmt,
+                                            possible_lifetimes);
         }
         // }
       }
     }
     // debugLifetimes("Original shortest lifetimes",
-    //                State.GetShortestLifetimes(el, el_type).size());
-    // debugLifetimes("New shortest lifetimes", shortest_lifetimes.size());
+    //                State.GetPossibleLifetimes(el, el_type).size());
+    // debugLifetimes("New shortest lifetimes", possible_lifetimes.size());
     // TODO this is not perfect
     if (new_children[el] != stmts ||
-        State.GetShortestLifetimes(current_var, current_type) !=
-            shortest_lifetimes) {
+        State.GetPossibleLifetimes(current_var, current_type) !=
+            possible_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
-      State.PropagateShortestLifetimes(current_var, shortest_lifetimes,
+      State.PropagatePossibleLifetimes(current_var, possible_lifetimes,
                                        current_type);
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);
@@ -217,7 +217,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
   // finally, process the lifetimes dependencies to attribute the correct set of
   // lifetimes to each variable
-  State.ProcessShortestLifetimes();
+  State.ProcessPossibleLifetimes();
 }
 
 // With all the lifetime information acquired, check that the return

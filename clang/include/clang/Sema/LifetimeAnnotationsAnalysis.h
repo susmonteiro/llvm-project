@@ -67,24 +67,24 @@ class LifetimeAnnotationsAnalysis {
 
   PointsToMap &GetPointsTo() { return PointsTo; }
 
-  const LifetimesVector &GetShortestLifetimes(const clang::VarDecl *var_decl,
+  const LifetimesVector &GetPossibleLifetimes(const clang::VarDecl *var_decl,
                                               clang::QualType type) {
-    return GetLifetime(var_decl, type).GetShortestLifetimes();
+    return GetLifetime(var_decl, type).GetPossibleLifetimes();
   }
 
-  void PropagateShortestLifetimes(const clang::VarDecl *target,
-                                  const LifetimesVector &shortest_lifetimes,
+  void PropagatePossibleLifetimes(const clang::VarDecl *target,
+                                  const LifetimesVector &possible_lifetimes,
                                   clang::QualType type) {
-    GetLifetime(target, type).InsertShortestLifetimes(shortest_lifetimes);
+    GetLifetime(target, type).InsertPossibleLifetimes(possible_lifetimes);
   }
 
-  void PropagateShortestLifetimes(const clang::VarDecl *to,
+  void PropagatePossibleLifetimes(const clang::VarDecl *to,
                                   clang::QualType &to_type,
                                   const clang::VarDecl *from,
                                   clang::QualType &from_type) {
     // TODO maybe same type is enough
-    const auto &from_lifetimes = GetShortestLifetimes(from, from_type);
-    PropagateShortestLifetimes(to, from_lifetimes, to_type);
+    const auto &from_lifetimes = GetPossibleLifetimes(from, from_type);
+    PropagatePossibleLifetimes(to, from_lifetimes, to_type);
   }
 
   void CreateVariable(const clang::VarDecl *var_decl, clang::QualType &type) {
@@ -116,7 +116,7 @@ class LifetimeAnnotationsAnalysis {
     LifetimeDependencies = std::move(dependencies);
   }
 
-  void ProcessShortestLifetimes();
+  void ProcessPossibleLifetimes();
 
   llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo>
   TransposeDependencies();

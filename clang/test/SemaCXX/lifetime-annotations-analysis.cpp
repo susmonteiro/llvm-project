@@ -339,8 +339,8 @@ void static_lifetime_function_call(int *$static x, int *$a y, int *$b z) {
                               // expected-note@-2 {{lifetime of 'y' is '$a'}} \
                               // expected-note@-28 {{lifetime of 'x' is '$static'}}
   y = static_lifetime_return(x); // correct
-  x = static_lifetime_return(x); // TODO should be incorrect
-  z = static_lifetime_return(x); // TODO should be incorrect
+  x = static_lifetime_return(x);
+  z = static_lifetime_return(x);
 }
 
 void aux_static_lifetimes(int *$static x1, int *$static *$a x2, int *$b *$static x3);

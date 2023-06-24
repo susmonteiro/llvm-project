@@ -7,6 +7,10 @@
 #include "clang/Sema/DebugLifetimes.h"
 #include "llvm/ADT/DenseSet.h"
 
+#define is_in_shortest(set, e)       (set & (1 << e))
+#define shortest_remove(set, e)      (set &= ~ (1 << e))
+#define shortest_insert(set, e)      (set |= 1 << e)
+
 namespace clang {
 
 using StmtDenseSet = llvm::DenseSet<const clang::Stmt *>;
@@ -58,7 +62,7 @@ class Lifetime {
   clang::QualType GetType() const { return LifetimeType; }
   void SetType(clang::QualType type) { LifetimeType = type; }
 
-  void ProcessShortestLifetimes();
+  void ProcessPossibleLifetimes();
 
   std::string DebugString() const;
 
@@ -66,62 +70,62 @@ class Lifetime {
   static std::string GetLifetimeName(char id);
   std::string GetLifetimeName() const { return GetLifetimeName(Id); }
 
-  static StmtDenseSet *GetAndResizeShortestLifetime(
-      char id, LifetimesVector &shortest_lifetimes) {
-    ResizeShortestLifetimes(id, shortest_lifetimes);
-    return &shortest_lifetimes[id];
+  static StmtDenseSet *GetAndResizePossibleLifetime(
+      char id, LifetimesVector &possible_lifetimes) {
+    ResizePossibleLifetimes(id, possible_lifetimes);
+    return &possible_lifetimes[id];
   }
 
-  StmtDenseSet *GetShortestLifetime(char id) {
-    return GetShortestLifetime(id, ShortestLifetimes);
+  StmtDenseSet *GetPossibleLifetime(char id) {
+    return GetPossibleLifetime(id, PossibleLifetimes);
   }
 
-  static StmtDenseSet *GetShortestLifetime(
-      char id, LifetimesVector &shortest_lifetimes) {
-    return &shortest_lifetimes[id];
+  static StmtDenseSet *GetPossibleLifetime(
+      char id, LifetimesVector &possible_lifetimes) {
+    return &possible_lifetimes[id];
   }
 
-  StmtDenseSet *GetAndResizeShortestLifetime(char id) {
-    return GetShortestLifetime(id, ShortestLifetimes);
+  StmtDenseSet *GetAndResizePossibleLifetime(char id) {
+    return GetPossibleLifetime(id, PossibleLifetimes);
   }
 
-  const LifetimesVector &GetShortestLifetimes() const {
-    return ShortestLifetimes;
+  const LifetimesVector &GetPossibleLifetimes() const {
+    return PossibleLifetimes;
   }
   std::optional<StmtDenseSet> GetStmts(char id);
 
-  static void ResizeShortestLifetimes(char id,
-                                      LifetimesVector &shortest_lifetimes) {
-    if ((unsigned int)id >= shortest_lifetimes.size())
-      shortest_lifetimes.resize(id + 1);
+  static void ResizePossibleLifetimes(char id,
+                                      LifetimesVector &possible_lifetimes) {
+    if ((unsigned int)id >= possible_lifetimes.size())
+      possible_lifetimes.resize(id + 1);
   }
 
-  static void InsertShortestLifetimes(char id, const clang::Stmt *stmt,
-                                      LifetimesVector &shortest_lifetimes) {
-    Lifetime::GetAndResizeShortestLifetime(id, shortest_lifetimes)
+  static void InsertPossibleLifetimes(char id, const clang::Stmt *stmt,
+                                      LifetimesVector &possible_lifetimes) {
+    Lifetime::GetAndResizePossibleLifetime(id, possible_lifetimes)
         ->insert(stmt);
   }
 
-  void InsertShortestLifetimes(char id, const clang::Stmt *stmt) {
-    InsertShortestLifetimes(id, stmt, ShortestLifetimes);
+  void InsertPossibleLifetimes(char id, const clang::Stmt *stmt) {
+    InsertPossibleLifetimes(id, stmt, PossibleLifetimes);
   }
 
-  void InsertShortestLifetimes(LifetimesVector shortest_lifetimes) {
-    if (shortest_lifetimes.size() > ShortestLifetimes.size())
-      ShortestLifetimes.resize(shortest_lifetimes.size());
-    for (unsigned int i = 0; i < shortest_lifetimes.size(); i++) {
-      GetShortestLifetime(i)->insert(
-          GetShortestLifetime(i, shortest_lifetimes)->begin(),
-          GetShortestLifetime(i, shortest_lifetimes)->end());
+  void InsertPossibleLifetimes(LifetimesVector possible_lifetimes) {
+    if (possible_lifetimes.size() > PossibleLifetimes.size())
+      PossibleLifetimes.resize(possible_lifetimes.size());
+    for (unsigned int i = 0; i < possible_lifetimes.size(); i++) {
+      GetPossibleLifetime(i)->insert(
+          GetPossibleLifetime(i, possible_lifetimes)->begin(),
+          GetPossibleLifetime(i, possible_lifetimes)->end());
     }
   }
 
-  void SetShortestLifetimes(LifetimesVector shortest_lifetimes) {
-    ShortestLifetimes = shortest_lifetimes;
+  void SetPossibleLifetimes(LifetimesVector possible_lifetimes) {
+    PossibleLifetimes = possible_lifetimes;
   }
 
-  void RemoveFromShortestLifetimes(char id) {
-    GetShortestLifetime(id)->clear();
+  void RemoveFromPossibleLifetimes(char id) {
+    GetPossibleLifetime(id)->clear();
   }
 
   bool operator==(const Lifetime &Other) const;
@@ -134,7 +138,7 @@ class Lifetime {
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
-  LifetimesVector ShortestLifetimes;
+  LifetimesVector PossibleLifetimes;
   clang::QualType LifetimeType;
   char Id = NOTSET;
 };

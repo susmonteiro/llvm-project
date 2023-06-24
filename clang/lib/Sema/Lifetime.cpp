@@ -49,14 +49,14 @@ bool Lifetime::IsSet() const { return Id >= LOCAL; }
 bool Lifetime::IsNotSet() const { return Id == NOTSET; }
 bool Lifetime::IsStatic() const { return Id == STATIC; }
 bool Lifetime::ContainsStatic() const {
-  return (unsigned int)STATIC < ShortestLifetimes.size() &&
-         !ShortestLifetimes[STATIC].empty();
+  return (unsigned int)STATIC < PossibleLifetimes.size() &&
+         !PossibleLifetimes[STATIC].empty();
 }
 
 bool Lifetime::IsLocal() const { return Id == LOCAL; }
 bool Lifetime::ContainsLocal() const {
-  return (unsigned int)LOCAL < ShortestLifetimes.size() &&
-         !ShortestLifetimes[LOCAL].empty();
+  return (unsigned int)LOCAL < PossibleLifetimes.size() &&
+         !PossibleLifetimes[LOCAL].empty();
 }
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
@@ -115,8 +115,8 @@ std::string Lifetime::DebugString() const {
 
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
-    for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
-      if (!ShortestLifetimes[i].empty()) {
+    for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
+      if (!PossibleLifetimes[i].empty()) {
         res += GetLifetimeName(i) + ' ';
       }
     }
@@ -125,7 +125,7 @@ std::string Lifetime::DebugString() const {
   return res + '\n';
 }
 
-void Lifetime::ProcessShortestLifetimes() {
+void Lifetime::ProcessPossibleLifetimes() {
   // should only reach this if lifetime is not set
   assert(IsNotSet());
   if (ContainsLocal()) {
@@ -134,14 +134,14 @@ void Lifetime::ProcessShortestLifetimes() {
     return;
   }
 
-  if (ShortestLifetimes.size() > 1 && ContainsStatic()) {
+  if (PossibleLifetimes.size() > 1 && ContainsStatic()) {
     // static outlives all others; if there are others lifetimes, static should
     // not belong to shortest lifetimes
-    RemoveFromShortestLifetimes(STATIC);
+    RemoveFromPossibleLifetimes(STATIC);
   }
   char unique_id = NOTSET;
-  for (unsigned int i = 0; i < ShortestLifetimes.size(); i++) {
-    if (!ShortestLifetimes[i].empty()) {
+  for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
+    if (!PossibleLifetimes[i].empty()) {
       if (unique_id != NOTSET)
         return;  // there are more than one shortest lifetimes
       unique_id = i;
@@ -150,19 +150,19 @@ void Lifetime::ProcessShortestLifetimes() {
   SetId(unique_id);
 
   // in all other cases, the Id of the lifetime remains NOTSET
-  // - if ShortestLifetimes is empty, the lifetime of this variable is
+  // - if PossibleLifetimes is empty, the lifetime of this variable is
   // undefined
-  // - if ShortestLifetimes contains multiple lifetimes, then the
+  // - if PossibleLifetimes contains multiple lifetimes, then the
   // lifetime is the shortest among them since we cannot now which lifetimes
   // outlives which, then all of them are considered the shortest
 }
 
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
   assert(id != NOTSET);
-  return (unsigned int)id >= ShortestLifetimes.size() ||
-                 ShortestLifetimes[id].empty()
+  return (unsigned int)id >= PossibleLifetimes.size() ||
+                 PossibleLifetimes[id].empty()
              ? std::nullopt
-             : std::optional(ShortestLifetimes[id]);
+             : std::optional(PossibleLifetimes[id]);
 }
 
 bool Lifetime::operator==(const Lifetime &Other) const {
@@ -170,15 +170,15 @@ bool Lifetime::operator==(const Lifetime &Other) const {
   if (IsSet()) return true;
 
   unsigned int min_size =
-      std::min(ShortestLifetimes.size(), Other.GetShortestLifetimes().size());
-  const auto &larger_vec = ShortestLifetimes.size() > min_size
-                               ? ShortestLifetimes
-                               : Other.GetShortestLifetimes();
+      std::min(PossibleLifetimes.size(), Other.GetPossibleLifetimes().size());
+  const auto &larger_vec = PossibleLifetimes.size() > min_size
+                               ? PossibleLifetimes
+                               : Other.GetPossibleLifetimes();
   unsigned int max_size = larger_vec.size();
   unsigned int i = -1;
 
   while (++i < min_size) {
-    if (ShortestLifetimes[i].empty() != Other.GetShortestLifetimes()[i].empty())
+    if (PossibleLifetimes[i].empty() != Other.GetPossibleLifetimes()[i].empty())
       return false;
   }
   i--;
@@ -197,30 +197,30 @@ bool Lifetime::operator<(const Lifetime &Other) const {
   if (IsStatic() || Other.IsLocal()) return false;
   if (IsLocal() || Other.IsStatic()) return true;
 
-  const auto &other_shortest_lifetimes = Other.GetShortestLifetimes();
+  const auto &other_possible_lifetimes = Other.GetPossibleLifetimes();
 
   if (IsSet() && Other.IsSet()) {
     return Id != Other.GetId();
   } else if (IsSet()) {
-    return (unsigned int)Id >= other_shortest_lifetimes.size() ||
-           other_shortest_lifetimes[Id].empty();
+    return (unsigned int)Id >= other_possible_lifetimes.size() ||
+           other_possible_lifetimes[Id].empty();
   } else if (Other.IsSet()) {
     return true;
   }
 
   // if both this and other are not set
   unsigned int min_size =
-      std::min(ShortestLifetimes.size(), other_shortest_lifetimes.size());
+      std::min(PossibleLifetimes.size(), other_possible_lifetimes.size());
   unsigned int i = -1;
   while (++i < min_size) {
-    if (!ShortestLifetimes[i].empty() && other_shortest_lifetimes[i].empty())
+    if (!PossibleLifetimes[i].empty() && other_possible_lifetimes[i].empty())
       return true;
   }
 
-  if (ShortestLifetimes.size() > other_shortest_lifetimes.size()) {
+  if (PossibleLifetimes.size() > other_possible_lifetimes.size()) {
     i--;
-    while (++i < ShortestLifetimes.size()) {
-      if (!ShortestLifetimes[i].empty()) return true;
+    while (++i < PossibleLifetimes.size()) {
+      if (!PossibleLifetimes[i].empty()) return true;
     }
   }
 

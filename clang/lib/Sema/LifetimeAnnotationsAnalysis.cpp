@@ -148,14 +148,14 @@ std::vector<VarTypePair> LifetimeAnnotationsAnalysis::InitializeWorklist()
   return worklist;
 }
 
-void LifetimeAnnotationsAnalysis::ProcessShortestLifetimes() {
+void LifetimeAnnotationsAnalysis::ProcessPossibleLifetimes() {
   // iterate over variables with no fixed lifetime
   for (const auto &pair : LifetimeDependencies) {
     auto &lifetimes = GetObjectLifetimes(pair.first.first).GetLifetimes();
     for (auto &objectLifetime : lifetimes) {
       Lifetime &lifetime = objectLifetime;
       if (lifetime.IsNotSet()) {
-        lifetime.ProcessShortestLifetimes();
+        lifetime.ProcessPossibleLifetimes();
       }
     }
   }

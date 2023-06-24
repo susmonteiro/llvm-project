@@ -23,9 +23,9 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
     assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr && op != nullptr);
     assert(lhs_lifetime.IsSet());
     if (rhs_lifetime.IsNotSet()) {
-      const auto &rhs_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
-      for (unsigned int i = 0; i < rhs_shortest_lifetimes.size(); i++) {
-        if (rhs_shortest_lifetimes[i].empty() ||
+      const auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
+      for (unsigned int i = 0; i < rhs_possible_lifetimes.size(); i++) {
+        if (rhs_possible_lifetimes[i].empty() ||
             (char)i == lhs_lifetime.GetId())
           continue;
         S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
@@ -54,9 +54,9 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
     assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr);
     assert(lhs_lifetime.IsSet());
     if (rhs_lifetime.IsNotSet()) {
-      const auto &init_shortest_lifetimes = rhs_lifetime.GetShortestLifetimes();
-      for (unsigned int i = 0; i < init_shortest_lifetimes.size(); i++) {
-        if (init_shortest_lifetimes[i].empty() ||
+      const auto &init_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
+      for (unsigned int i = 0; i < init_possible_lifetimes.size(); i++) {
+        if (init_possible_lifetimes[i].empty() ||
             (char)i == lhs_lifetime.GetId())
           continue;
         S.Diag(lhs_var_decl->getInit()->getExprLoc(),
@@ -85,9 +85,9 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
     assert(var_decl != nullptr && expr != nullptr && return_stmt != nullptr);
     assert(return_lifetime.IsSet());
     if (var_lifetime.IsNotSet()) {
-      const auto &var_shortest_lifetimes = var_lifetime.GetShortestLifetimes();
-      for (unsigned int i = 0; i < var_shortest_lifetimes.size(); i++) {
-        if (var_shortest_lifetimes[i].empty() ||
+      const auto &var_possible_lifetimes = var_lifetime.GetPossibleLifetimes();
+      for (unsigned int i = 0; i < var_possible_lifetimes.size(); i++) {
+        if (var_possible_lifetimes[i].empty() ||
             (char)i == return_lifetime.GetId())
           continue;
         S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
@@ -295,41 +295,41 @@ void LifetimesCheckerVisitor::CallExprChecker(
       << GenerateArgName(second_arg, second_num_indirections)
       << call->getSourceRange();
   if (first_lifetime.IsNotSet() && second_lifetime.IsNotSet()) {
-    const auto &first_arg_shortest_lifetimes =
-        first_lifetime.GetShortestLifetimes();
-    const auto &second_arg_shortest_lifetimes =
-        second_lifetime.GetShortestLifetimes();
-    unsigned int max_size = std::max(first_arg_shortest_lifetimes.size(),
-                                     second_arg_shortest_lifetimes.size());
+    const auto &first_arg_possible_lifetimes =
+        first_lifetime.GetPossibleLifetimes();
+    const auto &second_arg_possible_lifetimes =
+        second_lifetime.GetPossibleLifetimes();
+    unsigned int max_size = std::max(first_arg_possible_lifetimes.size(),
+                                     second_arg_possible_lifetimes.size());
     for (unsigned int i = 0; i < max_size; i++) {
-      if ((i >= second_arg_shortest_lifetimes.size() ||
-           second_arg_shortest_lifetimes[i].empty()) &&
-          (i < first_arg_shortest_lifetimes.size() &&
-           !first_arg_shortest_lifetimes[i].empty())) {
+      if ((i >= second_arg_possible_lifetimes.size() ||
+           second_arg_possible_lifetimes[i].empty()) &&
+          (i < first_arg_possible_lifetimes.size() &&
+           !first_arg_possible_lifetimes[i].empty())) {
         PrintNotes(first_arg, first_lifetime, i, first_num_indirections);
-      } else if ((i >= first_arg_shortest_lifetimes.size() ||
-                  first_arg_shortest_lifetimes[i].empty()) &&
-                 (i < second_arg_shortest_lifetimes.size() &&
-                  !second_arg_shortest_lifetimes[i].empty())) {
+      } else if ((i >= first_arg_possible_lifetimes.size() ||
+                  first_arg_possible_lifetimes[i].empty()) &&
+                 (i < second_arg_possible_lifetimes.size() &&
+                  !second_arg_possible_lifetimes[i].empty())) {
         PrintNotes(second_arg, second_lifetime, i, second_num_indirections);
       }
     }
   } else if (first_lifetime.IsNotSet()) {
-    const auto &first_arg_shortest_lifetimes =
-        first_lifetime.GetShortestLifetimes();
-    for (unsigned int i = 0; i < first_arg_shortest_lifetimes.size(); i++) {
+    const auto &first_arg_possible_lifetimes =
+        first_lifetime.GetPossibleLifetimes();
+    for (unsigned int i = 0; i < first_arg_possible_lifetimes.size(); i++) {
       if ((char)i == second_lifetime.GetId() ||
-          first_arg_shortest_lifetimes[i].empty())
+          first_arg_possible_lifetimes[i].empty())
         continue;
       PrintNotes(first_arg, first_lifetime, i, first_num_indirections);
     }
     PrintNotes(second_arg, second_lifetime, second_num_indirections);
   } else if (second_lifetime.IsNotSet()) {
-    const auto &second_arg_shortest_lifetimes =
-        second_lifetime.GetShortestLifetimes();
-    for (unsigned int i = 0; i < second_arg_shortest_lifetimes.size(); i++) {
+    const auto &second_arg_possible_lifetimes =
+        second_lifetime.GetPossibleLifetimes();
+    for (unsigned int i = 0; i < second_arg_possible_lifetimes.size(); i++) {
       if ((char)i == first_lifetime.GetId() ||
-          second_arg_shortest_lifetimes[i].empty())
+          second_arg_possible_lifetimes[i].empty())
         continue;
       PrintNotes(second_arg, second_lifetime, i, second_num_indirections);
     }
@@ -473,10 +473,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               State.GetLifetimeOrLocal(arg_decl, param_info.type);
           if (!arg_lifetime.IsStatic()) {
             if (arg_lifetime.IsNotSet()) {
-              const auto &arg_shortest_lifetimes =
-                  arg_lifetime.GetShortestLifetimes();
-              for (unsigned int i = 0; i < arg_shortest_lifetimes.size(); i++) {
-                if (arg_shortest_lifetimes[i].empty()) continue;
+              const auto &arg_possible_lifetimes =
+                  arg_lifetime.GetPossibleLifetimes();
+              for (unsigned int i = 0; i < arg_possible_lifetimes.size(); i++) {
+                if (arg_possible_lifetimes[i].empty()) continue;
                 S.Diag(arg->getExprLoc(), diag::arg_lifetimes_differ)
                     << GenerateArgName(arg_decl, param_info.num_indirections -
                                                      num_indirections)
