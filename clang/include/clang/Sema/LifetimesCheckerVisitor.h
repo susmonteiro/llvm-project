@@ -30,7 +30,7 @@ class LifetimesCheckerVisitorFactory {
                   char id) const;
   void PrintNotes(Lifetime &lifetime, clang::SourceLocation Loc,
                   clang::SourceRange range, int msg, char id) const;
-
+                  
   PrintNotesFactory BinAssignFactory() const;
   PrintNotesFactory DeclStmtFactory() const;
   PrintNotesFactory ReturnStmtFactory() const;

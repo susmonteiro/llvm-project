@@ -364,7 +364,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
   return std::nullopt;
 }
 
-// TODO sometimes this is not being visited
 std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryDeref(
     const clang::UnaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitUnaryDeref]");

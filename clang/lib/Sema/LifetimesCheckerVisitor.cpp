@@ -265,7 +265,88 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
                     Factory.BinAssignFactory());
   }
 
+  if (clang::isa<clang::UnaryOperator>(lhs) &&
+      clang::dyn_cast<clang::UnaryOperator>(lhs)->getOpcode() ==
+          clang::UO_Deref) {
+    for (const auto &expr : lhs_points_to) {
+      if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) {
+        continue;
+      }
+      const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
+      if (const auto *lhs_var_decl =
+              dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
+        for (const auto &expr : rhs_points_to) {
+          if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
+            const auto *rhs_decl_ref_expr =
+                clang::dyn_cast<clang::DeclRefExpr>(expr);
+            // there can only be one pointer/reference variable
+            if (const auto *rhs_var_decl =
+                    dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
+              if (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
+                Lifetime &lhs_lifetime =
+                    State.GetLifetime(lhs_var_decl, lhs_type);
+                Lifetime &rhs_lifetime =
+                    State.GetLifetimeOrLocal(rhs_var_decl, lhs_type);
+                unsigned int i = LOCAL - 1;
+                unsigned int lhs_possible_lifetimes_size =
+                    lhs_lifetime.GetPossibleLifetimes().size();
+                while (++i < lhs_possible_lifetimes_size) {
+                  if (lhs_lifetime.GetPossibleLifetime(i)->empty()) continue;
+                  Lifetime specific_lifetime(Lifetime::IdToChar(i));
+                  if (rhs_lifetime < specific_lifetime) {
+                    if (rhs_lifetime.IsNotSet()) {
+                      unsigned int possible_lifetimes_size =
+                          rhs_lifetime.GetPossibleLifetimes().size();
+                      const auto &stmts = lhs_lifetime.GetStmts(i);
+                      for (unsigned int i = OFFSET; i < possible_lifetimes_size;
+                           i++) {
+                        if (!rhs_lifetime.ContainsShortestLifetime(i) ||
+                            (char)i == specific_lifetime.GetId())
+                          continue;
+                        S.Diag(op->getExprLoc(),
+                               diag::warn_assign_lifetimes_differ)
+                            << specific_lifetime.GetLifetimeName()
+                            << Lifetime::GetLifetimeName(i)
+                            << op->getSourceRange();
+                        Factory.PrintNotes(rhs_lifetime, rhs_var_decl,
+                                           diag::note_lifetime_declared_here,
+                                           i);
+                      }
+                      Factory.PrintNotes(lhs_lifetime, lhs_var_decl,
+                                         diag::note_lifetime_declared_here, i);
+                    } else {
+                      S.Diag(op->getExprLoc(),
+                             diag::warn_assign_lifetimes_differ)
+                          << specific_lifetime.GetLifetimeName()
+                          << rhs_lifetime.GetLifetimeName()
+                          << op->getSourceRange();
+                      Factory.PrintNotes(rhs_lifetime, rhs_var_decl,
+                                         diag::note_lifetime_declared_here);
+                      Factory.PrintNotes(lhs_lifetime, lhs_var_decl,
+                                         diag::note_lifetime_declared_here, i);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // check against max lifetimes
+  }
+
   for (const auto &expr : lhs_points_to) {
+    // TODO
+    if (expr != nullptr && clang::isa<clang::UnaryOperator>(expr)) {
+      if (clang::dyn_cast<clang::UnaryOperator>(expr)->getOpcode() ==
+          clang::UO_Deref) {
+        debugWarn("It is a deref unary operator [2]");
+      }
+
+      debugWarn("It is a unary operator [2]");
+      // check against max lifetimes
+    }
     VerifyBinAssign(lhs_type, rhs, expr, rhs_points_to, op,
                     Factory.BinAssignFactory());
   }
@@ -323,7 +404,9 @@ void LifetimesCheckerVisitor::CallExprChecker(
     PrintNotes(second_arg, second_lifetime, second_num_indirections);
   } else if (second_lifetime.IsNotSet()) {
     for (unsigned int i = 0; i < second_arg_size; i++) {
-      if ((char)i == first_lifetime.GetId() || !second_lifetime.ContainsShortestLifetime(i)) continue;
+      if ((char)i == first_lifetime.GetId() ||
+          !second_lifetime.ContainsShortestLifetime(i))
+        continue;
       PrintNotes(second_arg, second_lifetime, i, second_num_indirections);
     }
     PrintNotes(first_arg, first_lifetime, first_num_indirections);
