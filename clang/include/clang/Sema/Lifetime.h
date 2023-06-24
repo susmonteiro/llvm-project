@@ -131,16 +131,6 @@ class Lifetime {
     GetPossibleLifetime(id)->clear();
   }
 
-  bool ContainsShortestLifetime(const LifetimesVector &vec,
-                                unsigned int i) const {
-    return !vec[i].empty() && is_in_shortest(ShortestLifetimes, i);
-  }
-
-  bool ContainsShortestLifetime(const LifetimesVector &vec, int shortest,
-                                unsigned int i) const {
-    return !vec[i].empty() && is_in_shortest(shortest, i);
-  }
-
   bool ContainsShortestLifetime(unsigned int id) const {
     return is_in_shortest(ShortestLifetimes, id);
   }

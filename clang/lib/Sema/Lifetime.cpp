@@ -117,17 +117,19 @@ std::string Lifetime::DebugString() const {
     res += "Shortest Lifetimes of this variable: { ";
     for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
       // TODO delete this
-      if ((!PossibleLifetimes[i].empty()) != (is_in_shortest(ShortestLifetimes, i))) {
+      if ((!PossibleLifetimes[i].empty()) !=
+          (is_in_shortest(ShortestLifetimes, i))) {
         debugWarn("POSSIBLE AND SHORTEST LIFETIMES ARE DIFFERENT");
         debugLifetimes("PossibleLifetimes", !PossibleLifetimes[i].empty());
-        debugLifetimes("ShortestLifetimes", is_in_shortest(ShortestLifetimes, i));
+        debugLifetimes("ShortestLifetimes",
+                       is_in_shortest(ShortestLifetimes, i));
       }
-      if (ContainsShortestLifetime(PossibleLifetimes, i)) {
+      if (ContainsShortestLifetime(i)) {
         res += GetLifetimeName(i) + ' ';
       }
     }
     res += "}";
-  }   
+  }
   return res + '\n';
 }
 
@@ -187,25 +189,18 @@ bool Lifetime::operator==(const Lifetime &Other) const {
 
   unsigned int min_size =
       std::min(PossibleLifetimes.size(), Other.GetPossibleLifetimes().size());
-  const auto &larger_vec = PossibleLifetimes.size() > min_size
-                               ? PossibleLifetimes
-                               : Other.GetPossibleLifetimes();
-  int larger_shortest_lifetimes = PossibleLifetimes.size() > min_size
-                                              ? ShortestLifetimes
-                                              : Other.GetShortestLifetimes();
-  unsigned int max_size = larger_vec.size();
+  const Lifetime &larger_lifetime =
+      PossibleLifetimes.size() > min_size ? *this : Other;
+  unsigned int max_size = larger_lifetime.GetPossibleLifetimes().size();
   unsigned int i = -1;
 
   while (++i < min_size) {
-    if (ContainsShortestLifetime(PossibleLifetimes, i) !=
-        ContainsShortestLifetime(Other.GetPossibleLifetimes(), Other.GetShortestLifetimes(), i))
+    if (ContainsShortestLifetime(i) != Other.ContainsShortestLifetime(i))
       return false;
   }
   i--;
   while (++i < max_size) {
-        debugLifetimes("i", i);
-
-    if (ContainsShortestLifetime(larger_vec, larger_shortest_lifetimes, i)) {
+    if (larger_lifetime.ContainsShortestLifetime(i)) {
       return false;
     }
   }
@@ -237,15 +232,14 @@ bool Lifetime::operator<(const Lifetime &Other) const {
       std::min(PossibleLifetimes.size(), other_possible_lifetimes.size());
   unsigned int i = -1;
   while (++i < min_size) {
-    if (ContainsShortestLifetime(PossibleLifetimes, i) &&
-        !ContainsShortestLifetime(other_possible_lifetimes, Other.GetShortestLifetimes(), i))
+    if (ContainsShortestLifetime(i) && !Other.ContainsShortestLifetime(i))
       return true;
   }
 
   if (PossibleLifetimes.size() > other_possible_lifetimes.size()) {
     i--;
     while (++i < PossibleLifetimes.size()) {
-      if (ContainsShortestLifetime(PossibleLifetimes, i)) return true;
+      if (ContainsShortestLifetime(i)) return true;
     }
   }
 

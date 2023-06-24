@@ -173,10 +173,10 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
         if (var_decl == current_var) continue;
         Lifetime &rhs_lifetime =
             State.GetLifetimeOrLocal(var_decl, current_type);
-        auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
 
         // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
+          auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
           for (unsigned int i = 0; i < rhs_possible_lifetimes.size(); i++) {
             if (!rhs_possible_lifetimes[i].empty()) {
               Lifetime::InsertPossibleLifetimes(i, stmt, possible_lifetimes);
