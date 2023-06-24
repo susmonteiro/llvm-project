@@ -116,12 +116,18 @@ std::string Lifetime::DebugString() const {
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
     for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
-      if (!PossibleLifetimes[i].empty()) {
+      // TODO delete this
+      if ((!PossibleLifetimes[i].empty()) != (is_in_shortest(ShortestLifetimes, i))) {
+        debugWarn("POSSIBLE AND SHORTEST LIFETIMES ARE DIFFERENT");
+        debugLifetimes("PossibleLifetimes", !PossibleLifetimes[i].empty());
+        debugLifetimes("ShortestLifetimes", is_in_shortest(ShortestLifetimes, i));
+      }
+      if (ContainsShortestLifetime(PossibleLifetimes, i)) {
         res += GetLifetimeName(i) + ' ';
       }
     }
     res += "}";
-  }
+  }   
   return res + '\n';
 }
 
@@ -134,26 +140,36 @@ void Lifetime::ProcessPossibleLifetimes() {
     return;
   }
 
+  // TODO delete this
   if (PossibleLifetimes.size() > 1 && ContainsStatic()) {
     // static outlives all others; if there are others lifetimes, static should
     // not belong to shortest lifetimes
     RemoveFromPossibleLifetimes(STATIC);
   }
+
   char unique_id = NOTSET;
   for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
     if (!PossibleLifetimes[i].empty()) {
-      if (unique_id != NOTSET)
+      if (unique_id != NOTSET) {
+        // set all possible lifetimes as shortest
+        for (unsigned int j = OFFSET; j < PossibleLifetimes.size(); j++) {
+          if (!PossibleLifetimes[j].empty() && j != STATIC) {
+            shortest_insert(ShortestLifetimes, j);
+          }
+        }
         return;  // there are more than one shortest lifetimes
+      }
       unique_id = i;
     }
   }
+
   SetId(unique_id);
 
   // in all other cases, the Id of the lifetime remains NOTSET
   // - if PossibleLifetimes is empty, the lifetime of this variable is
   // undefined
   // - if PossibleLifetimes contains multiple lifetimes, then the
-  // lifetime is the shortest among them since we cannot now which lifetimes
+  // lifetime is the shortest among them since we cannot know which lifetimes
   // outlives which, then all of them are considered the shortest
 }
 
@@ -174,16 +190,24 @@ bool Lifetime::operator==(const Lifetime &Other) const {
   const auto &larger_vec = PossibleLifetimes.size() > min_size
                                ? PossibleLifetimes
                                : Other.GetPossibleLifetimes();
+  int larger_shortest_lifetimes = PossibleLifetimes.size() > min_size
+                                              ? ShortestLifetimes
+                                              : Other.GetShortestLifetimes();
   unsigned int max_size = larger_vec.size();
   unsigned int i = -1;
 
   while (++i < min_size) {
-    if (PossibleLifetimes[i].empty() != Other.GetPossibleLifetimes()[i].empty())
+    if (ContainsShortestLifetime(PossibleLifetimes, i) !=
+        ContainsShortestLifetime(Other.GetPossibleLifetimes(), Other.GetShortestLifetimes(), i))
       return false;
   }
   i--;
   while (++i < max_size) {
-    if (!larger_vec[i].empty()) return false;
+        debugLifetimes("i", i);
+
+    if (ContainsShortestLifetime(larger_vec, larger_shortest_lifetimes, i)) {
+      return false;
+    }
   }
   return true;
 }
@@ -213,14 +237,15 @@ bool Lifetime::operator<(const Lifetime &Other) const {
       std::min(PossibleLifetimes.size(), other_possible_lifetimes.size());
   unsigned int i = -1;
   while (++i < min_size) {
-    if (!PossibleLifetimes[i].empty() && other_possible_lifetimes[i].empty())
+    if (ContainsShortestLifetime(PossibleLifetimes, i) &&
+        !ContainsShortestLifetime(other_possible_lifetimes, Other.GetShortestLifetimes(), i))
       return true;
   }
 
   if (PossibleLifetimes.size() > other_possible_lifetimes.size()) {
     i--;
     while (++i < PossibleLifetimes.size()) {
-      if (!PossibleLifetimes[i].empty()) return true;
+      if (ContainsShortestLifetime(PossibleLifetimes, i)) return true;
     }
   }
 

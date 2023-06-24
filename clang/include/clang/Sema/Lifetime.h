@@ -7,9 +7,9 @@
 #include "clang/Sema/DebugLifetimes.h"
 #include "llvm/ADT/DenseSet.h"
 
-#define is_in_shortest(set, e)       (set & (1 << e))
-#define shortest_remove(set, e)      (set &= ~ (1 << e))
-#define shortest_insert(set, e)      (set |= 1 << e)
+#define is_in_shortest(set, e) (set & (1 << e)) != 0
+#define shortest_remove(set, e) (set &= ~(1 << e))
+#define shortest_insert(set, e) (set |= 1 << e)
 
 namespace clang {
 
@@ -92,6 +92,9 @@ class Lifetime {
   const LifetimesVector &GetPossibleLifetimes() const {
     return PossibleLifetimes;
   }
+
+  int GetShortestLifetimes() const { return ShortestLifetimes; }
+
   std::optional<StmtDenseSet> GetStmts(char id);
 
   static void ResizePossibleLifetimes(char id,
@@ -128,6 +131,20 @@ class Lifetime {
     GetPossibleLifetime(id)->clear();
   }
 
+  bool ContainsShortestLifetime(const LifetimesVector &vec,
+                                unsigned int i) const {
+    return !vec[i].empty() && is_in_shortest(ShortestLifetimes, i);
+  }
+
+  bool ContainsShortestLifetime(const LifetimesVector &vec, int shortest,
+                                unsigned int i) const {
+    return !vec[i].empty() && is_in_shortest(shortest, i);
+  }
+
+  bool ContainsShortestLifetime(unsigned int id) const {
+    return is_in_shortest(ShortestLifetimes, id);
+  }
+
   bool operator==(const Lifetime &Other) const;
   bool operator!=(const Lifetime &Other) const;
   bool operator<(const Lifetime &Other) const;
@@ -140,6 +157,7 @@ class Lifetime {
 
   LifetimesVector PossibleLifetimes;
   clang::QualType LifetimeType;
+  int ShortestLifetimes = 0;
   char Id = NOTSET;
 };
 }  // namespace clang
