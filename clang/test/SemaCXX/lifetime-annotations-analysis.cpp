@@ -785,3 +785,19 @@ int *$a arrays(int *$b *$c arr) {
             // expected-note@-1 {{declared with lifetime '$b' here}}
 }
 
+void max_lifetimes(int *$a x, int *$b y, int *$c *$b z) {
+        int ***p;
+        *p = z;
+        **p = x; // expected-warning {{assignment requires that '$a' outlives '$b'}} \
+                // expected-note@-3 {{declared with lifetime '$a' here}} \
+                // expected-note@+6 {{declared with lifetime '$b' here}} \
+                // expected-warning{{assignment requires that '$a' outlives '$c'}} \
+                // expected-note@-3 {{declared with lifetime '$a' here}} \
+                // expected-note@-1 {{declared with lifetime '$c' here}}
+        **p = y;  // expected-warning {{assignment requires that '$b' outlives '$a'}} \
+                // expected-note@-9 {{declared with lifetime '$b' here}} \
+                // expected-note@-6 {{declared with lifetime '$a' here}} \
+                // expected-warning {{assignment requires that '$b' outlives '$c'}} \
+                // expected-note@-9 {{declared with lifetime '$b' here}} \
+                // expected-note@-7{{declared with lifetime '$c' here}}
+}
