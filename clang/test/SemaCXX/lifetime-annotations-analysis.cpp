@@ -45,16 +45,6 @@ int &$b incorrect_simple_return_references(int &$a x) {
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
-// TODO
-// int *$a correct_simple_return_pointers_and_references(int &$a x) {
-//   return &x;
-// }
-
-// TODO
-// int &$a correct_simple_return_references_and_pointers(int *$a x) {
-//   return *x;
-// }
-
 int *$a no_params_one_indirection(int *x) {
         return x; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$local'}} \
             // expected-note@-1 {{declared with lifetime '$local' here}}
@@ -520,7 +510,9 @@ int *$a *$b pointer_aliasing_3(int *$a *$b x, int *$c *$d y, int num) {
   int **p07 = x;
   if (num == 7) return p07; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$c'}} \
                 // expected-note@+2 {{declared with lifetime '$c' here}}
-  *p07 = *y;
+  *p07 = *y;  // expected-warning {{assignment requires that '$c' outlives '$a'}} \
+                // expected-note@-26 {{declared with lifetime '$c' here}} \
+                // expected-note@-3 {{declared with lifetime '$a' here}}
   return x;
 }
 
@@ -543,15 +535,19 @@ int *$a *$c *$a pointer_aliasing_4(int *$a *$b *$c *$d x, int *$a y) {
 void pointer_aliasing_5(int *$a x, int *$a *$b y) {
   int **p = &x;
   int i = 0;
-  *p = &i;
+  *p = &i;  // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}} \
+            // expected-note@-2 {{declared with lifetime '$a' here}}
 
   int *$a *q = y;
   *q = &i;  // expected-warning {{assignment requires that '$local' outlives '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}} \
-            // expected-note@-4 {{declared with lifetime '$local' here}}
+            // expected-note@-6 {{declared with lifetime '$local' here}}
 
   int **r = y;
-  *r = &i;
+  *r = &i;  // expected-warning {{assignment requires that '$local' outlives '$a'}} \
+            // expected-note@-11 {{declared with lifetime '$local' here}} \
+            // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
 void pointer_aliasing_6(int *$a *$c x, int *$a *$b y, int *$b *$b z) {
@@ -714,13 +710,13 @@ void function_calls_2(int *$a x, int *$b y, int *$a z, int *$c w, int *$d v) {
   int **xyw;
   *xx = x;
   *xx = z;
-  *xy = x;
-  *xy = y;
-  *yw = y;
-  *yw = w;
-  *xyw = x;
-  *xyw = y;
-  *xyw = w;
+  *xy = x;  // expected-warning {{assignment requires that '$a' outlives '$b'}} expected-note@-12 {{declared with lifetime '$a' here}} expected-note@+1 {{declared with lifetime '$b' here}}
+  *xy = y;  // expected-warning {{assignment requires that '$b' outlives '$a'}} expected-note@-13 {{declared with lifetime '$b' here}} expected-note@-1 {{declared with lifetime '$a' here}}
+  *yw = y;  // expected-warning {{assignment requires that '$b' outlives '$c'}} expected-note@-14 {{declared with lifetime '$b' here}} expected-note@+1 {{declared with lifetime '$c' here}}
+  *yw = w;  // expected-warning {{assignment requires that '$c' outlives '$b'}} expected-note@-15 {{declared with lifetime '$c' here}} expected-note@-1 {{declared with lifetime '$b' here}}
+  *xyw = x; // expected-warning {{assignment requires that '$a' outlives '$b'}} expected-note@-16 {{declared with lifetime '$a' here}} expected-note@+1 {{declared with lifetime '$b' here}} expected-warning {{assignment requires that '$a' outlives '$c'}} expected-note@-16 {{declared with lifetime '$a' here}} expected-note@+2 {{declared with lifetime '$c' here}}
+  *xyw = y; // expected-warning {{assignment requires that '$b' outlives '$a'}} expected-note@-17 {{declared with lifetime '$b' here}} expected-note@-1 {{declared with lifetime '$a' here}} expected-warning {{assignment requires that '$b' outlives '$c'}} expected-note@-17 {{declared with lifetime '$b' here}} expected-note@+1 {{declared with lifetime '$c' here}}
+  *xyw = w; // expected-warning {{assignment requires that '$c' outlives '$a'}} expected-note@-18 {{declared with lifetime '$c' here}} expected-note@-2 {{declared with lifetime '$a' here}} expected-warning {{assignment requires that '$c' outlives '$b'}} expected-note@-18 {{declared with lifetime '$c' here}} expected-note@-1 {{declared with lifetime '$b' here}}
 
   int *$a *$a pp;
   int *$a *$b qq;
