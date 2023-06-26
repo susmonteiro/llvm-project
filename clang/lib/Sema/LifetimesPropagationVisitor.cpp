@@ -345,33 +345,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
+std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryOperator(
     const clang::UnaryOperator *op) {
-  if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
-
-  if (!op->isGLValue() && !op->getType()->isPointerType() &&
-      !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
-    // debugWarn("Skipped...");
-    return std::nullopt;
-  }
-
-  for (const auto &child : op->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-    if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-      PointsTo.InsertExprLifetimes(op, child_expr);
-    }
-  }
-  return std::nullopt;
-}
-
-std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryDeref(
-    const clang::UnaryOperator *op) {
-  if (debugEnabled) debugLifetimes("[VisitUnaryDeref]");
-
-  if (!op->isGLValue() && !op->getType()->isPointerType() &&
-      !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
-    return std::nullopt;
-  }
+  if (debugEnabled) debugLifetimes("[VisitUnaryOperator]");
 
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
