@@ -59,6 +59,7 @@ void LifetimesPropagationVisitor::PropagateBinAssign(
 std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
     const clang::ArraySubscriptExpr *expr) {
   if (debugEnabled) debugLifetimes("[VisitArraySubscriptExpr]");
+  Visit(const_cast<clang::Expr *>(expr->getIdx()));
   Visit(const_cast<clang::Expr *>(expr->getBase()));
   PointsTo.InsertExprLifetimes(expr, expr->getBase());
   return std::nullopt;
@@ -70,19 +71,20 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS()->IgnoreParens();
+  const auto &rhs = op->getRHS()->IgnoreParens();
 
   // Because of how we handle reference-like structs, a member access to a
   // non-reference-like field in a struct might still produce lifetimes. We
   // don't want to change points-to sets in those cases.
   if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
-    // debugWarn("LHS of bin_op is not pointer type");
+    Visit(lhs);
+    Visit(rhs);
     return std::nullopt;
   }
 
   Visit(lhs);
   PointsTo.InsertExprLifetimes(op, lhs);
 
-  const auto &rhs = op->getRHS()->IgnoreParens();
   Visit(rhs);
   PointsTo.InsertExprLifetimes(op, rhs);
 
@@ -183,7 +185,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
 
       for (const auto *child : cast->children()) {
         Visit(const_cast<clang::Stmt *>(child));
-
+        if (!cast->getType()->isPointerType() &&
+            !cast->getType()->isReferenceType()) {
+          continue;
+        }
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
           PointsTo.InsertExprLifetimes(cast, child_expr);
         }
@@ -331,7 +336,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
     const clang::Expr *expr) {
   if (debugEnabled) debugLifetimes("[VisitExpr]");
-  // TODO
+  for (const auto &child : expr->children()) {
+    if (child == nullptr) continue;
+    Visit(const_cast<clang::Stmt *>(child));
+  }
   return std::nullopt;
 }
 
@@ -351,6 +359,11 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryOperator(
 
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
+    if (!op->isGLValue() && !op->getType()->isPointerType() &&
+        !op->getType()->isReferenceType() && !op->getType()->isArrayType()) {
+      return std::nullopt;
+    }
+
     if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
       PointsTo.InsertExprLifetimes(op, child_expr);
     }
