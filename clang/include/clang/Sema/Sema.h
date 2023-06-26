@@ -51,7 +51,7 @@
 #include "clang/Sema/DeclSpec.h"
 #include "clang/Sema/ExternalSemaSource.h"
 #include "clang/Sema/IdentifierResolver.h"
-#include "clang/Sema/LifetimeAnnotationsChecker.h"
+#include "clang/Sema/LifetimeAnnotationsAnalyzer.h"
 #include "clang/Sema/ObjCMethodList.h"
 #include "clang/Sema/Ownership.h"
 #include "clang/Sema/Scope.h"
@@ -144,7 +144,7 @@ namespace clang {
   class LabelStmt;
   class LambdaExpr;
   class LangOptions;
-  class LifetimeAnnotationsChecker;
+  class LifetimeAnnotationsAnalyzer;
   class LocalInstantiationScope;
   class LookupResult;
   class MacroInfo;
@@ -1210,7 +1210,7 @@ public:
   /// will hold 'respondsToSelector:'
   Selector RespondsToSelectorSel;
 
-  LifetimeAnnotationsChecker *LAChecker;
+  LifetimeAnnotationsAnalyzer *LAAnalyzer;
 
   /// A flag to remember whether the implicit forms of operator new and delete
   /// have been declared.
@@ -11009,8 +11009,8 @@ private:
   void InitDataSharingAttributesStack();
   void DestroyDataSharingAttributesStack();
 
-  void InitLifetimeAnnotationsChecker();
-  void DestroyLifetimeAnnotationsChecker();
+  void InitLifetimeAnnotationsAnalyzer();
+  void DestroyLifetimeAnnotationsAnalyzer();
   
   ExprResult
   VerifyPositiveIntegerConstantInClause(Expr *Op, OpenMPClauseKind CKind,

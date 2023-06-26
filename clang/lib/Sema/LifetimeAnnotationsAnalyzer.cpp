@@ -1,4 +1,4 @@
-#include "clang/Sema/LifetimeAnnotationsChecker.h"
+#include "clang/Sema/LifetimeAnnotationsAnalyzer.h"
 
 #include <iostream>
 
@@ -41,29 +41,22 @@ void GetExprObjectSet(const clang::Expr *expr,
 }
 
 // Process functions' headers
-void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
+void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func,
                                               Sema &S) {
   debugImportant("ANALYZING FUNCTION", func->getNameAsString());
   func = func->getCanonicalDecl();
 
-  if (!func->isDefined()) {
-    // DEBUG
-    // debugLifetimes("Function is not defined");
-    // func->dump();
-    // TODO error?
-  }
-
-  // TODO ellision
-
   // Following Case 2. Not part of a cycle.
   // AnalyzeSingleFunction()
-  FunctionLifetimeFactory function_lifetime_factory(
-      /* elision_enabled, */ func);
+  FunctionLifetimeFactory function_lifetime_factory(func);
 
   llvm::Expected<FunctionLifetimes> expected_func_lifetimes =
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
-  if (expected_func_lifetimes) {
+  if (!expected_func_lifetimes) {
+    // TODO
+    return;
+  }
     FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
     if (func_lifetimes.IsReturnLifetimeLocal()) {
       S.Diag(func->getLocation(), diag::warn_func_return_lifetime_local)
@@ -74,24 +67,10 @@ void LifetimeAnnotationsChecker::GetLifetimes(const FunctionDecl *func,
     // debugLifetimes(func_lifetimes.DebugString());
     func_lifetimes.ProcessParams();
     FunctionInfo[func] = func_lifetimes;
-    // TODO maybe keep track of analyzed functions
-    // TODO need to check if the lifetimes in the declaration and definition are
-    // the same?
-  } else {
-    // TODO error
-    /* return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          llvm::toString(func_lifetimes.takeError())
-          // TODO abseil
-          // absl::StrCat("Lifetime elision not enabled for '",
-          //              func->getNameAsString(), "'")
-      ); */
-    return;
-  }
 }
 
 // Process functions' bodies
-void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
+void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(const FunctionDecl *func,
                                                      Sema &S) {
   auto function_info = FunctionInfo[func];
   State = LifetimeAnnotationsAnalysis(function_info);
@@ -105,24 +84,24 @@ void LifetimeAnnotationsChecker::AnalyzeFunctionBody(const FunctionDecl *func,
 
   // step 2
   debugInfo("\n====== START STEP 2 - " + func_name + " ======\n");
-  LifetimeAnnotationsChecker::PropagateLifetimes();
+  LifetimeAnnotationsAnalyzer::PropagateLifetimes();
   debugInfo("\n====== FINISH STEP 2 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 
   // step 3
   debugInfo("\n====== START STEP 3 - " + func_name + " ======\n");
-  LifetimeAnnotationsChecker::CheckLifetimes(func, S);
+  LifetimeAnnotationsAnalyzer::CheckLifetimes(func, S);
   debugInfo("\n====== FINISH STEP 3 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 }
 
-void LifetimeAnnotationsChecker::GetLifetimeDependencies(
+void LifetimeAnnotationsAnalyzer::GetLifetimeDependencies(
     const clang::FunctionDecl *func) {
   LifetimesPropagationVisitor visitor(func, State, FunctionInfo);
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
 
-void LifetimeAnnotationsChecker::PropagateLifetimes() {
+void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
   auto children = State.GetLifetimeDependencies();
   auto new_children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
@@ -222,7 +201,7 @@ void LifetimeAnnotationsChecker::PropagateLifetimes() {
 
 // With all the lifetime information acquired, check that the return
 // statements and the attributions are correct
-void LifetimeAnnotationsChecker::CheckLifetimes(const clang::FunctionDecl *func,
+void LifetimeAnnotationsAnalyzer::CheckLifetimes(const clang::FunctionDecl *func,
                                                 Sema &S) {
   LifetimesCheckerVisitor visitor(func, State, S, FunctionInfo);
   std::optional<std::string> err = visitor.Visit(func->getBody());

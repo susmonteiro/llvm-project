@@ -1,5 +1,5 @@
-#ifndef LIFETIME_ANNOTATIONS_CHECKER_H_
-#define LIFETIME_ANNOTATIONS_CHECKER_H_
+#ifndef LIFETIME_ANNOTATIONS_ANALYZER_H_
+#define LIFETIME_ANNOTATIONS_ANALYZER_H_
 
 #include <iostream>
 #include <string>
@@ -19,7 +19,7 @@
 
 namespace clang {
 
-class LifetimeAnnotationsChecker {
+class LifetimeAnnotationsAnalyzer {
  public:
   void GetLifetimes(const FunctionDecl *func, Sema &S);
   void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
@@ -29,7 +29,7 @@ class LifetimeAnnotationsChecker {
 
   std::string DebugString() {
     std::string res;
-    res += "[LifetimeAnnotationsChecker]: Functions Information\n";
+    res += "[LifetimeAnnotationsAnalyzer]: Functions Information\n";
     for (auto &pair : FunctionInfo) {
       res += "Function " + pair.first->getNameAsString() + '\n' +
              pair.second.DebugString() + "\n\n============\n\n";

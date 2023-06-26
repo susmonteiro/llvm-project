@@ -245,7 +245,7 @@ Sema::Sema(Preprocessor &pp, ASTContext &ctxt, ASTConsumer &consumer,
 
   // Initialization of data sharing attributes stack for OpenMP
   InitDataSharingAttributesStack();
-  InitLifetimeAnnotationsChecker();
+  InitLifetimeAnnotationsAnalyzer();
 
   std::unique_ptr<sema::SemaPPCallbacks> Callbacks =
       std::make_unique<sema::SemaPPCallbacks>();
@@ -496,7 +496,7 @@ Sema::~Sema() {
   DestroyDataSharingAttributesStack();
 
   // Destroys lifetime annotations checker
-  DestroyLifetimeAnnotationsChecker();
+  DestroyLifetimeAnnotationsAnalyzer();
 
   // Detach from the PP callback handler which outlives Sema since it's owned
   // by the preprocessor.

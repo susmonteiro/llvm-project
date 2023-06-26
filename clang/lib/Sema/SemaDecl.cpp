@@ -9646,8 +9646,8 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
 
     if (!Diags.isIgnored(diag::print_lifetime_annotations,
                              NewFD->getLocation())) {
-      if (LAChecker) {
-        LAChecker->GetLifetimes(NewFD, *this);
+      if (LAAnalyzer) {
+        LAAnalyzer->GetLifetimes(NewFD, *this);
       }
     }
 
@@ -15497,7 +15497,7 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
 
       if (!Diags.isIgnored(diag::print_lifetime_annotations,
                              FD->getLocation())) {
-        LAChecker->AnalyzeFunctionBody(FD, *this);
+        LAAnalyzer->AnalyzeFunctionBody(FD, *this);
       }
 
 
@@ -20016,11 +20016,11 @@ bool Sema::shouldIgnoreInHostDeviceCheck(FunctionDecl *Callee) {
          IdentifyCUDATarget(Callee) == CFT_Global;
 }
 
-void Sema::InitLifetimeAnnotationsChecker() {
-  LAChecker = new LifetimeAnnotationsChecker();
+void Sema::InitLifetimeAnnotationsAnalyzer() {
+  LAAnalyzer = new LifetimeAnnotationsAnalyzer();
 }
 
 
-void Sema::DestroyLifetimeAnnotationsChecker() {
-  delete LAChecker;
+void Sema::DestroyLifetimeAnnotationsAnalyzer() {
+  delete LAAnalyzer;
 }

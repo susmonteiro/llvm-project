@@ -24,7 +24,7 @@ add_clang_library(clangSema
   JumpDiagnostics.cpp
   Lifetime.cpp
   LifetimeAnnotationsAnalysis.cpp
-  LifetimeAnnotationsChecker.cpp
+  LifetimeAnnotationsAnalyzer.cpp
   LifetimesCheckerVisitor.cpp
   LifetimesPropagationVisitor.cpp
   MultiplexExternalSemaSource.cpp
