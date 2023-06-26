@@ -434,11 +434,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     unsigned int num_indirections = params_info_vec.size();
 
     while (num_indirections-- > 0) {
-      debugLifetimes("Indirection level ", num_indirections);
       llvm::SmallVector<llvm::SmallVector<ParamInfo>> param_lifetimes;
 
       // get lifetimes for the current indirection level
-      debugLifetimes("Get lifetimes for current indirection level");
       for (const auto &param_info : params_set) {
         if (param_info.type.isNull()) continue;
         clang::QualType param_type = param_info.type->getPointeeType();
@@ -453,7 +451,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of higher indirections
-      debugLifetimes("Lifetimes of higher indirections");
       for (const auto &params : param_lifetimes) {
         if (params.size() < 2) continue;
 
@@ -487,7 +484,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of current indirection level
-      debugLifetimes("Lifetimes of current level");
       if (!param_lifetimes.empty()) {
         for (const auto &param_info : params_info_vec[num_indirections]) {
           Lifetime &current_lifetime =
@@ -523,14 +519,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // insert params for the next indirection level
-      debugLifetimes("Insert params for the next indirection level");
       for (const auto &param_info : params_info_vec[num_indirections]) {
         assert(param_info.index < params_set.size());
         params_set[param_info.index] = param_info;
       }
 
       // check static params
-      debugLifetimes("Check static params");
       for (const auto &param_info : params_set) {
         if (param_info.type.isNull()) continue;
         Lifetime &param_lifetime =
