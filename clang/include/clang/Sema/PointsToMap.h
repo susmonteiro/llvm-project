@@ -50,19 +50,6 @@ class PointsToMap {
   std::string DebugString() const;
   size_t size() const { return ExprPointsTo.size(); }
 
-  // TODO
-  //   const llvm::DenseMap<const Object*, ObjectSet>& PointerPointsTos() const
-  //   {
-  //     return pointer_points_tos_;
-  //   }
-
-  // Returns a `PointsToMap` containing the union of mappings from this map and
-  // `other`.
-  // If both this map and `other` associate a points-to set with the same
-  // entity, the returned map associates that entity with the union of the
-  // corresponding points-to sets.
-  PointsToMap Union(const PointsToMap& other) const;
-
   llvm::SmallSet<const clang::Expr*, 2> GetExprPointsTo(const clang::Expr* expr) {
     return ExprPointsTo[expr];
   }
@@ -76,7 +63,6 @@ class PointsToMap {
     ExprPointsTo[parent].insert(child);
     const auto child_points_to = ExprPointsTo[child];
     // propagate points-to
-    // ? check if null?
     ExprPointsTo[parent].insert(child_points_to.begin(), child_points_to.end());
   }
 

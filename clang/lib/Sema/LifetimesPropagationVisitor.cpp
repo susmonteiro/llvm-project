@@ -290,7 +290,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
     return std::nullopt;
   }
 
-  if (decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType()) return std::nullopt;
+  if (decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType())
+    return std::nullopt;
   PointsTo.InsertExprLifetimes(decl_ref, nullptr);
 
   // TODO
@@ -339,6 +340,16 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
     if (child == nullptr) continue;
     Visit(const_cast<clang::Stmt *>(child));
   }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
+    const clang::MemberExpr *member_expr) {
+  if (debugEnabled) debugLifetimes("[VisitMemberExpr]");
+
+  const clang::Expr *base = member_expr->getBase();
+  Visit(const_cast<clang::Expr *>(base));
+  PointsTo.InsertExprLifetimes(member_expr, base);
   return std::nullopt;
 }
 

@@ -38,6 +38,7 @@ class LifetimesPropagationVisitor
       const clang::DeclRefExpr *decl_ref);
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
+  std::optional<std::string> VisitMemberExpr(const clang::MemberExpr *member_expr);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
