@@ -7,6 +7,7 @@
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/LifetimeAnnotationsAnalysis.h"
+#include "clang/Sema/LifetimeAnnotationsAnalyzer.h"
 #include "clang/Sema/PointsToMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Error.h"
@@ -18,11 +19,11 @@ class LifetimesPropagationVisitor
                                 std::optional<std::string>> {
  public:
   LifetimesPropagationVisitor(
-      const clang::FunctionDecl *func, LifetimeAnnotationsAnalysis &state,
-      llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &func_info)
+      const clang::FunctionDecl *func, LifetimeAnnotationsAnalyzer *analyzer,
+      LifetimeAnnotationsAnalysis &state)
       : Func(func),
+        Analyzer(analyzer),
         State(state),
-        FuncInfo(func_info),
         PointsTo(state.GetPointsTo()),
         Factory(func) {}
 
@@ -46,8 +47,8 @@ class LifetimesPropagationVisitor
 
  private:
   const clang::FunctionDecl *Func;
+  LifetimeAnnotationsAnalyzer *Analyzer;
   LifetimeAnnotationsAnalysis &State;
-  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &FuncInfo;
   PointsToMap &PointsTo;
   FunctionLifetimeFactory Factory;
   bool debugEnabled = true;  // TODO delete this

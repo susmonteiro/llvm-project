@@ -18,31 +18,8 @@
 
 namespace clang {
 
-// TODO change to not void
-void GetExprObjectSet(const clang::Expr *expr,
-                      LifetimeAnnotationsAnalysis *state) {
-  // We can't handle `ParenExpr`s like other `Expr`s because the CFG doesn't
-  // contain `CFGStmt`s for them. Instead, if we encounter a `ParenExpr` here,
-  // we simply return the object set for its subexpression.
-  expr = expr->IgnoreParens();
-
-  assert(expr->isGLValue() || expr->getType()->isPointerType() ||
-         expr->getType()->isArrayType() || expr->getType()->isFunctionType() ||
-         expr->getType()->isBuiltinType());
-
-  // TODO implement this better
-
-  // const auto &variable_lifetimes = state->GetVariableLifetimes();
-  // auto iter = variable_lifetimes.find(expr);
-  // if (iter == variable_lifetimes.end()) {
-  //   // TODO error?
-  // }
-  // return iter->second();
-}
-
 // Process functions' headers
-void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func,
-                                              Sema &S) {
+void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
   debugImportant("ANALYZING FUNCTION", func->getNameAsString());
   func = func->getCanonicalDecl();
 
@@ -70,8 +47,7 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func,
 }
 
 // Process functions' bodies
-void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(const FunctionDecl *func,
-                                                     Sema &S) {
+void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(const FunctionDecl *func) {
   auto function_info = FunctionInfo[func];
   State = LifetimeAnnotationsAnalysis(function_info);
   std::string func_name = func->getNameAsString();
@@ -90,14 +66,14 @@ void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(const FunctionDecl *func,
 
   // step 3
   debugInfo("\n====== START STEP 3 - " + func_name + " ======\n");
-  LifetimeAnnotationsAnalyzer::CheckLifetimes(func, S);
+  LifetimeAnnotationsAnalyzer::CheckLifetimes(func);
   debugInfo("\n====== FINISH STEP 3 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 }
 
 void LifetimeAnnotationsAnalyzer::GetLifetimeDependencies(
     const clang::FunctionDecl *func) {
-  LifetimesPropagationVisitor visitor(func, State, FunctionInfo);
+  LifetimesPropagationVisitor visitor(func, this, State);
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
 
@@ -201,8 +177,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
 
 // With all the lifetime information acquired, check that the return
 // statements and the attributions are correct
-void LifetimeAnnotationsAnalyzer::CheckLifetimes(const clang::FunctionDecl *func,
-                                                Sema &S) {
+void LifetimeAnnotationsAnalyzer::CheckLifetimes(const clang::FunctionDecl *func) {
   LifetimesCheckerVisitor visitor(func, State, S, FunctionInfo);
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }

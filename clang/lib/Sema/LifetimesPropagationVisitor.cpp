@@ -109,15 +109,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
     clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
+    auto &all_func_info = Analyzer->GetFunctionInfo();
 
-    auto it = FuncInfo.find(direct_callee);
-    if (it == FuncInfo.end()) {
-      // TODO error
-      debugWarn("Did not find function in FuncInfo");
-      return std::nullopt;
+    auto it = all_func_info.find(direct_callee);
+    if (it == all_func_info.end()) {
+      Analyzer->GetLifetimes(direct_callee);
     }
 
-    auto &func_info = FuncInfo[direct_callee];
+    auto &func_info = all_func_info[direct_callee];
 
     // ignore if return type does not have a Lifetime
     if (!func_type->isPointerType() && !func_type->isReferenceType()) {
@@ -291,7 +290,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
     return std::nullopt;
   }
 
-  assert(decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType());
+  if (decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType()) return std::nullopt;
   PointsTo.InsertExprLifetimes(decl_ref, nullptr);
 
   // TODO

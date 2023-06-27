@@ -21,11 +21,16 @@ namespace clang {
 
 class LifetimeAnnotationsAnalyzer {
  public:
-  void GetLifetimes(const FunctionDecl *func, Sema &S);
-  void AnalyzeFunctionBody(const clang::FunctionDecl *func, Sema &S);
+  LifetimeAnnotationsAnalyzer(Sema &s) : S(s) {}
+  void GetLifetimes(const FunctionDecl *func);
+  void AnalyzeFunctionBody(const clang::FunctionDecl *func);
   void GetLifetimeDependencies(const clang::FunctionDecl *func);
   void PropagateLifetimes();
-  void CheckLifetimes(const clang::FunctionDecl *func, Sema &S);
+  void CheckLifetimes(const clang::FunctionDecl *func);
+
+  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &GetFunctionInfo() {
+    return FunctionInfo;
+  }
 
   std::string DebugString() {
     std::string res;
@@ -39,6 +44,7 @@ class LifetimeAnnotationsAnalyzer {
 
  private:
   llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> FunctionInfo;
+  Sema &S;
   LifetimeAnnotationsAnalysis State;
 };
 

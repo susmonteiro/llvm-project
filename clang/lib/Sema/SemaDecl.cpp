@@ -9644,12 +9644,12 @@ Sema::ActOnFunctionDeclarator(Scope *S, Declarator &D, DeclContext *DC,
                                               isVirtualOkay);
   if (!NewFD) return nullptr;
 
-    if (!Diags.isIgnored(diag::print_lifetime_annotations,
-                             NewFD->getLocation())) {
-      if (LAAnalyzer) {
-        LAAnalyzer->GetLifetimes(NewFD, *this);
-      }
+  if (!Diags.isIgnored(diag::print_lifetime_annotations,
+                            NewFD->getLocation())) {
+    if (LAAnalyzer) {
+      LAAnalyzer->GetLifetimes(NewFD);
     }
+  }
 
   if (OriginalLexicalContext && OriginalLexicalContext->isObjCContainer())
     NewFD->setTopLevelDeclInObjCContainer();
@@ -15497,7 +15497,7 @@ Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
 
       if (!Diags.isIgnored(diag::print_lifetime_annotations,
                              FD->getLocation())) {
-        LAAnalyzer->AnalyzeFunctionBody(FD, *this);
+        LAAnalyzer->AnalyzeFunctionBody(FD);
       }
 
 
@@ -20017,7 +20017,7 @@ bool Sema::shouldIgnoreInHostDeviceCheck(FunctionDecl *Callee) {
 }
 
 void Sema::InitLifetimeAnnotationsAnalyzer() {
-  LAAnalyzer = new LifetimeAnnotationsAnalyzer();
+  LAAnalyzer = new LifetimeAnnotationsAnalyzer(*this);
 }
 
 
