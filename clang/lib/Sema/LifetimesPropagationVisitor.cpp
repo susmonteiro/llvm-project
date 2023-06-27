@@ -3,14 +3,15 @@
 namespace clang {
 
 void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
-                      clang::QualType lhs_type, const clang::Stmt *loc,
+                      clang::QualType lhs_type, clang::QualType rhs_type, const clang::Stmt *loc,
                       LifetimeAnnotationsAnalysis &state) {
   if (clang::isa<clang::DeclRefExpr>(expr)) {
     const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
     if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
             rhs_ref_decl->getDecl()->getCanonicalDecl())) {
-              // TODO change to rhs_type
-      state.CreateDependency(lhs, lhs_type, rhs_var_decl, lhs_type, loc);
+      // TODO change to rhs_type
+      state.CreateDependency(lhs, lhs_type, rhs_var_decl,
+                             rhs_type, loc);
     }
   }
 }
@@ -20,10 +21,11 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  PointsToMap &PointsTo, LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("\t[TransferRHS]");
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
-  CreateDependency(rhs, lhs, lhs_type, loc, state);
+  clang::QualType rhs_type = rhs->getType().getCanonicalType();
+  CreateDependency(rhs, lhs, lhs_type, rhs_type, loc, state);
   for (const auto &expr : points_to) {
     if (expr != nullptr) {
-      CreateDependency(expr, lhs, lhs_type, loc, state);
+      CreateDependency(expr, lhs, lhs_type, rhs_type, loc, state);
     }
   }
 }
@@ -48,12 +50,17 @@ ObjectLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
 void LifetimesPropagationVisitor::PropagateBinAssign(
     const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
     const clang::BinaryOperator *op) const {
+  PropagateBinAssign(lhs, rhs, expr, op, lhs->getType());
+}
+void LifetimesPropagationVisitor::PropagateBinAssign(
+    const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
+    const clang::BinaryOperator *op, clang::QualType type) const {
   if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) return;
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
   if (const auto *lhs_var_decl =
           dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-    TransferRHS(lhs_var_decl, rhs, lhs->getType().getCanonicalType(), op,
-                PointsTo, State);
+    type = type.getCanonicalType();
+    TransferRHS(lhs_var_decl, rhs, type, op, PointsTo, State);
   }
 }
 
@@ -93,11 +100,18 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
 
   if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
     PropagateBinAssign(lhs, rhs, lhs_decl_ref_expr, op);
+  } else if (const auto *member_expr = dyn_cast<clang::MemberExpr>(lhs)) {
+    const auto *base = member_expr->getBase()->IgnoreParens();
+    const auto &base_points_to = PointsTo.GetExprPointsTo(base);
+    for (const auto &expr : base_points_to) {
+      PropagateBinAssign(lhs, rhs, expr, op, base->getType());
+    }
+  } else {
+    for (const auto &expr : lhs_points_to) {
+      PropagateBinAssign(lhs, rhs, expr, op);
+    }
   }
 
-  for (const auto &expr : lhs_points_to) {
-    PropagateBinAssign(lhs, rhs, expr, op);
-  }
   return std::nullopt;
 }
 

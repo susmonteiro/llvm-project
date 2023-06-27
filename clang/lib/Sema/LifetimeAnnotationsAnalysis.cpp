@@ -62,32 +62,13 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
                                                    const clang::VarDecl *to,
                                                    clang::QualType to_type,
                                                    const clang::Stmt *loc) {
-  // TODO implement
-  // clang::QualType type = to->getType().getCanonicalType();
-  // // TODO necessary?
-  // if (type->isArrayType()) {
-  //   type = type->castAsArrayTypeUnsafe()->getElementType();
-  // }
-
-  // if (type->isRecordType()) {
-  //   // TODO implement
-  //   return;
-  // }
-
-  // if (type->isPointerType() || type->isReferenceType() ||
-  //     type->isStructureOrClassType()) {
-  //   // TODO implement
-  // }
-  // if (from != to) { }
-
-  // TODO
-
   if (IsLifetimeNotset(from, from_type)) {
     CreateLifetimeDependency(from, from_type, loc, to_type);
     CreateStmtDependency(loc, to);
   }
 
   from_type = from_type->getPointeeType();
+  to_type = to_type->getPointeeType();
 
   while (from_type->isPointerType() || from_type->isReferenceType()) {
     if (IsLifetimeNotset(from, from_type)) {
@@ -95,10 +76,12 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
       CreateStmtDependency(loc, to);
     }
     if (IsLifetimeNotset(to, from_type)) {
-      CreateLifetimeDependency(to, from_type, loc, to_type);
+      // TODO check if it should be the other way around
+      CreateLifetimeDependency(to, to_type, loc, from_type);
       CreateStmtDependency(loc, from);
     }
     from_type = from_type->getPointeeType();
+    to_type = to_type->getPointeeType();
   }
 }
 

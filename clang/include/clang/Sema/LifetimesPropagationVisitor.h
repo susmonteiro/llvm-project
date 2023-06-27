@@ -18,9 +18,9 @@ class LifetimesPropagationVisitor
     : public clang::StmtVisitor<LifetimesPropagationVisitor,
                                 std::optional<std::string>> {
  public:
-  LifetimesPropagationVisitor(
-      const clang::FunctionDecl *func, LifetimeAnnotationsAnalyzer *analyzer,
-      LifetimeAnnotationsAnalysis &state)
+  LifetimesPropagationVisitor(const clang::FunctionDecl *func,
+                              LifetimeAnnotationsAnalyzer *analyzer,
+                              LifetimeAnnotationsAnalysis &state)
       : Func(func),
         Analyzer(analyzer),
         State(state),
@@ -38,13 +38,19 @@ class LifetimesPropagationVisitor
       const clang::DeclRefExpr *decl_ref);
   std::optional<std::string> VisitDeclStmt(const clang::DeclStmt *decl_stmt);
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
-  std::optional<std::string> VisitMemberExpr(const clang::MemberExpr *member_expr);
+  std::optional<std::string> VisitMemberExpr(
+      const clang::MemberExpr *member_expr);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
   void PropagateBinAssign(const clang::Expr *lhs, const clang::Expr *rhs,
                           const clang::Expr *expr,
                           const clang::BinaryOperator *op) const;
+
+  void PropagateBinAssign(const clang::Expr *lhs, const clang::Expr *rhs,
+                          const clang::Expr *expr,
+                          const clang::BinaryOperator *op,
+                          clang::QualType type) const;
 
  private:
   const clang::FunctionDecl *Func;
