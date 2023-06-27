@@ -25,6 +25,7 @@ using StmtVarDependenciesMap =
 struct VarTypeStruct {
   const clang::VarDecl *var_decl;
   clang::QualType lhs_type;
+  clang::QualType rhs_type;
 };
 
 using VarStmtDependenciesMap =
@@ -86,12 +87,13 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateLifetimeDependency(const clang::VarDecl *from,
                                 clang::QualType from_type,
-                                const clang::Stmt *to);
+                                const clang::Stmt *to, clang::QualType to_type);
 
   void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
 
   void CreateDependency(const clang::VarDecl *from, clang::QualType from_type,
-                        const clang::VarDecl *to, const clang::Stmt *loc);
+                        const clang::VarDecl *to, clang::QualType to_type,
+                        const clang::Stmt *loc);
 
   void SetDependencies(VarStmtDependenciesMap dependencies) {
     LifetimeDependencies = std::move(dependencies);
@@ -115,7 +117,6 @@ class LifetimeAnnotationsAnalysis {
   StmtVarDependenciesMap StmtDependencies;
   PointsToMap PointsTo;
   ObjectLifetimes ReturnLifetime;
-
 };
 }  // namespace clang
 
@@ -123,23 +124,25 @@ namespace llvm {
 template <>
 struct DenseMapInfo<clang::VarTypeStruct> {
   static inline clang::VarTypeStruct getEmptyKey() {
-    return clang::VarTypeStruct{nullptr, clang::QualType()};
+    return clang::VarTypeStruct{nullptr, clang::QualType(), clang::QualType()};
   }
 
   static inline clang::VarTypeStruct getTombstoneKey() {
     return clang::VarTypeStruct{reinterpret_cast<clang::VarDecl *>(-1),
-                                clang::QualType()};
+                                clang::QualType(), clang::QualType()};
   }
 
   static unsigned getHashValue(const clang::VarTypeStruct &pair) {
     return llvm::hash_combine(
         llvm::DenseMapInfo<const clang::VarDecl *>::getHashValue(pair.var_decl),
-        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.lhs_type));
+        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.lhs_type),
+        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.rhs_type));
   }
 
   static bool isEqual(const clang::VarTypeStruct &lhs,
                       const clang::VarTypeStruct &rhs) {
-    return lhs.var_decl == rhs.var_decl && lhs.lhs_type == rhs.lhs_type;
+    return lhs.var_decl == rhs.var_decl && lhs.lhs_type == rhs.lhs_type &&
+           lhs.rhs_type == rhs.rhs_type;
   }
 };
 }  // namespace llvm

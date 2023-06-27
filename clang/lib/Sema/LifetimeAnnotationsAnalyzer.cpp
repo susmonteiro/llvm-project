@@ -111,9 +111,10 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     worklist.pop_back();
 
     auto *current_var = el.var_decl;
-    auto current_type = el.lhs_type;
+    auto lhs_current_type = el.lhs_type;
+    auto rhs_current_type = el.rhs_type;
     // DEBUG
-    debugLifetimes("\nPropagation of", current_type.getAsString() + ' ' +
+    debugLifetimes("\nPropagation of", lhs_current_type.getAsString() + ' ' +
                                            current_var->getNameAsString());
 
     // each entry of the vector corresponds to a lifetime char
@@ -128,7 +129,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
       for (const auto &var_decl : stmt_dependencies[stmt]) {
         if (var_decl == current_var) continue;
         Lifetime &rhs_lifetime =
-            State.GetLifetimeOrLocal(var_decl, current_type);
+            State.GetLifetimeOrLocal(var_decl, lhs_current_type);
 
         // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
@@ -151,11 +152,11 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     // debugLifetimes("New shortest lifetimes", possible_lifetimes.size());
     // TODO this is not perfect
     if (new_children[el] != stmts ||
-        State.GetPossibleLifetimes(current_var, current_type) !=
+        State.GetPossibleLifetimes(current_var, lhs_current_type) !=
             possible_lifetimes) {
       new_children[el].insert(stmts.begin(), stmts.end());
       State.PropagatePossibleLifetimes(current_var, possible_lifetimes,
-                                       current_type);
+                                       lhs_current_type);
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);
       }

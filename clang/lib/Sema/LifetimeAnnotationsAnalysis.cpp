@@ -35,9 +35,6 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
     const clang::VarDecl *var_decl, clang::QualType type) {
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
-    // TODO error
-    // DEBUG
-    // debugWarn("Lifetime not found in VariableLifetimes");
     CreateVariable(var_decl, Lifetime(LOCAL, type));
   }
   return VariableLifetimes[var_decl].GetLifetimeOrLocal(type);
@@ -63,6 +60,7 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
 void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
                                                    clang::QualType from_type,
                                                    const clang::VarDecl *to,
+                                                   clang::QualType to_type,
                                                    const clang::Stmt *loc) {
   // TODO implement
   // clang::QualType type = to->getType().getCanonicalType();
@@ -85,7 +83,7 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
   // TODO
 
   if (IsLifetimeNotset(from, from_type)) {
-    CreateLifetimeDependency(from, from_type, loc);
+    CreateLifetimeDependency(from, from_type, loc, to_type);
     CreateStmtDependency(loc, to);
   }
 
@@ -93,11 +91,11 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
 
   while (from_type->isPointerType() || from_type->isReferenceType()) {
     if (IsLifetimeNotset(from, from_type)) {
-      CreateLifetimeDependency(from, from_type, loc);
+      CreateLifetimeDependency(from, from_type, loc, to_type);
       CreateStmtDependency(loc, to);
     }
     if (IsLifetimeNotset(to, from_type)) {
-      CreateLifetimeDependency(to, from_type, loc);
+      CreateLifetimeDependency(to, from_type, loc, to_type);
       CreateStmtDependency(loc, from);
     }
     from_type = from_type->getPointeeType();
@@ -114,8 +112,8 @@ StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
 
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
     const clang::VarDecl *from, clang::QualType from_type,
-    const clang::Stmt *to) {
-  LifetimeDependencies[VarTypeStruct{from, from_type}].insert(to);
+    const clang::Stmt *to, clang::QualType to_type) {
+  LifetimeDependencies[VarTypeStruct{from, from_type, to_type}].insert(to);
 }
 
 void LifetimeAnnotationsAnalysis::CreateStmtDependency(
@@ -125,14 +123,14 @@ void LifetimeAnnotationsAnalysis::CreateStmtDependency(
 
 llvm::DenseMap<VarTypeStruct, llvm::DenseSet<VarTypeStruct>>
 LifetimeAnnotationsAnalysis::TransposeDependencies() {
-  llvm::DenseMap<VarTypeStruct, llvm::DenseSet<VarTypeStruct>>
-      result;
+  llvm::DenseMap<VarTypeStruct, llvm::DenseSet<VarTypeStruct>> result;
   for (const auto &info : LifetimeDependencies) {
     clang::QualType lhs_type = info.first.lhs_type;
+    clang::QualType rhs_type = info.first.rhs_type;
     for (const auto &stmt : info.second) {
       for (const auto &child : StmtDependencies[stmt]) {
         if (IsLifetimeNotset(child, lhs_type) && info.first.var_decl != child)
-          result[VarTypeStruct{child, lhs_type}].insert(info.first);
+          result[VarTypeStruct{child, lhs_type, rhs_type}].insert(info.first);
       }
     }
   }

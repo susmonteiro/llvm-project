@@ -9,7 +9,8 @@ void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
     const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
     if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
             rhs_ref_decl->getDecl()->getCanonicalDecl())) {
-      state.CreateDependency(lhs, lhs_type, rhs_var_decl, loc);
+              // TODO change to rhs_type
+      state.CreateDependency(lhs, lhs_type, rhs_var_decl, lhs_type, loc);
     }
   }
 }
