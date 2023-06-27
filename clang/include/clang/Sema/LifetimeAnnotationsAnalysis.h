@@ -22,32 +22,13 @@ using VariableLifetimesVector =
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>;
 
-using VarTypePair = std::pair<const clang::VarDecl *, clang::QualType>;
-
-struct VarTypePairInfo {
-  static inline VarTypePair getEmptyKey() {
-    return std::make_pair(nullptr, clang::QualType());
-  }
-
-  static inline VarTypePair getTombstoneKey() {
-    return std::make_pair(reinterpret_cast<clang::VarDecl *>(-1),
-                          clang::QualType());
-  }
-
-  static unsigned getHashValue(const VarTypePair &pair) {
-    return llvm::hash_combine(
-        llvm::DenseMapInfo<const clang::VarDecl *>::getHashValue(pair.first),
-        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.second));
-  }
-
-  static bool isEqual(const VarTypePair &lhs, const VarTypePair &rhs) {
-    return lhs.first == rhs.first && lhs.second == rhs.second;
-  }
+struct VarTypeStruct {
+  const clang::VarDecl *var_decl;
+  clang::QualType lhs_type;
 };
 
 using VarStmtDependenciesMap =
-    llvm::DenseMap<VarTypePair, llvm::DenseSet<const clang::Stmt *>,
-                   VarTypePairInfo>;
+    llvm::DenseMap<VarTypeStruct, llvm::DenseSet<const clang::Stmt *>>;
 
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
@@ -118,22 +99,49 @@ class LifetimeAnnotationsAnalysis {
 
   void ProcessPossibleLifetimes();
 
-  llvm::DenseMap<VarTypePair, llvm::DenseSet<VarTypePair>, VarTypePairInfo>
+  llvm::DenseMap<VarTypeStruct, llvm::DenseSet<VarTypeStruct>>
   TransposeDependencies();
-  std::vector<VarTypePair> InitializeWorklist() const;
+  std::vector<VarTypeStruct> InitializeWorklist() const;
   std::string DebugString();
 
  private:
+  static VarTypeStruct InvalidEmpty();
+  static VarTypeStruct InvalidTombstone();
+
+  friend class llvm::DenseMapInfo<VarTypeStruct>;
+
   VariableLifetimesVector VariableLifetimes;
   VarStmtDependenciesMap LifetimeDependencies;
-  // ? can one stmt point to more than one var_decl?
   StmtVarDependenciesMap StmtDependencies;
   PointsToMap PointsTo;
   ObjectLifetimes ReturnLifetime;
 
-  // TODO this
-  // std::optional<ValueLifetimes> this_lifetimes_;
 };
 }  // namespace clang
+
+namespace llvm {
+template <>
+struct DenseMapInfo<clang::VarTypeStruct> {
+  static inline clang::VarTypeStruct getEmptyKey() {
+    return clang::VarTypeStruct{nullptr, clang::QualType()};
+  }
+
+  static inline clang::VarTypeStruct getTombstoneKey() {
+    return clang::VarTypeStruct{reinterpret_cast<clang::VarDecl *>(-1),
+                                clang::QualType()};
+  }
+
+  static unsigned getHashValue(const clang::VarTypeStruct &pair) {
+    return llvm::hash_combine(
+        llvm::DenseMapInfo<const clang::VarDecl *>::getHashValue(pair.var_decl),
+        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.lhs_type));
+  }
+
+  static bool isEqual(const clang::VarTypeStruct &lhs,
+                      const clang::VarTypeStruct &rhs) {
+    return lhs.var_decl == rhs.var_decl && lhs.lhs_type == rhs.lhs_type;
+  }
+};
+}  // namespace llvm
 
 #endif  // LIFETIME_ANNOTATIONS_ANALYSIS_H_

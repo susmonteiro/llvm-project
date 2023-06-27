@@ -34,20 +34,21 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
     // TODO
     return;
   }
-    FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
-    if (func_lifetimes.IsReturnLifetimeLocal()) {
-      S.Diag(func->getLocation(), diag::warn_func_return_lifetime_local)
-          << func->getSourceRange();
-    }
+  FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
+  if (func_lifetimes.IsReturnLifetimeLocal()) {
+    S.Diag(func->getLocation(), diag::warn_func_return_lifetime_local)
+        << func->getSourceRange();
+  }
 
-    // DEBUG
-    // debugLifetimes(func_lifetimes.DebugString());
-    func_lifetimes.ProcessParams();
-    FunctionInfo[func] = func_lifetimes;
+  // DEBUG
+  // debugLifetimes(func_lifetimes.DebugString());
+  func_lifetimes.ProcessParams();
+  FunctionInfo[func] = func_lifetimes;
 }
 
 // Process functions' bodies
-void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(const FunctionDecl *func) {
+void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(
+    const FunctionDecl *func) {
   auto function_info = FunctionInfo[func];
   State = LifetimeAnnotationsAnalysis(function_info);
   std::string func_name = func->getNameAsString();
@@ -86,7 +87,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
   // DEBUG
   debugLifetimes("=== dependencies_ ===");
   for (const auto &pair : children) {
-    debugLifetimes(pair.first.first, pair.first.second, pair.second,
+    debugLifetimes(pair.first.var_decl, pair.first.lhs_type, pair.second,
                    stmt_dependencies);
   }
 
@@ -109,8 +110,8 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     auto &el = worklist.back();
     worklist.pop_back();
 
-    auto *current_var = el.first;
-    auto current_type = el.second;
+    auto *current_var = el.var_decl;
+    auto current_type = el.lhs_type;
     // DEBUG
     debugLifetimes("\nPropagation of", current_type.getAsString() + ' ' +
                                            current_var->getNameAsString());
@@ -163,7 +164,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     // DEBUG
     debugLifetimes("=== children ===");
     for (const auto &pair : new_children) {
-      debugLifetimes(pair.first.first, pair.first.second, pair.second,
+      debugLifetimes(pair.first.var_decl, pair.first.lhs_type, pair.second,
                      stmt_dependencies);
     }
   }
@@ -177,7 +178,8 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
 
 // With all the lifetime information acquired, check that the return
 // statements and the attributions are correct
-void LifetimeAnnotationsAnalyzer::CheckLifetimes(const clang::FunctionDecl *func) {
+void LifetimeAnnotationsAnalyzer::CheckLifetimes(
+    const clang::FunctionDecl *func) {
   LifetimesCheckerVisitor visitor(func, State, S, FunctionInfo);
   std::optional<std::string> err = visitor.Visit(func->getBody());
 }
