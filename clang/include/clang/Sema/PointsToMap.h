@@ -63,48 +63,6 @@ class PointsToMap {
   // corresponding points-to sets.
   PointsToMap Union(const PointsToMap& other) const;
 
-  // Returns the points-to set associated with `pointer`, or an empty set if
-  // `pointer` is not associated with a points-to set.
-  // TODO
-  //   ObjectSet GetPointerPointsToSet(const Object* pointer) const;
-
-  // Associates `pointer` with the given points-to set.
-  // TODO
-  //   void SetPointerPointsToSet(const Object* pointer, ObjectSet points_to);
-
-  // Associates all `pointers` with the given points-to set.
-  // TODO
-  //   void SetPointerPointsToSet(const ObjectSet& pointers,
-  //                              const ObjectSet& points_to);
-
-  // Extends a single `pointer`'s points-to set with the given points-to set.
-  // TODO
-  //   void ExtendPointerPointsToSet(const Object* pointer,
-  //                                 const ObjectSet& points_to);
-
-  // Returns the union of the points-to sets associated with the given pointers,
-  // or an empty set if none of the pointers is associated with a points-to set.
-  // TODO
-  //   ObjectSet GetPointerPointsToSet(const ObjectSet& pointers) const;
-
-  // Returns the object set associated with `expr`.
-  // `expr` must previously have been associated with an object set through
-  // a call to SetExprObjectSet(), and the function asserts that this is the
-  // case. We intentionally don't return an empty object set in this case
-  // because we want to notice if we're not propagating object sets through
-  // expressions.
-  // TODO
-  //   ObjectSet GetExprObjectSet(const clang::Expr* expr) const;
-
-  // Associates `expr` with the given object set.
-  // TODO
-  //   void SetExprObjectSet(const clang::Expr* expr, ObjectSet objects);
-
-  // Returns all the pointers (not objects) with the given `lifetime`.
-  // TODO
-  //   std::vector<const Object*> GetAllPointersWithLifetime(
-  //       Lifetime lifetime) const;
-
   llvm::SmallSet<const clang::Expr*, 2> GetExprPointsTo(const clang::Expr* expr) {
     return ExprPointsTo[expr];
   }
@@ -123,13 +81,6 @@ class PointsToMap {
   }
 
  private:
-  // * objects to which each object points to
-  // TODO
-  //   llvm::DenseMap<const Object*, ObjectSet> pointer_points_tos_;
-  // * objects present in each expression
-  // TODO
-  //   llvm::DenseMap<const clang::Expr*, ObjectSet> expr_objects_;
-  // TODO 2?
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::Expr*, 2>>
       ExprPointsTo;
 };
