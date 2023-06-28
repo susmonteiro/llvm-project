@@ -86,9 +86,9 @@ class LifetimesCheckerVisitor
 
   void CompareAndCheck(const clang::VarDecl *lhs_var_decl,
                        clang::QualType lhs_type, const clang::Expr *expr,
-                       const clang::Expr *rhs, const clang::Stmt *stmt,
-                       const clang::BinaryOperator *op, bool return_lifetime,
-                       PrintNotesFactory factory) const;
+                       const clang::Expr *rhs, clang::QualType rhs_type,
+                       const clang::Stmt *stmt, const clang::BinaryOperator *op,
+                       bool return_lifetime, PrintNotesFactory factory) const;
 
   void PrintNotes(const clang::VarDecl *var_decl, Lifetime &lifetime,
                   unsigned int num_indirections) const;
