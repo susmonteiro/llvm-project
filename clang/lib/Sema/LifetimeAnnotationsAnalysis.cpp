@@ -157,7 +157,7 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
     for (const auto &stmt : pair.second) {
       for (const auto &var : StmtDependencies[stmt]) {
         if (pair.first.var_decl == var) continue;
-        str += var->getNameAsString() + ' ';
+        str += pair.first.rhs_type.getAsString() + ' ' + var->getNameAsString() + ' ';
       }
     }
     str += '\n';
