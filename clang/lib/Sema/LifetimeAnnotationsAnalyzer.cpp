@@ -82,7 +82,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
   auto children = State.GetLifetimeDependencies();
   auto new_children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
-  auto parents = State.TransposeDependencies();
+  auto parents = std::move(State.TransposeDependencies());
 
   // DEBUG
   debugLifetimes("=== dependencies_ ===");

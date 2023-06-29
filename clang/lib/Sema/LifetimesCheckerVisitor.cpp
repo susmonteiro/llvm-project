@@ -162,14 +162,15 @@ const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
 }
 
 void LifetimesCheckerVisitor::VerifyBinAssign(
-    clang::QualType lhs_type, const clang::Expr *rhs, const clang::Expr *expr,
+    clang::QualType lhs_type, clang::QualType base_type, const clang::Expr *rhs,
+    const clang::Expr *expr,
     const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
     const clang::BinaryOperator *op, PrintNotesFactory factory) const {
   if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) {
     return;
   }
   clang::QualType rhs_type = PointsTo.GetExprType(rhs);
-  rhs_type = rhs_type.isNull() ? rhs->getType().getCanonicalType() : rhs_type;
+  rhs_type = rhs_type.isNull() ? base_type : rhs_type;
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
   if (const auto *lhs_var_decl =
@@ -198,7 +199,9 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
     const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
     if (const auto *lhs_var_decl =
             dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-      clang::QualType lhs_type = lhs->getType().getCanonicalType();
+      clang::QualType lhs_type = PointsTo.GetExprType(lhs);
+      lhs_type =
+          lhs_type.isNull() ? lhs->getType().getCanonicalType() : lhs_type;
       Lifetime &lhs_lifetime = State.GetLifetime(lhs_var_decl, lhs_type);
       for (const auto &expr : rhs_points_to) {
         if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) continue;
@@ -208,12 +211,9 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
                 dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
           if (!lhs_type->isPointerType() && !lhs_type->isReferenceType())
             continue;
-          clang::QualType rhs_type;
-          if (const auto *member_expr = dyn_cast<clang::MemberExpr>(rhs)) {
-            rhs_type = member_expr->getBase()->getType().getCanonicalType();
-          } else {
-            rhs_type = lhs_type;
-          }
+          clang::QualType rhs_type = PointsTo.GetExprType(rhs);
+          rhs_type =
+              rhs_type.isNull() ? lhs->getType().getCanonicalType() : rhs_type;
           Lifetime &rhs_lifetime =
               State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
           unsigned int i = LOCAL - 1;
@@ -383,7 +383,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   // TODO remove this
-  if (lhs_points_to.empty()) {
+  if (lhs_points_to.empty() && !clang::isa<clang::DeclRefExpr>(lhs)) {
     debugWarn("LHS is not in PointsToMap");
     Visit(lhs);
     PointsTo.InsertExprLifetimes(op, lhs);
@@ -393,19 +393,20 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   const auto &rhs = op->getRHS()->IgnoreParens();
   const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   // TODO remove this
-  if (rhs_points_to.empty()) {
+  if (rhs_points_to.empty() && !clang::isa<clang::DeclRefExpr>(rhs)) {
     debugWarn("RHS is not in PointsToMap");
     Visit(rhs);
     PointsTo.InsertExprLifetimes(op, rhs);
     const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   }
 
+  clang::QualType base_type = lhs->getType().getCanonicalType();
   clang::QualType lhs_type = PointsTo.GetExprType(lhs);
-  lhs_type = lhs_type.isNull() ? lhs->getType().getCanonicalType() : lhs_type;
+  lhs_type = lhs_type.isNull() ? base_type : lhs_type;
 
   if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
-    VerifyBinAssign(lhs_type, rhs, lhs_decl_ref_expr, rhs_points_to, op,
-                    Factory.BinAssignFactory());
+    VerifyBinAssign(lhs_type, base_type, rhs, lhs_decl_ref_expr, rhs_points_to,
+                    op, Factory.BinAssignFactory());
   } else if (clang::isa<clang::UnaryOperator>(lhs)) {
     VerifyMaxLifetimes(lhs, rhs, op, lhs_points_to, rhs_points_to);
   }
@@ -413,7 +414,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   for (const auto &expr : lhs_points_to) {
     if (expr == nullptr) continue;
 
-    VerifyBinAssign(lhs_type, rhs, expr, rhs_points_to, op,
+    VerifyBinAssign(lhs_type, base_type, rhs, expr, rhs_points_to, op,
                     Factory.BinAssignFactory());
 
     if (clang::isa<clang::UnaryOperator>(expr)) {
@@ -430,11 +431,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
     auto it = FuncInfo.find(direct_callee);
-    if (it == FuncInfo.end()) {
-      // TODO error
-      debugWarn("Did not find function in FuncInfo");
-      return std::nullopt;
-    }
+    assert(it != FuncInfo.end());
 
     auto &func_info = it->second;
     const auto &params_info_vec = func_info.GetParamsInfo();
@@ -511,21 +508,16 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           const auto *current_arg_expr = call->getArg(param_info.index);
           const auto *current_arg = GetDeclFromArg(current_arg_expr);
           if (current_arg == nullptr) continue;
-          clang::QualType type = current_arg->getType().getCanonicalType();
-          clang::QualType arg_type;
-          if (const auto *member_expr =
-                  dyn_cast<clang::MemberExpr>(current_arg_expr)) {
-            arg_type = member_expr->getBase()->getType().getCanonicalType();
-          } else {
-            arg_type = type;
-          }
+          clang::QualType arg_type = PointsTo.GetExprType(current_arg_expr);
+          arg_type = arg_type.isNull() ? current_arg->getType().getCanonicalType() : arg_type;
+
           Lifetime &current_arg_lifetime =
-              State.GetLifetimeOrLocal(current_arg, type);
+              State.GetLifetimeOrLocal(current_arg, arg_type);
           for (const auto &other_param_info : filtered_params) {
             const auto *arg = call->getArg(other_param_info.index);
             const auto *arg_decl = GetDeclFromArg(arg);
             if (arg_decl == nullptr) continue;
-            Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, type);
+            Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, arg_type);
             if (current_arg_lifetime < arg_lifetime) {
               CallExprChecker(
                   call, direct_callee, current_arg, arg_decl,
@@ -611,25 +603,15 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
       const auto &init_points_to = PointsTo.GetExprPointsTo(init);
 
       // TODO remove this
-      if (init_points_to.empty()) {
+      if (init_points_to.empty() && !clang::isa<clang::DeclRefExpr>(init)) {
         debugWarn("Initializer is not in PointsToMap");
         return std::nullopt;
       }
 
-      clang::QualType init_type = init->getType().getCanonicalType();
-      if (const auto *member_expr = dyn_cast<clang::MemberExpr>(init)) {
-        init_type = member_expr->getBase()->getType().getCanonicalType();
-      }
-
+      clang::QualType init_type = PointsTo.GetExprType(init);
+      init_type = init_type.isNull() ? var_decl_type : init_type;
       CompareAndCheck(var_decl, var_decl_type, init, init, init_type, nullptr,
                       nullptr, false, Factory.DeclStmtFactory());
-
-      for (const auto &expr : init_points_to) {
-        if (const auto *member_expr = dyn_cast<clang::MemberExpr>(expr)) {
-          init_type = member_expr->getBase()->getType().getCanonicalType();
-          break;
-        }
-      }
 
       for (const auto &expr : init_points_to) {
         CompareAndCheck(var_decl, var_decl_type, expr, init, init_type, nullptr,
@@ -663,17 +645,19 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   const auto &return_value = return_stmt->getRetValue()->IgnoreParens();
 
   // TODO remove this
-  if (PointsTo.IsEmpty(return_value)) {
+  if (PointsTo.IsEmpty(return_value) && !clang::isa<clang::DeclRefExpr>(return_value)) {
     debugWarn("Return expr is not in PointsToMap");
     Visit(const_cast<clang::Expr *>(return_value));
   }
 
   CompareAndCheck(nullptr, return_type, return_value, return_value, return_type,
                   return_stmt, nullptr, true, Factory.ReturnStmtFactory());
+  clang::QualType return_value_type = PointsTo.GetExprType(return_value);
+  return_value_type = return_value_type.isNull() ? return_type : return_value_type;
 
   const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
   for (const auto &expr : return_expr) {
-    CompareAndCheck(nullptr, return_type, expr, return_value, return_type,
+    CompareAndCheck(nullptr, return_type, expr, return_value, return_value_type,
                     return_stmt, nullptr, true, Factory.ReturnStmtFactory());
   }
   return std::nullopt;
@@ -689,31 +673,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitStmt(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryAddrOf(
-    const clang::UnaryOperator *op) {
-  // TODO implement
-  if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
-  for (const auto &child : op->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-  }
-  return std::nullopt;
-}
-
-// TODO sometimes this is not being visited
-std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryDeref(
-    const clang::UnaryOperator *op) {
-  // TODO implement
-  if (debugEnabled) debugLifetimes("[VisitUnaryDeref]");
-  for (const auto &child : op->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-  }
-  return std::nullopt;
-}
-
-// TODO delete this
 std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryOperator(
     const clang::UnaryOperator *op) {
-  // TODO implement
   if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
