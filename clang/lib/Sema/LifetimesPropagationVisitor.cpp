@@ -72,6 +72,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
   Visit(const_cast<clang::Expr *>(expr->getIdx()));
   Visit(const_cast<clang::Expr *>(expr->getBase()));
   PointsTo.InsertExprLifetimes(expr, expr->getBase());
+  clang::QualType found_type = PointsTo.GetExprType(expr->getBase());
+  if (!found_type.isNull()) {
+    PointsTo.InsertExprType(expr, found_type);
+  }
   return std::nullopt;
 }
 
@@ -120,6 +124,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
     clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
+
     auto &all_func_info = Analyzer->GetFunctionInfo();
 
     auto it = all_func_info.find(direct_callee);
@@ -142,6 +147,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
         }
         const Expr *arg = call->getArg(i)->IgnoreParens();
         Visit(const_cast<clang::Expr *>(arg));
+        clang::QualType found_type = PointsTo.GetExprType(arg);
+        if (!found_type.isNull()) {
+          PointsTo.InsertExprType(arg, found_type);
+        }
       }
       return std::nullopt;
     }
@@ -158,9 +167,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       }
       const Expr *arg = call->getArg(i)->IgnoreParens();
       Visit(const_cast<clang::Expr *>(arg));
+      clang::QualType param_type = PointsTo.GetExprType(arg);
+      if (!param_type.isNull()) {
+        PointsTo.InsertExprType(arg, param_type);
+      } else {
+        param_type = param->getType().getCanonicalType();
+      }
 
       const auto &param_lifetime =
-          func_info.GetParamLifetime(param, param->getType());
+          func_info.GetParamLifetime(param, param_type);
 
       if (param_lifetime == return_lifetime) {
         PointsTo.InsertExprLifetimes(call, arg);

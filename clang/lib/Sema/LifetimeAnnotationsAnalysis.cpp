@@ -67,10 +67,16 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
     CreateStmtDependency(loc, to);
   }
 
+  if ((!from_type->isPointerType() && !from_type->isReferenceType()) ||
+      (!to_type->isPointerType() && !to_type->isReferenceType())) {
+    return;
+  }
+
   from_type = from_type->getPointeeType();
   to_type = to_type->getPointeeType();
 
-  while (from_type->isPointerType() || from_type->isReferenceType()) {
+  while ((from_type->isPointerType() || from_type->isReferenceType()) &&
+         (to_type->isPointerType() || to_type->isReferenceType())) {
     if (IsLifetimeNotset(from, from_type)) {
       CreateLifetimeDependency(from, from_type, loc, to_type);
       CreateStmtDependency(loc, to);
