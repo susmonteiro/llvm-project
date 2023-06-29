@@ -72,7 +72,8 @@ class LifetimesCheckerVisitor
       const clang::BinaryOperator *op, PrintNotesFactory factory) const;
 
   void VerifyMaxLifetimes(
-      const clang::Expr *lhs, const clang::BinaryOperator *op,
+      const clang::Expr *lhs, const clang::Expr *rhs,
+      const clang::BinaryOperator *op,
       const llvm::SmallSet<const clang::Expr *, 2U> &lhs_points_to,
       const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to) const;
 

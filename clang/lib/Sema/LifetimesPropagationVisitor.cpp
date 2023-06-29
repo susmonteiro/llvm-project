@@ -21,14 +21,27 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  PointsToMap &PointsTo, LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("\t[TransferRHS]");
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
-  clang::QualType rhs_type;
+  clang::QualType rhs_type = rhs->getType().getCanonicalType();
   if (lhs_type->isReferenceType()) {
     rhs_type = lhs_type;
-  } else {
-    rhs_type = rhs->getType().getCanonicalType();
   }
+
+  if (const auto *member_expr = dyn_cast<clang::MemberExpr>(rhs)) {
+    rhs_type = member_expr->getBase()->getType().getCanonicalType();
+  }
+
   CreateDependency(rhs, lhs, lhs_type, rhs_type, loc, state);
   for (const auto &expr : points_to) {
+    if (const auto *member_expr = dyn_cast<clang::MemberExpr>(expr)) {
+      rhs_type = member_expr->getBase()->getType().getCanonicalType();
+      break;
+    }
+  }
+
+  for (const auto &expr : points_to) {
+    if (const auto *member_expr = dyn_cast<clang::MemberExpr>(rhs)) {
+      rhs_type = member_expr->getBase()->getType().getCanonicalType();
+    }
     if (expr != nullptr) {
       CreateDependency(expr, lhs, lhs_type, rhs_type, loc, state);
     }
