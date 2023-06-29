@@ -168,8 +168,8 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
   if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) {
     return;
   }
-
-  clang::QualType rhs_type = rhs->getType().getCanonicalType();
+  clang::QualType rhs_type = PointsTo.GetExprType(rhs);
+  rhs_type = rhs_type.isNull() ? rhs->getType().getCanonicalType() : rhs_type;
 
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
   if (const auto *lhs_var_decl =
@@ -400,10 +400,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   }
 
-  clang::QualType lhs_type = lhs->getType().getCanonicalType();
-  if (const auto *member_expr = dyn_cast<clang::MemberExpr>(lhs)) {
-    lhs_type = member_expr->getBase()->getType().getCanonicalType();
-  }
+  clang::QualType lhs_type = PointsTo.GetExprType(lhs);
+  lhs_type = lhs_type.isNull() ? lhs->getType().getCanonicalType() : lhs_type;
 
   if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
     VerifyBinAssign(lhs_type, rhs, lhs_decl_ref_expr, rhs_points_to, op,

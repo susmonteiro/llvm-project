@@ -82,7 +82,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
   auto children = State.GetLifetimeDependencies();
   auto new_children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
-  auto parents = std::move(State.TransposeDependencies());
+  auto parents = State.TransposeDependencies();
 
   // DEBUG
   debugLifetimes("=== dependencies_ ===");
@@ -90,11 +90,6 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     debugLifetimes(pair.first.var_decl, pair.first.lhs_type, pair.second,
                    stmt_dependencies);
   }
-
-  // debugLifetimes("State at the beginning of step 2", State.DebugString());
-
-  // debugLifetimes("=== parents (transposed) ===");
-  // debugLifetimes(parents);
 
   auto worklist = State.InitializeWorklist();
 
@@ -105,7 +100,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     debugInfo("---> Iteration", i++);
     // DEBUG
     // debugLifetimes("=== worklist ===");
-    // debugLifetimes(worklist);
+    // debugLifetimes(LifetimeAnnotationsAnalysis::WorklistDebugString(worklist));
 
     auto &el = worklist.back();
     worklist.pop_back();

@@ -113,7 +113,7 @@ LifetimeAnnotationsAnalysis::TransposeDependencies() {
     for (const auto &stmt : info.second) {
       for (const auto &child : StmtDependencies[stmt]) {
         if (IsLifetimeNotset(child, lhs_type) && info.first.var_decl != child)
-          result[VarTypeStruct{child, lhs_type, rhs_type}].insert(info.first);
+          result[VarTypeStruct{child, rhs_type, lhs_type}].insert(info.first);
       }
     }
   }
@@ -157,12 +157,24 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
     for (const auto &stmt : pair.second) {
       for (const auto &var : StmtDependencies[stmt]) {
         if (pair.first.var_decl == var) continue;
-        str += pair.first.rhs_type.getAsString() + ' ' + var->getNameAsString() + ' ';
+        str += pair.first.rhs_type.getAsString() + ' ' +
+               var->getNameAsString() + ' ';
       }
     }
     str += '\n';
   }
   return str;
+}
+
+std::string LifetimeAnnotationsAnalysis::WorklistDebugString(
+    std::vector<VarTypeStruct> &worklist) {
+  std::string res;
+  for (const auto &el : worklist) {
+    res += '{' + el.lhs_type.getAsString() + ' ' +
+           el.var_decl->getNameAsString() + "}, ";
+  }
+  res += '\n';
+  return res;
 }
 
 }  // namespace clang

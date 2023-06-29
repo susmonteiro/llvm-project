@@ -48,15 +48,24 @@ class PointsToMap {
 
   // Returns a human-readable representation of this object.
   std::string DebugString() const;
-  size_t size() const { return ExprPointsTo.size(); }
+  size_t PointsToSize() const { return ExprPointsTo.size(); }
 
-  llvm::SmallSet<const clang::Expr*, 2> GetExprPointsTo(const clang::Expr* expr) {
+  llvm::SmallSet<const clang::Expr*, 2> GetExprPointsTo(
+      const clang::Expr* expr) {
     return ExprPointsTo[expr];
   }
 
-  bool IsEmpty(const clang::Expr* expr) {
-    return ExprPointsTo[expr].empty();
+  clang::QualType GetExprType(const clang::Expr* expr) {
+    auto it = ExprToType.find(expr);
+    if (it == ExprToType.end()) {
+      return clang::QualType();
+    }
+    else {
+      return it->second;
+    }
   }
+
+  bool IsEmpty(const clang::Expr* expr) { return ExprPointsTo[expr].empty(); }
 
   void InsertExprLifetimes(const clang::Expr* parent,
                            const clang::Expr* child) {
@@ -66,9 +75,14 @@ class PointsToMap {
     ExprPointsTo[parent].insert(child_points_to.begin(), child_points_to.end());
   }
 
+  void InsertExprType(const clang::Expr* expr, clang::QualType type) {
+    ExprToType[expr] = type.getCanonicalType();
+  }
+
  private:
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::Expr*, 2>>
       ExprPointsTo;
+  llvm::DenseMap<const clang::Expr*, clang::QualType> ExprToType;
 };
 
 }  // namespace clang

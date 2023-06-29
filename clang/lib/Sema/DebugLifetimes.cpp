@@ -52,18 +52,6 @@ void debugLifetimes(std::vector<const clang::VarDecl *> vec) {
   debugLifetimes(res);
 }
 
-void debugLifetimes(
-    std::vector<std::pair<const clang::VarDecl *, clang::QualType>> vec) {
-  if (stop_debug) return;
-  std::string res;
-  for (const auto &el : vec) {
-    res += '{' + el.second.getAsString() + ' ' + el.first->getNameAsString() +
-           "}, ";
-  }
-  res += '\n';
-  debugLifetimes(res);
-}
-
 void debugLifetimes(llvm::DenseSet<const clang::VarDecl *> vec) {
   if (stop_debug) return;
   for (const auto &el : vec) {

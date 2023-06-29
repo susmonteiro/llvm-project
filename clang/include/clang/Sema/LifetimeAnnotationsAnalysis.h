@@ -105,6 +105,7 @@ class LifetimeAnnotationsAnalysis {
   TransposeDependencies();
   std::vector<VarTypeStruct> InitializeWorklist() const;
   std::string DebugString();
+  static std::string WorklistDebugString(std::vector<VarTypeStruct> &worklist);
 
  private:
   static VarTypeStruct InvalidEmpty();

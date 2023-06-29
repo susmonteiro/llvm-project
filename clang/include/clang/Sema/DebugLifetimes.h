@@ -18,8 +18,6 @@ void debugLifetimes(llvm::SmallVector<const clang::Expr *> vec);
 void debugLifetimes(llvm::SmallVector<const clang::Attr *> vec);
 void debugLifetimes(llvm::SmallVector<std::string> vec);
 void debugLifetimes(std::vector<const clang::VarDecl *> vec);
-void debugLifetimes(
-    std::vector<std::pair<const clang::VarDecl *, clang::QualType>> vec);
 void debugLifetimes(llvm::DenseSet<const clang::VarDecl *> vec);
 void debugLifetimes(llvm::DenseSet<char> vec);
 void debugLifetimes(

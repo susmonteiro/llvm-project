@@ -47,11 +47,6 @@ class LifetimesPropagationVisitor
                           const clang::Expr *expr,
                           const clang::BinaryOperator *op) const;
 
-  void PropagateBinAssign(const clang::Expr *lhs, const clang::Expr *rhs,
-                          const clang::Expr *expr,
-                          const clang::BinaryOperator *op,
-                          clang::QualType type) const;
-
  private:
   const clang::FunctionDecl *Func;
   LifetimeAnnotationsAnalyzer *Analyzer;
