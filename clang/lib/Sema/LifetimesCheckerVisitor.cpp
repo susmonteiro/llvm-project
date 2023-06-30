@@ -313,22 +313,19 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     // there can only be one pointer/reference variable
     if (const auto *rhs_var_decl =
             dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
-      clang::QualType current_lhs_type = lhs_type;
-      clang::QualType current_rhs_type = rhs_type;
-      while (current_lhs_type->isPointerType() ||
-             current_lhs_type->isReferenceType()) {
+      while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
         Lifetime &lhs_lifetime =
-            return_lifetime ? State.GetReturnLifetime(current_lhs_type)
-                            : State.GetLifetime(lhs_var_decl, current_lhs_type);
+            return_lifetime ? State.GetReturnLifetime(lhs_type)
+                            : State.GetLifetime(lhs_var_decl, lhs_type);
         Lifetime &rhs_lifetime =
-            State.GetLifetimeOrLocal(rhs_var_decl, current_rhs_type);
+            State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
         // TODO is the first part of the condition true?
         if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
           factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                   rhs_lifetime);
         }
-        current_lhs_type = current_lhs_type->getPointeeType();
-        current_rhs_type = current_rhs_type->getPointeeType();
+        lhs_type = lhs_type->getPointeeType();
+        rhs_type = rhs_type->getPointeeType();
       }
     }
   }
@@ -372,11 +369,15 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
 
   const auto &lhs = op->getLHS()->IgnoreParens();
 
+  clang::QualType base_type = lhs->getType().getCanonicalType();
+  clang::QualType lhs_type = PointsTo.GetExprType(lhs);
+  lhs_type = lhs_type.isNull() ? base_type : lhs_type;
+
   // Because of how we handle reference-like structs, a member access to a
   // non-reference-like field in a struct might still produce lifetimes.
   // We don't want to change points-to sets in those cases.
-  // TODO need to check for references?
-  if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
+
+  if (!lhs_type->isPointerType() && !lhs_type->isReferenceType()) {
     // debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
@@ -399,10 +400,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     PointsTo.InsertExprLifetimes(op, rhs);
     const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
   }
-
-  clang::QualType base_type = lhs->getType().getCanonicalType();
-  clang::QualType lhs_type = PointsTo.GetExprType(lhs);
-  lhs_type = lhs_type.isNull() ? base_type : lhs_type;
 
   if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
     VerifyBinAssign(lhs_type, base_type, rhs, lhs_decl_ref_expr, rhs_points_to,
@@ -467,18 +464,26 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         // ! param_lifetimes should have ParamInfo sorted
         auto it = params.begin();
         const ParamInfo *first_param_info = it;
-        const auto *first_arg =
-            GetDeclFromArg(call->getArg(first_param_info->index));
+        const auto *first_arg_expr = call->getArg(first_param_info->index);
+        const auto *first_arg = GetDeclFromArg(first_arg_expr);
         if (first_arg == nullptr) continue;
 
-        Lifetime &first_arg_lifetime = State.GetLifetime(first_arg, (it->type));
+        clang::QualType first_arg_type = PointsTo.GetExprType(first_arg_expr);
+        first_arg_type = first_arg_type.isNull() ? first_param_info->type
+                                                 : first_arg_type;
+
+        Lifetime &first_arg_lifetime = State.GetLifetime(first_arg, first_arg_type);
 
         while (++it != params.end()) {
           if (it->index != first_param_info->index) {
-            const auto *current_arg = GetDeclFromArg(call->getArg(it->index));
+            const auto *current_arg_expr = call->getArg(it->index);
+            const auto *current_arg = GetDeclFromArg(current_arg_expr);
             if (current_arg != nullptr) {
+              clang::QualType current_arg_type = PointsTo.GetExprType(current_arg_expr);
+              current_arg_type = current_arg_type.isNull() ? it->type
+                                                           : current_arg_type;
               Lifetime &current_arg_lifetime =
-                  State.GetLifetime(current_arg, (it->type));
+                  State.GetLifetime(current_arg, current_arg_type);
               if (first_arg_lifetime != current_arg_lifetime) {
                 CallExprChecker(
                     call, direct_callee, first_arg, current_arg,
@@ -646,6 +651,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   }
 
   const auto &return_value = return_stmt->getRetValue()->IgnoreParens();
+  clang::QualType return_value_type = PointsTo.GetExprType(return_value);
+  return_value_type =
+      return_value_type.isNull() ? return_type : return_value_type;
 
   // TODO remove this
   if (PointsTo.IsEmpty(return_value) &&
@@ -654,11 +662,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
     Visit(const_cast<clang::Expr *>(return_value));
   }
 
-  CompareAndCheck(nullptr, return_type, return_value, return_value, return_type,
-                  return_stmt, nullptr, true, Factory.ReturnStmtFactory());
-  clang::QualType return_value_type = PointsTo.GetExprType(return_value);
-  return_value_type =
-      return_value_type.isNull() ? return_type : return_value_type;
+  CompareAndCheck(nullptr, return_type, return_value, return_value,
+                  return_value_type, return_stmt, nullptr, true,
+                  Factory.ReturnStmtFactory());
 
   const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
   for (const auto &expr : return_expr) {
