@@ -62,6 +62,7 @@ class Lifetime {
   clang::QualType GetType() const { return LifetimeType; }
   void SetType(clang::QualType type) { LifetimeType = type; }
 
+  bool EmptyPossibleLifetimes() const;
   void ProcessPossibleLifetimes();
 
   std::string DebugString() const;

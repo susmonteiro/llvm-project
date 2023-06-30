@@ -509,7 +509,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           const auto *current_arg = GetDeclFromArg(current_arg_expr);
           if (current_arg == nullptr) continue;
           clang::QualType arg_type = PointsTo.GetExprType(current_arg_expr);
-          arg_type = arg_type.isNull() ? current_arg->getType().getCanonicalType() : arg_type;
+          arg_type = arg_type.isNull()
+                         ? current_arg->getType().getCanonicalType()
+                         : arg_type;
 
           Lifetime &current_arg_lifetime =
               State.GetLifetimeOrLocal(current_arg, arg_type);
@@ -517,7 +519,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             const auto *arg = call->getArg(other_param_info.index);
             const auto *arg_decl = GetDeclFromArg(arg);
             if (arg_decl == nullptr) continue;
-            Lifetime &arg_lifetime = State.GetLifetimeOrLocal(arg_decl, arg_type);
+            Lifetime &arg_lifetime =
+                State.GetLifetimeOrLocal(arg_decl, arg_type);
             if (current_arg_lifetime < arg_lifetime) {
               CallExprChecker(
                   call, direct_callee, current_arg, arg_decl,
@@ -645,7 +648,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   const auto &return_value = return_stmt->getRetValue()->IgnoreParens();
 
   // TODO remove this
-  if (PointsTo.IsEmpty(return_value) && !clang::isa<clang::DeclRefExpr>(return_value)) {
+  if (PointsTo.IsEmpty(return_value) &&
+      !clang::isa<clang::DeclRefExpr>(return_value)) {
     debugWarn("Return expr is not in PointsToMap");
     Visit(const_cast<clang::Expr *>(return_value));
   }
@@ -653,7 +657,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   CompareAndCheck(nullptr, return_type, return_value, return_value, return_type,
                   return_stmt, nullptr, true, Factory.ReturnStmtFactory());
   clang::QualType return_value_type = PointsTo.GetExprType(return_value);
-  return_value_type = return_value_type.isNull() ? return_type : return_value_type;
+  return_value_type =
+      return_value_type.isNull() ? return_type : return_value_type;
 
   const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
   for (const auto &expr : return_expr) {

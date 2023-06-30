@@ -133,6 +133,14 @@ std::string Lifetime::DebugString() const {
   return res + '\n';
 }
 
+bool Lifetime::EmptyPossibleLifetimes() const {
+  unsigned idx = LOCAL;
+  unsigned size = PossibleLifetimes.size();
+  while (++idx < size && PossibleLifetimes[idx].empty()) {
+  }
+  return idx >= size;
+}
+
 void Lifetime::ProcessPossibleLifetimes() {
   // should only reach this if lifetime is not set
   assert(IsNotSet());
@@ -177,7 +185,11 @@ std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
 }
 
 bool Lifetime::operator==(const Lifetime &Other) const {
-  if (Id != Other.GetId()) return false;
+  if (Id != Other.GetId()) {
+    return (Id == NOTSET && EmptyPossibleLifetimes()) ||
+           (Other.GetId() == NOTSET && Other.EmptyPossibleLifetimes());
+  }
+
   if (IsSet()) return true;
 
   unsigned int min_size =
