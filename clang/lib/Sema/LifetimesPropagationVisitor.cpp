@@ -192,7 +192,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     case clang::CK_LValueToRValue: {
       // TODO
       // debugLight("> Case LValueToRValue");
-      if (cast->getType()->isPointerType()) {
+      // if (cast->getType()->isPointerType()) {
         // Converting from a glvalue to a prvalue means that we need to
         // perform a dereferencing operation because the objects associated
         // with glvalues and prvalues have different meanings:
@@ -206,7 +206,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
         // ObjectSet points_to = PointsTo.GetPointerPointsToSet(
         //     PointsTo.GetExprObjectSet(cast->getSubExpr()));
         // PointsTo.SetExprObjectSet(cast, points_to);
-      }
+      // }
 
       for (const auto *child : cast->children()) {
         Visit(const_cast<clang::Stmt *>(child));
@@ -229,7 +229,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // debugLight("> Case NullToPointer");
 
       // PointsTo.SetExprObjectSet(cast, {});
-      break;
+      // break;
     }
     // These casts are just no-ops from a Object point of view.
     case clang::CK_FunctionToPointerDecay:
@@ -273,6 +273,20 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // We don't support analyzing functions that perform a reinterpret_cast.
 
       // TODO
+      for (const auto *child : cast->children()) {
+        Visit(const_cast<clang::Stmt *>(child));
+        if (!cast->getType()->isPointerType() &&
+            !cast->getType()->isReferenceType()) {
+          continue;
+        }
+        if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
+          PointsTo.InsertExprLifetimes(cast, child_expr);
+          clang::QualType found_type = PointsTo.GetExprType(child_expr);
+          if (!found_type.isNull()) {
+            PointsTo.InsertExprType(cast, found_type);
+          }
+        }
+      }
       // debugLight("> Case Reinterpret cast");
 
       // diag_reporter_(
