@@ -47,7 +47,13 @@ class PointsToMap {
   bool operator!=(const PointsToMap& other) const { return !(*this == other); }
 
   // Returns a human-readable representation of this object.
-  std::string DebugString() const;
+  void DebugExprToType() const {
+    for (const auto& [expr, type] : ExprToType) {
+      debugLifetimes("Expr");
+      expr->dump();
+      debugLifetimes("Type", type.getAsString());
+    }
+  }
   size_t PointsToSize() const { return ExprPointsTo.size(); }
 
   llvm::SmallSet<const clang::Expr*, 2> GetExprPointsTo(
@@ -63,6 +69,10 @@ class PointsToMap {
     else {
       return it->second;
     }
+  }
+
+  void RemoveExprType(const clang::Expr* expr) {
+    ExprToType.erase(expr);
   }
 
   bool IsEmpty(const clang::Expr* expr) { return ExprPointsTo[expr].empty(); }

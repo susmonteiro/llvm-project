@@ -642,10 +642,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
 
   clang::QualType return_type = Func->getReturnType().IgnoreParens();
 
-  // We only need to handle pointers and references.
-  // For record types, initialization of the return value has already been
-  // handled in VisitCXXConstructExpr() or VisitInitListExpr(), so nothing
-  // to do here.
   if (!return_type->isPointerType() && !return_type->isReferenceType()) {
     return std::nullopt;
   }

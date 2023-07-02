@@ -193,19 +193,19 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // TODO
       // debugLight("> Case LValueToRValue");
       // if (cast->getType()->isPointerType()) {
-        // Converting from a glvalue to a prvalue means that we need to
-        // perform a dereferencing operation because the objects associated
-        // with glvalues and prvalues have different meanings:
-        // - A glvalue is associated with the object identified by the
-        // glvalue.
-        // - A prvalue is only associated with an object if the prvalue is of
-        //   pointer type; the object it is associated with is the object the
-        //   pointer points to.
-        // See also documentation for PointsToMap.
+      // Converting from a glvalue to a prvalue means that we need to
+      // perform a dereferencing operation because the objects associated
+      // with glvalues and prvalues have different meanings:
+      // - A glvalue is associated with the object identified by the
+      // glvalue.
+      // - A prvalue is only associated with an object if the prvalue is of
+      //   pointer type; the object it is associated with is the object the
+      //   pointer points to.
+      // See also documentation for PointsToMap.
 
-        // ObjectSet points_to = PointsTo.GetPointerPointsToSet(
-        //     PointsTo.GetExprObjectSet(cast->getSubExpr()));
-        // PointsTo.SetExprObjectSet(cast, points_to);
+      // ObjectSet points_to = PointsTo.GetPointerPointsToSet(
+      //     PointsTo.GetExprObjectSet(cast->getSubExpr()));
+      // PointsTo.SetExprObjectSet(cast, points_to);
       // }
 
       for (const auto *child : cast->children()) {
@@ -395,6 +395,28 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   Visit(const_cast<clang::Expr *>(base));
   PointsTo.InsertExprLifetimes(member_expr, base);
   PointsTo.InsertExprType(member_expr, base->getType());
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitReturnStmt(
+    const clang::ReturnStmt *return_stmt) {
+  if (debugEnabled) debugLifetimes("[VisitReturnStmt]");
+
+  const auto *return_value = return_stmt->getRetValue();
+  clang::QualType return_type = Func->getReturnType().IgnoreParens();
+  if (return_value == nullptr || !return_type->isPointerType() ||
+      return_type->isReferenceType()) {
+    return std::nullopt;
+  }
+  
+  Visit(const_cast<clang::Expr *>(return_value));
+
+  for (const auto &child : return_value->children()) {
+    if (child == nullptr) continue;
+    if (const auto *cast_expr = clang::dyn_cast<clang::CastExpr>(child)) {
+      PointsTo.InsertExprType(return_stmt->getRetValue(), cast_expr->getType());
+    }
+  }
   return std::nullopt;
 }
 
