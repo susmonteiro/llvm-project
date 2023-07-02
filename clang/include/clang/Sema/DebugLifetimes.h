@@ -20,11 +20,6 @@ void debugLifetimes(llvm::SmallVector<std::string> vec);
 void debugLifetimes(std::vector<const clang::VarDecl *> vec);
 void debugLifetimes(llvm::DenseSet<const clang::VarDecl *> vec);
 void debugLifetimes(llvm::DenseSet<char> vec);
-void debugLifetimes(
-    const clang::VarDecl *var, clang::QualType type,
-    llvm::DenseSet<const clang::Stmt *> var_stmt,
-    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>
-        stmt_var);
 void debugImportant(std::string txt);
 void debugImportant(std::string txt1, std::string txt2);
 void debugInfo(std::string txt);

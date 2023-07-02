@@ -87,8 +87,8 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
   // DEBUG
   debugLifetimes("=== dependencies_ ===");
   for (const auto &pair : children) {
-    debugLifetimes(pair.first.var_decl, pair.first.lhs_type, pair.second,
-                   stmt_dependencies);
+    debugLifetimes(DebugDependencies(pair.first.var_decl, pair.first.type,
+                                     pair.second, stmt_dependencies));
   }
 
   auto worklist = State.InitializeWorklist();
@@ -106,22 +106,23 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     worklist.pop_back();
 
     auto *current_var = el.var_decl;
-    auto lhs_current_type = el.lhs_type;
-    auto rhs_current_type = el.rhs_type;
+    auto lhs_current_type = el.type;
     // DEBUG
+
     debugLifetimes("\nPropagation of", lhs_current_type.getAsString() + ' ' +
                                            current_var->getNameAsString());
 
     // each entry of the vector corresponds to a lifetime char
     llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> possible_lifetimes;
-    llvm::DenseSet<const clang::Stmt *> stmts;
+    llvm::DenseSet<RHSTypeStruct> stmts;
 
     // ObjectLifetimes objectLifetimes = State.GetObjectLifetimes(el);
     // debugLifetimes("Processing " + objectLifetimes.DebugString());
 
-    for (auto &stmt : children[el]) {
-      stmts.insert(stmt);
-      for (const auto &var_decl : stmt_dependencies[stmt]) {
+    for (auto &rhs_info : children[el]) {
+      auto rhs_current_type = rhs_info.type;
+      stmts.insert(rhs_info);
+      for (const auto &var_decl : stmt_dependencies[rhs_info.stmt]) {
         if (var_decl == current_var) continue;
         Lifetime &rhs_lifetime =
             State.GetLifetimeOrLocal(var_decl, rhs_current_type);
@@ -131,12 +132,13 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
           auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
           for (unsigned int i = 0; i < rhs_possible_lifetimes.size(); i++) {
             if (!rhs_possible_lifetimes[i].empty()) {
-              Lifetime::InsertPossibleLifetimes(i, stmt, possible_lifetimes);
+              Lifetime::InsertPossibleLifetimes(i, rhs_info.stmt,
+                                                possible_lifetimes);
             }
           }
         } else {
           char vardecl_lifetime_id = rhs_lifetime.GetId();
-          Lifetime::InsertPossibleLifetimes(vardecl_lifetime_id, stmt,
+          Lifetime::InsertPossibleLifetimes(vardecl_lifetime_id, rhs_info.stmt,
                                             possible_lifetimes);
         }
         // }
@@ -160,8 +162,8 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     // DEBUG
     debugLifetimes("=== children ===");
     for (const auto &pair : new_children) {
-      debugLifetimes(pair.first.var_decl, pair.first.lhs_type, pair.second,
-                     stmt_dependencies);
+      debugLifetimes(DebugDependencies(pair.first.var_decl, pair.first.type,
+                                       pair.second, stmt_dependencies));
     }
   }
 

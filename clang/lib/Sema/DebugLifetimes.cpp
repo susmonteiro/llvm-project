@@ -68,25 +68,6 @@ void debugLifetimes(llvm::DenseSet<char> vec) {
   debugLifetimes(res);
 }
 
-void debugLifetimes(
-    const clang::VarDecl *var, clang::QualType type,
-    llvm::DenseSet<const clang::Stmt *> var_stmt,
-    llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>
-        stmt_var) {
-  if (stop_debug) return;
-  std::string res;
-  res += "Dependencies of " + var->getNameAsString() + ": ";
-  res += "[Type]: " + type.getAsString() + "\t[vars]: ";
-  for (const auto &stmt : var_stmt) {
-    for (const auto &rhs_var : stmt_var[stmt]) {
-      if (var == rhs_var) continue;
-      res += rhs_var->getNameAsString() + ' ';
-    }
-  }
-  res += '\n';
-  debugLifetimes(res);
-}
-
 void debugImportant(std::string txt) {
   if (stop_debug) return;
   std::cout << "\033[1;96m======== " << txt << " ========\033[0m\n";

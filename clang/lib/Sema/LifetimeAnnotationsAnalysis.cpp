@@ -102,7 +102,8 @@ StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
     const clang::VarDecl *from, clang::QualType from_type,
     const clang::Stmt *to, clang::QualType to_type) {
-  LifetimeDependencies[VarTypeStruct{from, from_type, to_type}].insert(to);
+  LifetimeDependencies[LHSTypeStruct{from, from_type}].insert(
+      RHSTypeStruct{to, to_type});
 }
 
 void LifetimeAnnotationsAnalysis::CreateStmtDependency(
@@ -110,25 +111,26 @@ void LifetimeAnnotationsAnalysis::CreateStmtDependency(
   StmtDependencies[from].insert(to);
 }
 
-llvm::DenseMap<VarTypeStruct, llvm::DenseSet<VarTypeStruct>>
+llvm::DenseMap<LHSTypeStruct, llvm::DenseSet<LHSTypeStruct>>
 LifetimeAnnotationsAnalysis::TransposeDependencies() {
-  llvm::DenseMap<VarTypeStruct, llvm::DenseSet<VarTypeStruct>> result;
-  for (const auto &info : LifetimeDependencies) {
-    clang::QualType lhs_type = info.first.lhs_type;
-    clang::QualType rhs_type = info.first.rhs_type;
-    for (const auto &stmt : info.second) {
-      for (const auto &child : StmtDependencies[stmt]) {
-        if (IsLifetimeNotset(child, lhs_type) && info.first.var_decl != child)
-          result[VarTypeStruct{child, rhs_type, lhs_type}].insert(info.first);
+  llvm::DenseMap<LHSTypeStruct, llvm::DenseSet<LHSTypeStruct>> result;
+  for (const auto &info_lhs : LifetimeDependencies) {
+    clang::QualType lhs_type = info_lhs.first.type;
+    for (const auto &info_rhs : info_lhs.second) {
+      clang::QualType rhs_type = info_rhs.type;
+      for (const auto &child : StmtDependencies[info_rhs.stmt]) {
+        if (IsLifetimeNotset(child, lhs_type) &&
+            info_lhs.first.var_decl != child)
+          result[LHSTypeStruct{child, rhs_type}].insert(info_lhs.first);
       }
     }
   }
   return result;
 }
 
-std::vector<VarTypeStruct> LifetimeAnnotationsAnalysis::InitializeWorklist()
+std::vector<LHSTypeStruct> LifetimeAnnotationsAnalysis::InitializeWorklist()
     const {
-  std::vector<VarTypeStruct> worklist;
+  std::vector<LHSTypeStruct> worklist;
   for (const auto &pair : LifetimeDependencies) {
     worklist.emplace_back(pair.first);
   }
@@ -157,13 +159,13 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
         pair.first->getNameAsString() + ": " + pair.second.DebugString() + '\n';
   }
   str += "\n>> Dependencies\n\n";
-  for (const auto &pair : LifetimeDependencies) {
-    str += pair.first.var_decl->getNameAsString() + ": ";
-    str += "[type] " + pair.first.lhs_type.getAsString() + "\t\t[vars] ";
-    for (const auto &stmt : pair.second) {
-      for (const auto &var : StmtDependencies[stmt]) {
-        if (pair.first.var_decl == var) continue;
-        str += pair.first.rhs_type.getAsString() + ' ' +
+  for (const auto &info_lhs : LifetimeDependencies) {
+    str += info_lhs.first.var_decl->getNameAsString() + ": ";
+    str += "[type] " + info_lhs.first.type.getAsString() + "\t\t[vars] ";
+    for (const auto &info_rhs : info_lhs.second) {
+      for (const auto &var : StmtDependencies[info_rhs.stmt]) {
+        if (info_lhs.first.var_decl == var) continue;
+        str += info_rhs.type.getAsString() + ' ' +
                var->getNameAsString() + ' ';
       }
     }
@@ -173,10 +175,10 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
 }
 
 std::string LifetimeAnnotationsAnalysis::WorklistDebugString(
-    std::vector<VarTypeStruct> &worklist) {
+    std::vector<LHSTypeStruct> &worklist) {
   std::string res;
   for (const auto &el : worklist) {
-    res += '{' + el.lhs_type.getAsString() + ' ' +
+    res += '{' + el.type.getAsString() + ' ' +
            el.var_decl->getNameAsString() + "}, ";
   }
   res += '\n';

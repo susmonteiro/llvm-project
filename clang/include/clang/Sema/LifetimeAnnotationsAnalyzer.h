@@ -9,8 +9,8 @@
 #include "clang/Sema/FunctionLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/LifetimeAnnotationsAnalysis.h"
-#include "clang/Sema/Sema.h"
 #include "clang/Sema/PointsToMap.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/DenseMap.h"
 
 // DEBUG
@@ -28,7 +28,8 @@ class LifetimeAnnotationsAnalyzer {
   void PropagateLifetimes();
   void CheckLifetimes(const clang::FunctionDecl *func);
 
-  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &GetFunctionInfo() {
+  llvm::DenseMap<const clang::FunctionDecl *, FunctionLifetimes> &
+  GetFunctionInfo() {
     return FunctionInfo;
   }
 
@@ -39,6 +40,25 @@ class LifetimeAnnotationsAnalyzer {
       res += "Function " + pair.first->getNameAsString() + '\n' +
              pair.second.DebugString() + "\n\n============\n\n";
     }
+    return res;
+  }
+
+  std::string DebugDependencies(
+      const clang::VarDecl *var, clang::QualType type,
+      llvm::DenseSet<RHSTypeStruct> var_stmt,
+      llvm::DenseMap<const clang::Stmt *,
+                     llvm::DenseSet<const clang::VarDecl *>>
+          stmt_var) {
+    std::string res;
+    res += "Dependencies of " + var->getNameAsString() + ": ";
+    res += "[Type]: " + type.getAsString() + "\t[vars]: ";
+    for (const auto &info : var_stmt) {
+      for (const auto &rhs_var : stmt_var[info.stmt]) {
+        if (var == rhs_var) continue;
+        res += rhs_var->getNameAsString() + ' ';
+      }
+    }
+    res += '\n';
     return res;
   }
 

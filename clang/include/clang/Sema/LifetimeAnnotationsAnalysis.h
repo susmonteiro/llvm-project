@@ -22,14 +22,18 @@ using VariableLifetimesVector =
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>;
 
-struct VarTypeStruct {
+struct LHSTypeStruct {
   const clang::VarDecl *var_decl;
-  clang::QualType lhs_type;
-  clang::QualType rhs_type;
+  clang::QualType type;
+};
+
+struct RHSTypeStruct {
+  const clang::Stmt *stmt;
+  clang::QualType type;
 };
 
 using VarStmtDependenciesMap =
-    llvm::DenseMap<VarTypeStruct, llvm::DenseSet<const clang::Stmt *>>;
+    llvm::DenseMap<LHSTypeStruct, llvm::DenseSet<RHSTypeStruct>>;
 
 // Holds the state and function used during the analysis of a function
 class LifetimeAnnotationsAnalysis {
@@ -101,17 +105,17 @@ class LifetimeAnnotationsAnalysis {
 
   void ProcessPossibleLifetimes();
 
-  llvm::DenseMap<VarTypeStruct, llvm::DenseSet<VarTypeStruct>>
+  llvm::DenseMap<LHSTypeStruct, llvm::DenseSet<LHSTypeStruct>>
   TransposeDependencies();
-  std::vector<VarTypeStruct> InitializeWorklist() const;
+  std::vector<LHSTypeStruct> InitializeWorklist() const;
   std::string DebugString();
-  static std::string WorklistDebugString(std::vector<VarTypeStruct> &worklist);
+  static std::string WorklistDebugString(std::vector<LHSTypeStruct> &worklist);
 
  private:
-  static VarTypeStruct InvalidEmpty();
-  static VarTypeStruct InvalidTombstone();
+  static LHSTypeStruct InvalidEmpty();
+  static LHSTypeStruct InvalidTombstone();
 
-  friend class llvm::DenseMapInfo<VarTypeStruct>;
+  friend class llvm::DenseMapInfo<LHSTypeStruct>;
 
   VariableLifetimesVector VariableLifetimes;
   VarStmtDependenciesMap LifetimeDependencies;
@@ -123,27 +127,47 @@ class LifetimeAnnotationsAnalysis {
 
 namespace llvm {
 template <>
-struct DenseMapInfo<clang::VarTypeStruct> {
-  static inline clang::VarTypeStruct getEmptyKey() {
-    return clang::VarTypeStruct{nullptr, clang::QualType(), clang::QualType()};
+struct DenseMapInfo<clang::LHSTypeStruct> {
+  static inline clang::LHSTypeStruct getEmptyKey() {
+    return clang::LHSTypeStruct{nullptr, clang::QualType()};
   }
 
-  static inline clang::VarTypeStruct getTombstoneKey() {
-    return clang::VarTypeStruct{reinterpret_cast<clang::VarDecl *>(-1),
-                                clang::QualType(), clang::QualType()};
+  static inline clang::LHSTypeStruct getTombstoneKey() {
+    return clang::LHSTypeStruct{reinterpret_cast<clang::VarDecl *>(-1),
+                                clang::QualType()};
   }
 
-  static unsigned getHashValue(const clang::VarTypeStruct &pair) {
+  static unsigned getHashValue(const clang::LHSTypeStruct &pair) {
     return llvm::hash_combine(
         llvm::DenseMapInfo<const clang::VarDecl *>::getHashValue(pair.var_decl),
-        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.lhs_type),
-        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.rhs_type));
+        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.type));
   }
 
-  static bool isEqual(const clang::VarTypeStruct &lhs,
-                      const clang::VarTypeStruct &rhs) {
-    return lhs.var_decl == rhs.var_decl && lhs.lhs_type == rhs.lhs_type &&
-           lhs.rhs_type == rhs.rhs_type;
+  static bool isEqual(const clang::LHSTypeStruct &lhs,
+                      const clang::LHSTypeStruct &rhs) {
+    return lhs.var_decl == rhs.var_decl && lhs.type == rhs.type;
+  }
+};
+template <>
+struct DenseMapInfo<clang::RHSTypeStruct> {
+  static inline clang::RHSTypeStruct getEmptyKey() {
+    return clang::RHSTypeStruct{nullptr, clang::QualType()};
+  }
+
+  static inline clang::RHSTypeStruct getTombstoneKey() {
+    return clang::RHSTypeStruct{reinterpret_cast<clang::Stmt *>(-1),
+                                clang::QualType()};
+  }
+
+  static unsigned getHashValue(const clang::RHSTypeStruct &pair) {
+    return llvm::hash_combine(
+        llvm::DenseMapInfo<const clang::Stmt *>::getHashValue(pair.stmt),
+        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.type));
+  }
+
+  static bool isEqual(const clang::RHSTypeStruct &lhs,
+                      const clang::RHSTypeStruct &rhs) {
+    return lhs.stmt == rhs.stmt && lhs.type == rhs.type;
   }
 };
 }  // namespace llvm
