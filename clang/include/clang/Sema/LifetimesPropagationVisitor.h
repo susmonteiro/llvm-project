@@ -40,8 +40,10 @@ class LifetimesPropagationVisitor
   std::optional<std::string> VisitExpr(const clang::Expr *expr);
   std::optional<std::string> VisitMemberExpr(
       const clang::MemberExpr *member_expr);
-  std::optional<std::string> VisitReturnStmt(const clang::ReturnStmt *return_stmt);
+  std::optional<std::string> VisitReturnStmt(
+      const clang::ReturnStmt *return_stmt);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
+  std::optional<std::string> VisitUnaryAddrOf(const clang::UnaryOperator *op);
   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
   void PropagateBinAssign(const clang::Expr *lhs, const clang::Expr *rhs,

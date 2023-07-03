@@ -6,8 +6,7 @@ void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
                       clang::QualType lhs_type, clang::QualType rhs_type,
                       const clang::Stmt *loc,
                       LifetimeAnnotationsAnalysis &state) {
-  if (clang::isa<clang::DeclRefExpr>(expr)) {
-    const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr);
+  if (const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr)) {
     if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
             rhs_ref_decl->getDecl()->getCanonicalDecl())) {
       state.CreateDependency(lhs, lhs_type, rhs_var_decl, rhs_type, loc);
@@ -338,14 +337,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
     return std::nullopt;
   PointsTo.InsertExprLifetimes(decl_ref, nullptr);
 
-  // TODO
-  // if (type->isReferenceType()) {
-  //   PointsTo.SetExprObjectSet(
-  //       decl_ref, PointsTo.GetPointerPointsToSet(object));
-  // } else {
-  //   PointsTo.SetExprObjectSet(decl_ref, {object});
-  // }
-
   return std::nullopt;
 }
 
@@ -357,7 +348,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
       clang::QualType type = var_decl->getType().getCanonicalType();
       if (!type->isPointerType() && !type->isReferenceType()) {
-        // debugWarn("Var decl is not pointer type");
         continue;
       }
 
@@ -408,7 +398,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitReturnStmt(
       return_type->isReferenceType()) {
     return std::nullopt;
   }
-  
+
   Visit(const_cast<clang::Expr *>(return_value));
 
   for (const auto &child : return_value->children()) {
@@ -427,6 +417,29 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitStmt(
     if (child == nullptr) continue;
     Visit(const_cast<clang::Stmt *>(child));
   }
+  return std::nullopt;
+}
+
+std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
+    const clang::UnaryOperator *op) {
+  if (debugEnabled) debugLifetimes("[VisitUnaryAddrOfOperator]");
+
+  for (const auto &child : op->children()) {
+    Visit(const_cast<clang::Stmt *>(child));
+    if (const auto *child_expr = dyn_cast<clang::Expr>(child)) {
+      PointsTo.InsertExprLifetimes(op, child_expr);
+    }
+  }
+
+  for (const auto &child : PointsTo.GetExprPointsTo(op)) {
+    if (child == nullptr) continue;
+    if (const auto *decl_ref_expr = clang::dyn_cast<DeclRefExpr>(child)) {
+      if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl_ref_expr->getDecl()->getCanonicalDecl())) {
+        State.GetObjectLifetimes(var_decl).InsertPointeeObject(Lifetime(LOCAL, op->getType().getCanonicalType()));
+      }
+    }
+  }
+
   return std::nullopt;
 }
 

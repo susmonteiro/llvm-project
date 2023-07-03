@@ -82,7 +82,6 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
       CreateStmtDependency(loc, to);
     }
     if (IsLifetimeNotset(to, from_type)) {
-      // TODO check if it should be the other way around
       CreateLifetimeDependency(to, to_type, loc, from_type);
       CreateStmtDependency(loc, from);
     }

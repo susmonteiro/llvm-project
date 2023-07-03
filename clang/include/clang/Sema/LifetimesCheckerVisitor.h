@@ -64,7 +64,8 @@ class LifetimesCheckerVisitor
   const clang::VarDecl *GetDeclFromArg(const clang::Expr *arg) const;
 
   void VerifyBinAssign(
-      clang::QualType lhs_type, clang::QualType base_type, const clang::Expr *rhs, const clang::Expr *expr,
+      clang::QualType lhs_type, clang::QualType base_type,
+      const clang::Expr *rhs, const clang::Expr *expr,
       const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
       const clang::BinaryOperator *op, PrintNotesFactory factory) const;
 

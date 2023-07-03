@@ -125,7 +125,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
       for (const auto &var_decl : stmt_dependencies[rhs_info.stmt]) {
         if (var_decl == current_var) continue;
         Lifetime &rhs_lifetime =
-            State.GetLifetimeOrLocal(var_decl, rhs_current_type);
+            State.GetLifetime(var_decl, rhs_current_type);
 
         // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
