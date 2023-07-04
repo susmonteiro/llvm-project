@@ -400,13 +400,16 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitReturnStmt(
   }
 
   Visit(const_cast<clang::Expr *>(return_value));
-
-  for (const auto &child : return_value->children()) {
-    if (child == nullptr) continue;
-    if (const auto *cast_expr = clang::dyn_cast<clang::CastExpr>(child)) {
-      PointsTo.InsertExprType(return_stmt->getRetValue(), cast_expr->getType());
+  if (const auto *cast_expr = clang::dyn_cast<clang::CastExpr>(return_value)) {
+    for (const auto &child : return_value->children()) {
+      if (child == nullptr) continue;
+      if (const auto *sub_cast_expr = clang::dyn_cast<clang::CastExpr>(child)) {
+        PointsTo.InsertExprType(return_stmt->getRetValue(),
+                                sub_cast_expr->getType());
+      }
     }
   }
+
   return std::nullopt;
 }
 
@@ -434,8 +437,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
   for (const auto &child : PointsTo.GetExprPointsTo(op)) {
     if (child == nullptr) continue;
     if (const auto *decl_ref_expr = clang::dyn_cast<DeclRefExpr>(child)) {
-      if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl_ref_expr->getDecl()->getCanonicalDecl())) {
-        State.GetObjectLifetimes(var_decl).InsertPointeeObject(Lifetime(LOCAL, op->getType().getCanonicalType()));
+      if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(
+              decl_ref_expr->getDecl()->getCanonicalDecl())) {
+        State.GetObjectLifetimes(var_decl).InsertPointeeObject(
+            Lifetime(LOCAL, op->getType().getCanonicalType()));
       }
     }
   }
