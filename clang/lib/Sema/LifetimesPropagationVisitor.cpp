@@ -351,12 +351,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         continue;
       }
 
-      ObjectLifetimes objectsLifetimes = GetVarDeclLifetime(var_decl, Factory);
-      State.CreateVariable(var_decl, objectsLifetimes);
+      if (var_decl->isStaticLocal()) {
+        ObjectLifetimes objectLifetimes(Lifetime(STATIC, type.getCanonicalType()));
+        State.CreateVariable(var_decl, objectLifetimes);
+      } else {
+        ObjectLifetimes objectsLifetimes =
+            GetVarDeclLifetime(var_decl, Factory);
+        State.CreateVariable(var_decl, objectsLifetimes);
+      }
 
-      // Don't need to record initializers because initialization has already
-      // happened in VisitCXXConstructExpr(), VisitInitListExpr(), or
-      // VisitCallExpr().
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
