@@ -353,6 +353,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
       if (var_decl->isStaticLocal()) {
         ObjectLifetimes objectLifetimes(Lifetime(STATIC, type.getCanonicalType()));
+        if (type->isPointerType()) {
+          objectLifetimes.InsertPointeeObject(
+              Lifetime(STATIC, type->getPointeeType().getCanonicalType()));
+        }
         State.CreateVariable(var_decl, objectLifetimes);
       } else {
         ObjectLifetimes objectsLifetimes =
