@@ -400,7 +400,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitReturnStmt(
   }
 
   Visit(const_cast<clang::Expr *>(return_value));
-  if (const auto *cast_expr = clang::dyn_cast<clang::CastExpr>(return_value)) {
+  if (clang::isa<clang::CastExpr>(return_value)) {
     for (const auto &child : return_value->children()) {
       if (child == nullptr) continue;
       if (const auto *sub_cast_expr = clang::dyn_cast<clang::CastExpr>(child)) {
