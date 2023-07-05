@@ -79,7 +79,7 @@ class FunctionLifetimes {
 
   const clang::ParmVarDecl *GetParam(unsigned int i) const { return Params[i]; }
 
-  ParamsLifetimesMap GetParamsLifetimes() const { return ParamsLifetimes; }
+  ParamsLifetimesMap &GetParamsLifetimes() { return ParamsLifetimes; }
 
   Lifetime &GetParamLifetime(const clang::ParmVarDecl *param,
                              clang::QualType type) {

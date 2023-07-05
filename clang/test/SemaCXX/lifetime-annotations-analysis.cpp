@@ -389,7 +389,7 @@ int *$local return_local_lifetime_2() { // expected-warning {{the return lifetim
   return p; 
 }
 
-int *return_local_lifetime_3() {  // expected-warning {{the return lifetime cannot be '$local'}}
+int *return_local_lifetime_3() {
   int i = 0;
   int *p = &i;
   return p; 

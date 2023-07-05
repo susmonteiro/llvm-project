@@ -46,6 +46,13 @@ class ObjectLifetimes {
     return false;
   }
 
+  bool HasLifetime(char id) {
+    for (Lifetime &lifetime : PointeeObjects) {
+      if (lifetime.GetId() == id) return true;
+    }
+    return false;
+  }
+
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
     clang::QualType type = lifetime.GetType();
     PointeeObjects.emplace_back(lifetime);
@@ -65,15 +72,6 @@ class ObjectLifetimes {
     }
     return res;
   }
-
-  // bool IsLifetimeNotSet() {
-  //   for (auto& pointee : PointeeObjects) {
-  //     if (pointee.IsNotSet()) {
-  //       return true;
-  //     }
-  //   }
-  //   return false;
-  // }
 
  private:
   llvm::SmallVector<Lifetime> PointeeObjects;

@@ -347,8 +347,8 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
   return [this](const clang::Expr* name, clang::QualType type
                 /*,&input_lifetime */) -> llvm::Expected<Lifetime> {
     clang::QualType canonical_type = type.getCanonicalType();
+    Lifetime lifetime(canonical_type);
     if (name) {
-      Lifetime lifetime;
       if (llvm::Error err =
               LifetimeFromName(name, canonical_type).moveInto(lifetime)) {
         return std::move(err);
@@ -356,44 +356,13 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
       return lifetime;
     }
 
-    // TODO elision
-    // if (!elision_enabled) {
-    //   return llvm::createStringError(
-    //       llvm::inconvertibleErrorCode(),
-    //       "Lifetime elision not enabled for function"
-    // TODO abseil
-    // absl::StrCat("Lifetime elision not enabled for '",
-    //              func->getNameAsString(), "'")
-    // );
-    // }
-
-    // TODO uncomment this
-    // If we have a single input lifetime, its lifetime is assigned to
-    // all output lifetimes.
-    // if (input_lifetime.has_value()) {
-    //   return *input_lifetime;
-    // } else {
-    //   // Otherwise, we don't know how to elide the output lifetime.
-    //   return llvm::createStringError(
-    //       llvm::inconvertibleErrorCode(),
-    //       absl::StrCat("Cannot elide output lifetimes for '",
-    //                    func->getNameAsString(),
-    //                    "' because it is a non-member function that "
-    //                    "does not have "
-    //                    "exactly one input lifetime"));
-    // }
-    // });
-    // TODO remove this
-    return Lifetime(LOCAL, canonical_type);;
+    return lifetime;
   };
 }
 
 LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
   return [this](const clang::Expr* name,
                 clang::QualType type) -> llvm::Expected<Lifetime> {
-    // TODO change me
-    // clang::QualType expr_type = name->getType().getCanonicalType();
-    // Lifetime lifetime(expr_type);
     clang::QualType canonical_type = type.getCanonicalType();
     Lifetime lifetime(canonical_type);
     if (name) {
@@ -403,7 +372,6 @@ LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
       }
       return lifetime;
     }
-    // TODO error?
     return lifetime;
   };
 }
@@ -421,7 +389,8 @@ void FunctionLifetimes::ProcessParams() {
       if (num_indirections >= ParamsInfo.size()) {
         ParamsInfo.resize(num_indirections + 1);
       }
-      ParamsInfo[num_indirections].emplace_back(ParamInfo{type, param, idx, num_indirections});
+      ParamsInfo[num_indirections].emplace_back(
+          ParamInfo{type, param, idx, num_indirections});
     }
     idx++;
   }
@@ -487,8 +456,8 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
   const clang::FunctionProtoType* type =
       func->getType()->getAs<clang::FunctionProtoType>();
   FunctionLifetimes ret(func->getID());
-    if (type == nullptr) {
-      // DEBUG
+  if (type == nullptr) {
+    // DEBUG
     // debugWarn("FunctionProtoType is null");
     return ret;
   }
@@ -497,11 +466,6 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
   if (type_loc) {
     func_type_loc = type_loc.getAsAdjusted<clang::FunctionTypeLoc>();
   }
-
-  // TODO implement for Lifetime
-  // ret.param_lifetimes_.reserve(type->getNumParams());
-  // DEBUG
-  // debugLifetimes("Num of parameters", std::to_string(type->getNumParams()));
 
   for (size_t i = 0; i < type->getNumParams(); i++) {
     clang::TypeLoc param_type_loc;
@@ -539,7 +503,7 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
 
   clang::QualType return_type = type->getReturnType();
   clang::QualType return_pointee = PointeeType(return_type);
-  // TODO check if this covers everything that should have a lifetime
+
   if (!return_pointee.isNull()) {
     clang::TypeLoc return_type_loc;
     if (func_type_loc) {

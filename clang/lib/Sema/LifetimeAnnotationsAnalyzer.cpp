@@ -23,8 +23,6 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
   debugImportant("ANALYZING FUNCTION", func->getNameAsString());
   func = func->getCanonicalDecl();
 
-  // Following Case 2. Not part of a cycle.
-  // AnalyzeSingleFunction()
   FunctionLifetimeFactory function_lifetime_factory(func);
 
   llvm::Expected<FunctionLifetimes> expected_func_lifetimes =
@@ -34,10 +32,37 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
     // TODO
     return;
   }
+
   FunctionLifetimes func_lifetimes = *expected_func_lifetimes;
   if (func_lifetimes.IsReturnLifetimeLocal()) {
     S.Diag(func->getLocation(), diag::warn_func_return_lifetime_local)
         << func->getSourceRange();
+  }
+
+  debugLifetimes("Check return lifetime");
+
+  auto &params_lifetimes = func_lifetimes.GetParamsLifetimes();
+  ObjectLifetimes return_lifetime = func_lifetimes.GetReturnLifetime();
+  debugLifetimes("After get return lifetime");
+  for (Lifetime &rl : return_lifetime.GetLifetimes()) {
+    if (rl.IsStatic() || rl.IsNotSet()) continue;
+    debugLifetimes("For each lifetime");
+    auto it = params_lifetimes.begin();
+    it++;
+    debugLifetimes("Are they the same?", it == params_lifetimes.end());
+    debugLifetimes("Get iterator");
+    while (it != params_lifetimes.end() && !it->second.HasLifetime(rl.GetId())) {
+      debugLifetimes("Inside iterator");
+      it++;
+    }
+    debugLifetimes("After iterator");
+    // TODO change this
+    if (it == params_lifetimes.end()) {
+      debugWarn("WARN FUNC RETURN STRANGE LIFETIME");
+      // S.Diag(func->getLocation(), diag::warn_func_return_lifetime_local)
+      //     << func->getSourceRange();
+    }
+    debugLifetimes("After check with end");
   }
 
   // DEBUG
@@ -124,8 +149,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
       stmts.insert(rhs_info);
       for (const auto &var_decl : stmt_dependencies[rhs_info.stmt]) {
         if (var_decl == current_var) continue;
-        Lifetime &rhs_lifetime =
-            State.GetLifetime(var_decl, rhs_current_type);
+        Lifetime &rhs_lifetime = State.GetLifetime(var_decl, rhs_current_type);
 
         // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
