@@ -10,10 +10,17 @@
 // #include "lifetime_analysis/object_set.h"
 #include "clang/AST/Expr.h"
 #include "clang/Sema/Lifetime.h"
+#include "clang/Sema/ObjectLifetimes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 
 namespace clang {
+
+typedef struct CallExprInfo {
+  // decl = nullptr -> lifetime $local
+  const clang::Expr* arg;
+  clang::QualType rtype;
+} CallExprInfo;
 
 // Maintains the points-to sets needed for the analysis of a function.
 // A `PointsToMap` stores points-to sets for
@@ -70,13 +77,18 @@ class PointsToMap {
     }
   }
 
-  std::optional<Lifetime> GetExprLifetime(const clang::Expr* expr) {
+  std::optional<char> GetExprLifetime(const clang::Expr* expr) {
     auto it = ExprToLifetime.find(expr);
     if (it == ExprToLifetime.end()) {
       return std::nullopt;
     } else {
       return it->second;
     }
+  }
+
+  llvm::DenseMap<clang::QualType, CallExprInfo> GetExprInfo(
+      const clang::CallExpr* expr) {
+    return ExprToInfo[expr];
   }
 
   void RemoveExprType(const clang::Expr* expr) { ExprToType.erase(expr); }
@@ -95,15 +107,23 @@ class PointsToMap {
     ExprToType[expr] = type.getCanonicalType();
   }
 
-  void InsertExprLifetime(const clang::Expr* expr, Lifetime lifetime) {
-    ExprToLifetime[expr] = lifetime;
+  void InsertExprLifetime(const clang::Expr* expr, char lifetime_id) {
+    ExprToLifetime[expr] = lifetime_id;
+  }
+
+  void InsertExprInfo(const clang::Expr* expr, clang::QualType type,
+                      const clang::Expr* decl) {
+    ExprToInfo[expr][type] = {decl, type};
   }
 
  private:
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::Expr*, 2>>
       ExprPointsTo;
   llvm::DenseMap<const clang::Expr*, clang::QualType> ExprToType;
-  llvm::DenseMap<const clang::Expr*, Lifetime> ExprToLifetime;
+  llvm::DenseMap<const clang::Expr*, char> ExprToLifetime;
+  llvm::DenseMap<const clang::Expr*,
+                 llvm::DenseMap<clang::QualType, CallExprInfo>>
+      ExprToInfo;
 };
 
 }  // namespace clang

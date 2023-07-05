@@ -81,6 +81,12 @@ class FunctionLifetimes {
 
   ParamsLifetimesMap &GetParamsLifetimes() { return ParamsLifetimes; }
 
+  ObjectLifetimes &GetParamLifetime(const clang::ParmVarDecl *param) {
+    auto it = ParamsLifetimes.find(param);
+    assert(it != ParamsLifetimes.end());
+    return it->second;
+  }
+
   Lifetime &GetParamLifetime(const clang::ParmVarDecl *param,
                              clang::QualType type) {
     type = type.getCanonicalType();
