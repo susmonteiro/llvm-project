@@ -39,30 +39,21 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
         << func->getSourceRange();
   }
 
-  debugLifetimes("Check return lifetime");
-
   auto &params_lifetimes = func_lifetimes.GetParamsLifetimes();
   ObjectLifetimes return_lifetime = func_lifetimes.GetReturnLifetime();
-  debugLifetimes("After get return lifetime");
   for (Lifetime &rl : return_lifetime.GetLifetimes()) {
-    if (rl.IsStatic() || rl.IsNotSet()) continue;
-    debugLifetimes("For each lifetime");
+    if (rl.IsStatic() || rl.IsNotSet() || rl.IsLocal()) continue;
     auto it = params_lifetimes.begin();
-    it++;
-    debugLifetimes("Are they the same?", it == params_lifetimes.end());
-    debugLifetimes("Get iterator");
-    while (it != params_lifetimes.end() && !it->second.HasLifetime(rl.GetId())) {
-      debugLifetimes("Inside iterator");
+    while (it != params_lifetimes.end() &&
+           !it->second.HasLifetime(rl.GetId())) {
       it++;
     }
-    debugLifetimes("After iterator");
-    // TODO change this
+
     if (it == params_lifetimes.end()) {
-      debugWarn("WARN FUNC RETURN STRANGE LIFETIME");
-      // S.Diag(func->getLocation(), diag::warn_func_return_lifetime_local)
-      //     << func->getSourceRange();
+      S.Diag(func->getLocation(),
+             diag::warn_func_return_unknown_lifetime)
+          << rl.GetLifetimeName() << func->getSourceRange();
     }
-    debugLifetimes("After check with end");
   }
 
   // DEBUG

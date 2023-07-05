@@ -31,7 +31,7 @@ int *$a correct_simple_return(int *$a x) {
   return x; // no warning
 }
 
-int *$b incorrect_simple_return(int *$a x) {
+int *$b incorrect_simple_return(int *$a x) { // expected-warning {{at least one parameter must be annotated with '$b'}}
   return x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
@@ -40,12 +40,12 @@ int &$a correct_simple_return_references(int &$a x) {
   return x;
 }
 
-int &$b incorrect_simple_return_references(int &$a x) {
+int &$b incorrect_simple_return_references(int &$a x) { // expected-warning {{at least one parameter must be annotated with '$b'}}
   return x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
-int *$a no_params_one_indirection(int *x) {
+int *$a no_params_one_indirection(int *x) { // expected-warning {{at least one parameter must be annotated with '$a'}}
         return x; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$local'}} \
             // expected-note@-1 {{declared with lifetime '$local' here}}
 }
@@ -59,7 +59,7 @@ int *$b no_params_two_indirections_2(int *$a *$b x) {
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
-int *$a *$b no_params_two_indirections(int *$a *x) {
+int *$a *$b no_params_two_indirections(int *$a *x) { // expected-warning {{at least one parameter must be annotated with '$b'}}
         return x; // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$local'}} \
             // expected-note@-1 {{declared with lifetime '$local' here}}
 }
@@ -96,13 +96,13 @@ int &$a correct_simple_dependencies_references(int &$a x) {
   return p;  // no warning
 }
 
-int *$b incorrect_simple_dependencies(int *$a x) {
+int *$b incorrect_simple_dependencies(int *$a x) { // expected-warning {{at least one parameter must be annotated with '$b'}}
   int *p = x;
   return p;  // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}}
 }
 
-int &$b incorrect_simple_dependencies_references(int &$a x) {
+int &$b incorrect_simple_dependencies_references(int &$a x) { // expected-warning {{at least one parameter must be annotated with '$b'}}
   int &p = x;
   return p;  // expected-warning {{function should return data with lifetime '$b' but it is returning data with lifetime '$a'}} \
             // expected-note@-1 {{declared with lifetime '$a' here}}
@@ -297,7 +297,7 @@ void no_warn_assignments(int *$a x, int *$b y, int *$c z, int *$d w) {
 
 // === Static and Local lifetimes ===
 
-int *$a static_lifetime_return(int *$static x) {
+int *$a static_lifetime_return(int *$static x) { // expected-warning {{at least one parameter must be annotated with '$a'}}
   return x; // correct because $a <= $static
 }
 
@@ -376,7 +376,7 @@ void local_lifetime_assign_and_return(int *$a x) {
                 // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
-int *$a return_local_lifetime_1() {
+int *$a return_local_lifetime_1() { // expected-warning {{at least one parameter must be annotated with '$a'}}
   int i = 0;
   int *p = &i;
   return p; // expected-warning {{function should return data with lifetime '$a' but it is returning data with lifetime '$local'}} \
@@ -787,7 +787,7 @@ void function_calls_2(int *$a x, int *$b y, int *$a z, int *$c w, int *$d v) {
                 // expected-note@-53 {{lifetime of '*xyw' is '$c}}
 }
 
-int *$a arrays(int *$b *$c arr) {
+int *$a arrays(int *$b *$c arr) { // expected-warning {{at least one parameter must be annotated with '$a'}}
   int *p = arr[0];
   int *q = arr[1];
   int *$a r = arr[2]; // expected-warning {{initialization requires that '$b' outlives '$a'}} \
