@@ -307,7 +307,7 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     const clang::VarDecl *lhs_var_decl, clang::QualType lhs_type,
     const clang::Expr *expr, const clang::Expr *rhs, clang::QualType rhs_type,
     const clang::Stmt *stmt, const clang::BinaryOperator *op,
-    bool return_lifetime, PrintNotesFactory factory) const {
+    bool is_return, PrintNotesFactory factory) const {
   if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
     const auto *rhs_decl_ref_expr = clang::dyn_cast<clang::DeclRefExpr>(expr);
     // there can only be one pointer/reference variable
@@ -315,15 +315,19 @@ void LifetimesCheckerVisitor::CompareAndCheck(
             dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
       while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
         Lifetime &lhs_lifetime =
-            return_lifetime ? State.GetReturnLifetime(lhs_type)
+            is_return ? State.GetReturnLifetime(lhs_type)
                             : State.GetLifetime(lhs_var_decl, lhs_type);
         Lifetime &rhs_lifetime =
             State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
-        // TODO is the first part of the condition true?
-        if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
+
+        if (is_return && rhs_lifetime.IsLocal()) {
+          S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
+              << rhs_type.getCanonicalType() << expr->getSourceRange();
+        } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
           factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                   rhs_lifetime);
         }
+
         lhs_type = lhs_type->getPointeeType();
         rhs_type = rhs_type->getPointeeType();
       }
@@ -469,19 +473,21 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         if (first_arg == nullptr) continue;
 
         clang::QualType first_arg_type = PointsTo.GetExprType(first_arg_expr);
-        first_arg_type = first_arg_type.isNull() ? first_param_info->type
-                                                 : first_arg_type;
+        first_arg_type =
+            first_arg_type.isNull() ? first_param_info->type : first_arg_type;
 
-        Lifetime &first_arg_lifetime = State.GetLifetime(first_arg, first_arg_type);
+        Lifetime &first_arg_lifetime =
+            State.GetLifetime(first_arg, first_arg_type);
 
         while (++it != params.end()) {
           if (it->index != first_param_info->index) {
             const auto *current_arg_expr = call->getArg(it->index);
             const auto *current_arg = GetDeclFromArg(current_arg_expr);
             if (current_arg != nullptr) {
-              clang::QualType current_arg_type = PointsTo.GetExprType(current_arg_expr);
-              current_arg_type = current_arg_type.isNull() ? it->type
-                                                           : current_arg_type;
+              clang::QualType current_arg_type =
+                  PointsTo.GetExprType(current_arg_expr);
+              current_arg_type =
+                  current_arg_type.isNull() ? it->type : current_arg_type;
               Lifetime &current_arg_lifetime =
                   State.GetLifetime(current_arg, current_arg_type);
               if (first_arg_lifetime != current_arg_lifetime) {
@@ -561,7 +567,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                   arg_lifetime.GetPossibleLifetimes().size();
               for (unsigned int i = 0; i < arg_possible_lifetimes_size; i++) {
                 if (!arg_lifetime.ContainsShortestLifetime(i)) continue;
-                S.Diag(arg->getExprLoc(), diag::arg_lifetimes_differ)
+                S.Diag(arg->getExprLoc(), diag::warn_arg_lifetimes_differ)
                     << GenerateArgName(arg_decl, param_info.num_indirections -
                                                      num_indirections)
                     << Lifetime::GetLifetimeName(STATIC)
@@ -573,7 +579,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                          param_info.num_indirections - num_indirections);
 
             } else {
-              S.Diag(arg->getExprLoc(), diag::arg_lifetimes_differ)
+              S.Diag(arg->getExprLoc(), diag::warn_arg_lifetimes_differ)
                   << GenerateArgName(arg_decl, param_info.num_indirections -
                                                    num_indirections)
                   << Lifetime::GetLifetimeName(STATIC)

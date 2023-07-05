@@ -116,14 +116,6 @@ std::string Lifetime::DebugString() const {
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
     for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
-      // TODO delete this
-      if ((!PossibleLifetimes[i].empty()) !=
-          (is_in_shortest(ShortestLifetimes, i))) {
-        debugWarn("POSSIBLE AND SHORTEST LIFETIMES ARE DIFFERENT");
-        debugLifetimes("PossibleLifetimes", !PossibleLifetimes[i].empty());
-        debugLifetimes("ShortestLifetimes",
-                       is_in_shortest(ShortestLifetimes, i));
-      }
       if (ContainsShortestLifetime(i)) {
         res += GetLifetimeName(i) + ' ';
       }

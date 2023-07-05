@@ -11830,7 +11830,7 @@ def warn_assign_lifetimes_differ : Warning<
   "assignment requires that '%1' outlives '%0'">;
 def warn_decl_lifetimes_differ : Warning<
   "initialization requires that '%1' outlives '%0'">;
-def arg_lifetimes_differ : Warning<
+def warn_arg_lifetimes_differ : Warning<
   "argument %0 requires that '%2' outlives '%1'">;
 def warn_func_params_lifetimes_equal : Warning<
   "when calling function %0, the lifetimes of arguments %1 and %2 should be the same">;
@@ -11840,6 +11840,8 @@ def warn_func_return_lifetime_local : Warning<
   "the return lifetime cannot be '$local'">;
 def warn_func_return_unknown_lifetime : Warning<
   "at least one parameter must be annotated with '%0'">;
+def warn_cannot_return_local : Warning<
+  "cannot return data of type %0 with lifetime '$local'">;
 def note_lifetime_of : Note<
   "lifetime of %0 is '%1'">;
 def note_lifetime_declared_here : Note<"declared with lifetime '%0' here">;

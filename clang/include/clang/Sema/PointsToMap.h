@@ -65,15 +65,21 @@ class PointsToMap {
     auto it = ExprToType.find(expr);
     if (it == ExprToType.end()) {
       return clang::QualType();
-    }
-    else {
+    } else {
       return it->second;
     }
   }
 
-  void RemoveExprType(const clang::Expr* expr) {
-    ExprToType.erase(expr);
+  std::optional<Lifetime> GetExprLifetime(const clang::Expr* expr) {
+    auto it = ExprToLifetime.find(expr);
+    if (it == ExprToLifetime.end()) {
+      return std::nullopt;
+    } else {
+      return it->second;
+    }
   }
+
+  void RemoveExprType(const clang::Expr* expr) { ExprToType.erase(expr); }
 
   bool IsEmpty(const clang::Expr* expr) { return ExprPointsTo[expr].empty(); }
 
@@ -89,10 +95,15 @@ class PointsToMap {
     ExprToType[expr] = type.getCanonicalType();
   }
 
+  void InsertExprLifetime(const clang::Expr* expr, Lifetime lifetime) {
+    ExprToLifetime[expr] = lifetime;
+  }
+
  private:
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::Expr*, 2>>
       ExprPointsTo;
   llvm::DenseMap<const clang::Expr*, clang::QualType> ExprToType;
+  llvm::DenseMap<const clang::Expr*, Lifetime> ExprToLifetime;
 };
 
 }  // namespace clang

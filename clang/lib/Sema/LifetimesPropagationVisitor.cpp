@@ -18,14 +18,26 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  clang::QualType lhs_type, clang::QualType base_type,
                  const clang::Stmt *loc, PointsToMap &PointsTo,
                  LifetimeAnnotationsAnalysis &state) {
-  const auto &points_to = PointsTo.GetExprPointsTo(rhs);
-  clang::QualType rhs_type = PointsTo.GetExprType(rhs);
-  rhs_type = rhs_type.isNull() ? base_type : rhs_type;
+  auto maybe_lifetime = PointsTo.GetExprLifetime(rhs);
+  if (maybe_lifetime.has_value()) {
+    state.GetLifetime(lhs, lhs_type)
+        .InsertPossibleLifetimes(maybe_lifetime.value().GetId(), loc);
+  } else {
+    const auto &points_to = PointsTo.GetExprPointsTo(rhs);
+    clang::QualType rhs_type = PointsTo.GetExprType(rhs);
+    rhs_type = rhs_type.isNull() ? base_type : rhs_type;
 
-  CreateDependency(rhs, lhs, lhs_type, rhs_type, loc, state);
-  for (const auto &expr : points_to) {
-    if (expr != nullptr) {
-      CreateDependency(expr, lhs, lhs_type, rhs_type, loc, state);
+    CreateDependency(rhs, lhs, lhs_type, rhs_type, loc, state);
+    for (const auto &expr : points_to) {
+      if (expr != nullptr) {
+        auto maybe_lifetime = PointsTo.GetExprLifetime(expr);
+        if (maybe_lifetime.has_value()) {
+          state.GetLifetime(lhs, lhs_type)
+              .InsertPossibleLifetimes(maybe_lifetime.value().GetId(), loc);
+        } else {
+          CreateDependency(expr, lhs, lhs_type, rhs_type, loc, state);
+        }
+      }
     }
   }
 }
@@ -123,7 +135,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
     clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
-
     auto &all_func_info = Analyzer->GetFunctionInfo();
 
     auto it = all_func_info.find(direct_callee);
@@ -133,7 +144,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     auto &func_info = all_func_info[direct_callee];
 
-    // ignore if return type does not have a Lifetime
+    // ignore if return type is not pointer or reference
     if (!func_type->isPointerType() && !func_type->isReferenceType()) {
       // debugWarn("Return type is not pointer type");
       unsigned int i = -1;
@@ -154,7 +165,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       return std::nullopt;
     }
 
+    // TODO should do this for all levels below
+    // TODO maybe do in the checker
     const Lifetime &return_lifetime = func_info.GetReturnLifetime(func_type);
+    if (return_lifetime.IsNotSet()) {
+      PointsTo.InsertExprLifetime(call,
+                                  Lifetime(LOCAL, return_lifetime.GetType()));
+      return std::nullopt;
+    }
 
     unsigned int i = -1;
     while (++i < func_info.GetNumParams()) {
@@ -351,17 +369,19 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         continue;
       }
 
+      ObjectLifetimes objectLifetimes;
       if (var_decl->isStaticLocal()) {
-        ObjectLifetimes objectLifetimes(Lifetime(STATIC, type.getCanonicalType()));
+        objectLifetimes =
+            ObjectLifetimes(Lifetime(STATIC, type.getCanonicalType()));
         if (type->isPointerType()) {
           objectLifetimes.InsertPointeeObject(
               Lifetime(STATIC, type->getPointeeType().getCanonicalType()));
         }
         State.CreateVariable(var_decl, objectLifetimes);
+        return std::nullopt;
       } else {
-        ObjectLifetimes objectsLifetimes =
-            GetVarDeclLifetime(var_decl, Factory);
-        State.CreateVariable(var_decl, objectsLifetimes);
+        objectLifetimes = GetVarDeclLifetime(var_decl, Factory);
+        State.CreateVariable(var_decl, objectLifetimes);
       }
 
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
@@ -380,6 +400,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
   for (const auto &child : expr->children()) {
     if (child == nullptr) continue;
     Visit(const_cast<clang::Stmt *>(child));
+    if (const auto *child_expr = clang::dyn_cast<clang::Expr>(child)) {
+      PointsTo.InsertExprLifetimes(expr, child_expr);
+    }
   }
   return std::nullopt;
 }
