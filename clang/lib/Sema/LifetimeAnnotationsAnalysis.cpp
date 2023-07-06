@@ -57,6 +57,15 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
   }
 }
 
+void LifetimeAnnotationsAnalysis::CreateDependencySimple(
+    const clang::VarDecl *from, clang::QualType from_type,
+    const clang::VarDecl *to, clang::QualType to_type, const clang::Stmt *loc) {
+  if (IsLifetimeNotset(from, from_type)) {
+    CreateLifetimeDependency(from, from_type, loc, to_type);
+    CreateStmtDependency(loc, to);
+  }
+}
+
 void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
                                                    clang::QualType from_type,
                                                    const clang::VarDecl *to,
@@ -164,8 +173,7 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
     for (const auto &info_rhs : info_lhs.second) {
       for (const auto &var : StmtDependencies[info_rhs.stmt]) {
         if (info_lhs.first.var_decl == var) continue;
-        str += info_rhs.type.getAsString() + ' ' +
-               var->getNameAsString() + ' ';
+        str += info_rhs.type.getAsString() + ' ' + var->getNameAsString() + ' ';
       }
     }
     str += '\n';
@@ -177,8 +185,8 @@ std::string LifetimeAnnotationsAnalysis::WorklistDebugString(
     std::vector<LHSTypeStruct> &worklist) {
   std::string res;
   for (const auto &el : worklist) {
-    res += '{' + el.type.getAsString() + ' ' +
-           el.var_decl->getNameAsString() + "}, ";
+    res += '{' + el.type.getAsString() + ' ' + el.var_decl->getNameAsString() +
+           "}, ";
   }
   res += '\n';
   return res;

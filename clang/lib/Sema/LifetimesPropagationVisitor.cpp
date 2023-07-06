@@ -14,6 +14,36 @@ void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
   }
 }
 
+void TransferFuncCall(const clang::VarDecl *lhs,
+                      const clang::CallExpr *call_expr,
+                      clang::QualType lhs_type, const clang::Stmt *loc,
+                      PointsToMap &PointsTo,
+                      LifetimeAnnotationsAnalysis &state) {
+  auto &call_info = PointsTo.GetCallExprInfo(call_expr);
+  while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
+    auto &current_type_call_info = call_info[lhs_type];
+    if (current_type_call_info.is_local) {
+      state.GetLifetime(lhs, lhs_type).InsertPossibleLifetimes(LOCAL, loc);
+    } else {
+      for (const auto &[arg, arg_type] : current_type_call_info.info) {
+        const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
+        for (const auto &expr : arg_points_to) {
+          if (expr == nullptr) continue;
+          if (const auto *rhs_ref_decl =
+                  clang::dyn_cast<clang::DeclRefExpr>(expr)) {
+            if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
+                    rhs_ref_decl->getDecl()->getCanonicalDecl())) {
+              state.CreateDependencySimple(lhs, lhs_type, rhs_var_decl,
+                                           arg_type, loc);
+            }
+          }
+        }
+      }
+    }
+    lhs_type = lhs_type->getPointeeType();
+  }
+}
+
 void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  clang::QualType lhs_type, clang::QualType base_type,
                  const clang::Stmt *loc, PointsToMap &PointsTo,
@@ -22,21 +52,16 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   clang::QualType rhs_type = PointsTo.GetExprType(rhs);
   rhs_type = rhs_type.isNull() ? base_type : rhs_type;
 
-  auto maybe_id = PointsTo.GetExprLifetime(rhs);
   if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
-    // auto call_info = PointsTo.GetExprInfo(call_expr);
-    if (maybe_id.has_value())
-      state.GetLifetime(lhs, lhs_type)
-          .InsertPossibleLifetimes(maybe_id.value(), loc);
+    TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
   } else {
     CreateDependency(rhs, lhs, lhs_type, rhs_type, loc, state);
   }
+
   for (const auto &expr : points_to) {
     if (expr != nullptr) {
-      auto maybe_id = PointsTo.GetExprLifetime(expr);
-      if (maybe_id.has_value()) {
-        state.GetLifetime(lhs, lhs_type)
-            .InsertPossibleLifetimes(maybe_id.value(), loc);
+      if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
+        TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
       } else {
         CreateDependency(expr, lhs, lhs_type, rhs_type, loc, state);
       }
@@ -146,7 +171,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     auto &func_info = all_func_info[direct_callee];
 
-    // ignore if return type is not pointer or reference
     if (!func_type->isPointerType() && !func_type->isReferenceType()) {
       // debugWarn("Return type is not pointer type");
       unsigned int i = -1;
@@ -167,55 +191,37 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       return std::nullopt;
     }
 
-    // TODO should do this for all levels below
-    // TODO maybe do in the checker
-    // ObjectLifetimes result_ol;
     ObjectLifetimes return_ol = func_info.GetReturnLifetime();
+    auto &call_info = PointsTo.GetCallExprInfo(call);
     while (func_type->isPointerType() || func_type->isReferenceType()) {
       Lifetime &return_lifetime = return_ol.GetLifetime(func_type);
+      auto &current_type_call_info = call_info[func_type];
+
       if (return_lifetime.IsNotSet()) {
-        // result_ol.InsertPointeeObject(Lifetime(LOCAL, func_type));
-        PointsTo.InsertExprLifetime(call, LOCAL);
-        // PointsTo.InsertExprInfo(call, clang::QualType(), nullptr);
-
-        func_type = func_type->getPointeeType();
-        continue;
-      }
-
-      unsigned int i = -1;
-      while (++i < func_info.GetNumParams()) {
-        const clang::ParmVarDecl *param = func_info.GetParam(i);
-        if (!param->getType()->isPointerType() &&
-            !param->getType()->isReferenceType()) {
-          // debugWarn("Param type is not pointer type");
-          continue;
-        }
-        const Expr *arg = call->getArg(i)->IgnoreParens();
-        Visit(const_cast<clang::Expr *>(arg));
-        clang::QualType param_type = PointsTo.GetExprType(arg);
-        if (!param_type.isNull()) {
-          PointsTo.InsertExprType(arg, param_type);
-        } else {
-          param_type = param->getType().getCanonicalType();
-        }
-
-        ObjectLifetimes &param_ol = func_info.GetParamLifetime(param);
-        for (Lifetime &param_lifetime : param_ol.GetLifetimes()) {
-          if (param_lifetime == return_lifetime) {
-            PointsTo.InsertExprInfo(call, param_lifetime.GetType(), arg);
+        current_type_call_info.is_local = true;
+      } else {
+        unsigned int i = -1;
+        while (++i < func_info.GetNumParams()) {
+          const clang::ParmVarDecl *param = func_info.GetParam(i);
+          if (!param->getType()->isPointerType() &&
+              !param->getType()->isReferenceType()) {
+            // debugWarn("Param type is not pointer type");
+            continue;
           }
-        }
-
-        const auto &param_lifetime =
-            func_info.GetParamLifetime(param, param_type);
-
-        if (param_lifetime == return_lifetime) {
-          PointsTo.InsertExprLifetimes(call, arg);
+          const Expr *arg = call->getArg(i)->IgnoreParens();
+          Visit(const_cast<clang::Expr *>(arg));
+          ObjectLifetimes &param_ol = func_info.GetParamLifetime(param);
+          for (Lifetime &param_lifetime : param_ol.GetLifetimes()) {
+            // TODO == or contains?
+            if (param_lifetime == return_lifetime) {
+              current_type_call_info.info.insert(
+                  {arg, param_lifetime.GetType().getCanonicalType()});
+            }
+          }
         }
       }
       func_type = func_type->getPointeeType();
     }
-    // PointsTo.InsertExprLifetime(call, return_ol);
   }
   return std::nullopt;
 }

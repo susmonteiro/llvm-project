@@ -16,11 +16,19 @@
 
 namespace clang {
 
-typedef struct CallExprInfo {
+typedef struct {
   // decl = nullptr -> lifetime $local
   const clang::Expr* arg;
   clang::QualType rtype;
 } CallExprInfo;
+
+typedef struct {
+  llvm::DenseSet<CallExprInfo> info;
+  bool is_local = false;
+} Dependencies;
+
+using TypeToSet = llvm::DenseMap<clang::QualType, Dependencies>;
+using CallExprInfoMap = llvm::DenseMap<const clang::CallExpr*, TypeToSet>;
 
 // Maintains the points-to sets needed for the analysis of a function.
 // A `PointsToMap` stores points-to sets for
@@ -77,18 +85,8 @@ class PointsToMap {
     }
   }
 
-  std::optional<char> GetExprLifetime(const clang::Expr* expr) {
-    auto it = ExprToLifetime.find(expr);
-    if (it == ExprToLifetime.end()) {
-      return std::nullopt;
-    } else {
-      return it->second;
-    }
-  }
-
-  llvm::DenseMap<clang::QualType, CallExprInfo> GetExprInfo(
-      const clang::CallExpr* expr) {
-    return ExprToInfo[expr];
+  TypeToSet& GetCallExprInfo(const clang::CallExpr* expr) {
+    return CallExprToInfo[expr];
   }
 
   void RemoveExprType(const clang::Expr* expr) { ExprToType.erase(expr); }
@@ -107,25 +105,38 @@ class PointsToMap {
     ExprToType[expr] = type.getCanonicalType();
   }
 
-  void InsertExprLifetime(const clang::Expr* expr, char lifetime_id) {
-    ExprToLifetime[expr] = lifetime_id;
-  }
-
-  void InsertExprInfo(const clang::Expr* expr, clang::QualType type,
-                      const clang::Expr* decl) {
-    ExprToInfo[expr][type] = {decl, type};
-  }
-
  private:
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::Expr*, 2>>
       ExprPointsTo;
   llvm::DenseMap<const clang::Expr*, clang::QualType> ExprToType;
-  llvm::DenseMap<const clang::Expr*, char> ExprToLifetime;
-  llvm::DenseMap<const clang::Expr*,
-                 llvm::DenseMap<clang::QualType, CallExprInfo>>
-      ExprToInfo;
+  CallExprInfoMap CallExprToInfo;
 };
 
 }  // namespace clang
+
+namespace llvm {
+
+template <>
+struct DenseMapInfo<clang::CallExprInfo, void> {
+  static clang::CallExprInfo getEmptyKey() {
+    return clang::CallExprInfo{nullptr, clang::QualType()};
+  }
+
+  static clang::CallExprInfo getTombstoneKey() {
+    return clang::CallExprInfo{reinterpret_cast<const clang::Expr*>(-1),
+                               clang::QualType()};
+  }
+
+  static unsigned getHashValue(const clang::CallExprInfo& info) {
+    return llvm::hash_value(info.arg);
+  }
+
+  static bool isEqual(const clang::CallExprInfo& lhs,
+                      const clang::CallExprInfo& rhs) {
+    return lhs.arg == rhs.arg && lhs.rtype == rhs.rtype;
+  }
+};
+
+}  // namespace llvm
 
 #endif  // LIFETIMES__POINTS_TO_MAP_H_

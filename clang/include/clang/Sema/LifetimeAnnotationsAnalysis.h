@@ -95,6 +95,11 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
 
+  void CreateDependencySimple(const clang::VarDecl *from,
+                              clang::QualType from_type,
+                              const clang::VarDecl *to, clang::QualType to_type,
+                              const clang::Stmt *loc);
+
   void CreateDependency(const clang::VarDecl *from, clang::QualType from_type,
                         const clang::VarDecl *to, clang::QualType to_type,
                         const clang::Stmt *loc);
