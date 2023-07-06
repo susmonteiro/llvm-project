@@ -21,20 +21,22 @@ void TransferFuncCall(const clang::VarDecl *lhs,
                       LifetimeAnnotationsAnalysis &state) {
   auto &call_info = PointsTo.GetCallExprInfo(call_expr);
   while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
-    auto &current_type_call_info = call_info[lhs_type];
-    if (current_type_call_info.is_local) {
-      state.GetLifetime(lhs, lhs_type).InsertPossibleLifetimes(LOCAL, loc);
-    } else {
-      for (const auto &[arg, arg_type] : current_type_call_info.info) {
-        const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
-        for (const auto &expr : arg_points_to) {
-          if (expr == nullptr) continue;
-          if (const auto *rhs_ref_decl =
-                  clang::dyn_cast<clang::DeclRefExpr>(expr)) {
-            if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
-                    rhs_ref_decl->getDecl()->getCanonicalDecl())) {
-              state.CreateDependencySimple(lhs, lhs_type, rhs_var_decl,
-                                           arg_type, loc);
+    if (state.IsLifetimeNotset(lhs, lhs_type)) {
+      auto &current_type_call_info = call_info[lhs_type];
+      if (current_type_call_info.is_local) {
+        state.GetLifetime(lhs, lhs_type).InsertPossibleLifetimes(LOCAL, loc);
+      } else {
+        for (const auto &[arg, arg_type] : current_type_call_info.info) {
+          const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
+          for (const auto &expr : arg_points_to) {
+            if (expr == nullptr) continue;
+            if (const auto *rhs_ref_decl =
+                    clang::dyn_cast<clang::DeclRefExpr>(expr)) {
+              if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
+                      rhs_ref_decl->getDecl()->getCanonicalDecl())) {
+                state.CreateDependencySimple(lhs, lhs_type, rhs_var_decl,
+                                             arg_type, loc);
+              }
             }
           }
         }
@@ -51,7 +53,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   const auto &points_to = PointsTo.GetExprPointsTo(rhs);
   clang::QualType rhs_type = PointsTo.GetExprType(rhs);
   rhs_type = rhs_type.isNull() ? base_type : rhs_type;
-
   if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
     TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
   } else {
@@ -60,7 +61,7 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
 
   for (const auto &expr : points_to) {
     if (expr != nullptr) {
-      if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
+      if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
         TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
       } else {
         CreateDependency(expr, lhs, lhs_type, rhs_type, loc, state);
@@ -161,6 +162,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
+    PointsTo.InsertExprLifetimes(call, nullptr);
+
     clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
     auto &all_func_info = Analyzer->GetFunctionInfo();
 

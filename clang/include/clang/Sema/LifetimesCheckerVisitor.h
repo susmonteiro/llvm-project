@@ -12,7 +12,7 @@
 
 namespace clang {
 using PrintNotesFactory =
-    std::function<void(const clang::VarDecl *, const clang::VarDecl *,
+    std::function<void(const clang::VarDecl *, const clang::Decl *,
                        const clang::BinaryOperator *, const clang::Expr *,
                        const clang::Stmt *, Lifetime &, Lifetime &)>;
 
@@ -20,11 +20,11 @@ class LifetimesCheckerVisitorFactory {
  public:
   LifetimesCheckerVisitorFactory(Sema &sema) : S(sema) {}
 
-  void PrintNotes(Lifetime &lifetime, const clang::VarDecl *var_decl,
+  void PrintNotes(Lifetime &lifetime, const clang::Decl *var_decl,
                   int msg) const;
   void PrintNotes(Lifetime &lifetime, clang::SourceLocation loc,
                   clang::SourceRange range, int msg) const;
-  void PrintNotes(Lifetime &lifetime, const clang::VarDecl *var_decl, int msg,
+  void PrintNotes(Lifetime &lifetime, const clang::Decl *var_decl, int msg,
                   char id) const;
   void PrintNotes(Lifetime &lifetime, clang::SourceLocation Loc,
                   clang::SourceRange range, int msg, char id) const;

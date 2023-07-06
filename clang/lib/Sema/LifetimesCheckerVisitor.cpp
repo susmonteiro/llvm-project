@@ -15,7 +15,7 @@ std::string GenerateArgName(const clang::VarDecl *arg,
 }
 
 void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
-                                                const clang::VarDecl *var_decl,
+                                                const clang::Decl *var_decl,
                                                 int msg) const {
   char id = lifetime.GetId();
   PrintNotes(lifetime, var_decl, msg, id);
@@ -30,7 +30,7 @@ void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
 }
 
 void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
-                                                const clang::VarDecl *var_decl,
+                                                const clang::Decl *var_decl,
                                                 int msg, char id) const {
   PrintNotes(lifetime, var_decl->getLocation(), var_decl->getSourceRange(), msg,
              id);
@@ -54,7 +54,7 @@ void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
 
 PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
   return [this](const clang::VarDecl *lhs_var_decl,
-                const clang::VarDecl *rhs_var_decl,
+                const clang::Decl *rhs_var_decl,
                 const clang::BinaryOperator *op, const clang::Expr *expr,
                 const clang::Stmt *stmt, clang::Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
@@ -86,7 +86,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
 
 PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
   return [this](const clang::VarDecl *lhs_var_decl,
-                const clang::VarDecl *rhs_var_decl,
+                const clang::Decl *rhs_var_decl,
                 const clang::BinaryOperator *op, const clang::Expr *expr,
                 const clang::Stmt *stmt, Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
@@ -118,7 +118,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
 
 PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
   return [this](const clang::VarDecl *_lhs_var_decl,
-                const clang::VarDecl *var_decl,
+                const clang::Decl *var_decl,
                 const clang::BinaryOperator *_op, const clang::Expr *expr,
                 const clang::Stmt *return_stmt, Lifetime &return_lifetime,
                 Lifetime &var_lifetime) {
@@ -175,6 +175,9 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
   const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
   if (const auto *lhs_var_decl =
           dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
+    CompareAndCheck(lhs_var_decl, lhs_type, rhs, rhs, rhs_type, nullptr, op,
+                    false, factory);
+
     for (const auto &expr : rhs_points_to) {
       CompareAndCheck(lhs_var_decl, lhs_type, expr, rhs, rhs_type, nullptr, op,
                       false, factory);
@@ -306,17 +309,18 @@ void LifetimesCheckerVisitor::CallExprChecker(
 void LifetimesCheckerVisitor::CompareAndCheck(
     const clang::VarDecl *lhs_var_decl, clang::QualType lhs_type,
     const clang::Expr *expr, const clang::Expr *rhs, clang::QualType rhs_type,
-    const clang::Stmt *stmt, const clang::BinaryOperator *op,
-    bool is_return, PrintNotesFactory factory) const {
-  if (expr != nullptr && clang::isa<clang::DeclRefExpr>(expr)) {
-    const auto *rhs_decl_ref_expr = clang::dyn_cast<clang::DeclRefExpr>(expr);
+    const clang::Stmt *stmt, const clang::BinaryOperator *op, bool is_return,
+    PrintNotesFactory factory) const {
+  if (expr == nullptr) return;
+  if (const auto *rhs_decl_ref_expr =
+          clang::dyn_cast<clang::DeclRefExpr>(expr)) {
     // there can only be one pointer/reference variable
     if (const auto *rhs_var_decl =
             dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
       while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
         Lifetime &lhs_lifetime =
             is_return ? State.GetReturnLifetime(lhs_type)
-                            : State.GetLifetime(lhs_var_decl, lhs_type);
+                      : State.GetLifetime(lhs_var_decl, lhs_type);
         Lifetime &rhs_lifetime =
             State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
 
@@ -331,6 +335,48 @@ void LifetimesCheckerVisitor::CompareAndCheck(
         lhs_type = lhs_type->getPointeeType();
         rhs_type = rhs_type->getPointeeType();
       }
+    }
+  } else if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
+    auto &call_info = PointsTo.GetCallExprInfo(call_expr);
+    while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
+      Lifetime &lhs_lifetime = is_return
+                                   ? State.GetReturnLifetime(lhs_type)
+                                   : State.GetLifetime(lhs_var_decl, lhs_type);
+
+      auto &current_type_call_info = call_info[lhs_type];
+
+      if (current_type_call_info.is_local) {
+        if (is_return) {
+        S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
+            << rhs_type.getCanonicalType() << expr->getSourceRange();
+        } else {
+          Lifetime arg_lifetime(LOCAL);
+          if (Lifetime(LOCAL) < lhs_lifetime) {
+            factory(lhs_var_decl, call_expr->getCalleeDecl(), op, expr, stmt, lhs_lifetime,
+                    arg_lifetime);
+          }
+        }
+      }
+
+      for (const auto &[arg, arg_type] : current_type_call_info.info) {
+        const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
+        for (const auto &expr : arg_points_to) {
+          if (expr == nullptr) continue;
+          if (const auto *rhs_ref_decl =
+                  clang::dyn_cast<clang::DeclRefExpr>(expr)) {
+            if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
+                    rhs_ref_decl->getDecl()->getCanonicalDecl())) {
+              Lifetime &arg_lifetime =
+                  State.GetLifetimeOrLocal(rhs_var_decl, arg_type);
+              if (arg_lifetime < lhs_lifetime) {
+                factory(lhs_var_decl, rhs_var_decl, op, expr, stmt,
+                        lhs_lifetime, arg_lifetime);
+              }
+            }
+          }
+        }
+      }
+      lhs_type = lhs_type->getPointeeType();
     }
   }
 }
