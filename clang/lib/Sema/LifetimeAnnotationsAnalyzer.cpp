@@ -50,8 +50,7 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
     }
 
     if (it == params_lifetimes.end()) {
-      S.Diag(func->getLocation(),
-             diag::warn_func_return_unknown_lifetime)
+      S.Diag(func->getLocation(), diag::warn_func_return_unknown_lifetime)
           << rl.GetLifetimeName() << func->getSourceRange();
     }
   }
@@ -138,11 +137,17 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     for (auto &rhs_info : children[el]) {
       auto rhs_current_type = rhs_info.type;
       stmts.insert(rhs_info);
-      for (const auto &var_decl : stmt_dependencies[rhs_info.stmt]) {
+
+      auto &this_stmt_dependencies = stmt_dependencies[rhs_info.stmt];
+      if (this_stmt_dependencies.empty()) {
+        Lifetime::InsertPossibleLifetimes(LOCAL, rhs_info.stmt,
+                                          possible_lifetimes);
+        continue;
+      }
+      for (const auto &var_decl : this_stmt_dependencies) {
         if (var_decl == current_var) continue;
         Lifetime &rhs_lifetime = State.GetLifetime(var_decl, rhs_current_type);
 
-        // TODO relation between lifetimes and stmts
         if (rhs_lifetime.IsNotSet()) {
           auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
           for (unsigned int i = 0; i < rhs_possible_lifetimes.size(); i++) {
@@ -156,7 +161,6 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
           Lifetime::InsertPossibleLifetimes(vardecl_lifetime_id, rhs_info.stmt,
                                             possible_lifetimes);
         }
-        // }
       }
     }
     // debugLifetimes("Original shortest lifetimes",

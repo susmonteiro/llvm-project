@@ -118,10 +118,9 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
 
 PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
   return [this](const clang::VarDecl *_lhs_var_decl,
-                const clang::Decl *var_decl,
-                const clang::BinaryOperator *_op, const clang::Expr *expr,
-                const clang::Stmt *return_stmt, Lifetime &return_lifetime,
-                Lifetime &var_lifetime) {
+                const clang::Decl *var_decl, const clang::BinaryOperator *_op,
+                const clang::Expr *expr, const clang::Stmt *return_stmt,
+                Lifetime &return_lifetime, Lifetime &var_lifetime) {
     assert(var_decl != nullptr && expr != nullptr && return_stmt != nullptr);
     assert(return_lifetime.IsSet());
     if (var_lifetime.IsNotSet()) {
@@ -342,18 +341,21 @@ void LifetimesCheckerVisitor::CompareAndCheck(
       Lifetime &lhs_lifetime = is_return
                                    ? State.GetReturnLifetime(lhs_type)
                                    : State.GetLifetime(lhs_var_decl, lhs_type);
-
+      if (lhs_lifetime.IsNotSet()) {
+        lhs_type = lhs_type->getPointeeType();
+        continue;
+      }
       auto &current_type_call_info = call_info[lhs_type];
 
       if (current_type_call_info.is_local) {
         if (is_return) {
-        S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
-            << rhs_type.getCanonicalType() << expr->getSourceRange();
+          S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
+              << rhs_type.getCanonicalType() << expr->getSourceRange();
         } else {
           Lifetime arg_lifetime(LOCAL);
           if (Lifetime(LOCAL) < lhs_lifetime) {
-            factory(lhs_var_decl, call_expr->getCalleeDecl(), op, expr, stmt, lhs_lifetime,
-                    arg_lifetime);
+            factory(lhs_var_decl, call_expr->getCalleeDecl(), op, expr, stmt,
+                    lhs_lifetime, arg_lifetime);
           }
         }
       }

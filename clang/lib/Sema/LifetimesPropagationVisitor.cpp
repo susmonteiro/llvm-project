@@ -24,7 +24,7 @@ void TransferFuncCall(const clang::VarDecl *lhs,
     if (state.IsLifetimeNotset(lhs, lhs_type)) {
       auto &current_type_call_info = call_info[lhs_type];
       if (current_type_call_info.is_local) {
-        state.GetLifetime(lhs, lhs_type).InsertPossibleLifetimes(LOCAL, loc);
+        state.CreateLifetimeDependency(lhs, lhs_type, loc, lhs_type);
       } else {
         for (const auto &[arg, arg_type] : current_type_call_info.info) {
           const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
