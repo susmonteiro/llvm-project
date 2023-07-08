@@ -326,6 +326,16 @@ void LifetimesCheckerVisitor::CompareAndCheck(
         if (is_return && rhs_lifetime.IsLocal()) {
           S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
               << rhs_type.getCanonicalType() << expr->getSourceRange();
+          const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
+          if (maybe_stmts.has_value()) {
+            const auto &stmts = maybe_stmts.value();
+            for (const auto &stmt : stmts) {
+              S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
+                  << Lifetime::GetLifetimeName(LOCAL) << stmt->getSourceRange();
+            }
+          } else {
+            S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here) << rhs_lifetime.GetLifetimeName() << rhs_var_decl->getSourceRange();
+          }
         } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
           factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                   rhs_lifetime);

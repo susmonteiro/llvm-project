@@ -46,7 +46,8 @@ int &$b incorrect_simple_return_references(int &$a x) { // expected-warning {{at
 }
 
 int *$a no_params_one_indirection(int *x) { // expected-warning {{at least one parameter must be annotated with '$a'}}
-        return x; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+        return x; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int *$a no_params_two_indirections_1(int *$a *$b x) {
@@ -59,7 +60,8 @@ int *$b no_params_two_indirections_2(int *$a *$b x) {
 }
 
 int *$a *$b no_params_two_indirections(int *$a *x) { // expected-warning {{at least one parameter must be annotated with '$b'}}
-        return x; // expected-warning {{cannot return data of type 'int **' with lifetime '$local'}}
+        return x; // expected-warning {{cannot return data of type 'int **' with lifetime '$local'}} \
+        // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int *$a correct_simple_return(int *$a x, int *$b y) {
@@ -377,19 +379,22 @@ void local_lifetime_assign_and_return(int *$a x) {
 int *$a return_local_lifetime_1() { // expected-warning {{at least one parameter must be annotated with '$a'}}
   int i = 0;
   int *p = &i;
-  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int *$local return_local_lifetime_2() { // expected-warning {{the return lifetime cannot be '$local'}}
   int i = 0;
   int *p = &i;
-  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+  // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int *return_local_lifetime_3() {
   int i = 0;
   int *p = &i;
-  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 void multiple_indirections(int *$a *$b *$c *$d x) {
@@ -819,35 +824,43 @@ int *no_return_lifetime(int *$a x) {
 
 int *$a call_no_return_lifetime(int *$a x) {
   int *p = no_return_lifetime(x);
-  if (*x < 0) return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  if (*x < 0) return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+                        // expected-note@-1 {{declared with lifetime '$local' here}}
 
   int *q = x;
   q = no_return_lifetime(x);
-  if (*x < 1) return q; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  if (*x < 1) return q; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+                        // expected-note@-1 {{declared with lifetime '$local' here}}
 
   int *r = x;
   r = no_return_lifetime(x) + 1;
-  if (*x < 2) return r; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  if (*x < 2) return r; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+                        // expected-note@-1 {{declared with lifetime '$local' here}}
   return x;
 }
 
 int *return_local() {
   int *$local p;
-  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int **return_local2() {
   int *$local *p;
-  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}}
+  return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int **return_local3() {
   int *$local *$local p;
   return p; // expected-warning {{cannot return data of type 'int *' with lifetime '$local'}} \
-            // expected-warning {{cannot return data of type 'int **' with lifetime '$local'}}
+            // expected-warning {{cannot return data of type 'int **' with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
 }
 
 int **return_local4() {
   int **$local p;
-  return p; // expected-warning {{cannot return data of type 'int **' with lifetime '$local'}}
+  return p; // expected-warning {{cannot return data of type 'int **' with lifetime '$local'}} \
+            // expected-note@-1 {{declared with lifetime '$local' here}}
 }
