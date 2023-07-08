@@ -435,23 +435,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   }
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
-  // TODO remove this
-  if (lhs_points_to.empty() && !clang::isa<clang::DeclRefExpr>(lhs)) {
-    debugWarn("LHS is not in PointsToMap");
-    Visit(lhs);
-    PointsTo.InsertExprLifetimes(op, lhs);
-    const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
-  }
 
   const auto &rhs = op->getRHS()->IgnoreParens();
   const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
-  // TODO remove this
-  if (rhs_points_to.empty() && !clang::isa<clang::DeclRefExpr>(rhs)) {
-    debugWarn("RHS is not in PointsToMap");
-    Visit(rhs);
-    PointsTo.InsertExprLifetimes(op, rhs);
-    const auto &rhs_points_to = PointsTo.GetExprPointsTo(rhs);
-  }
 
   if (const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(lhs)) {
     VerifyBinAssign(lhs_type, base_type, rhs, lhs_decl_ref_expr, rhs_points_to,

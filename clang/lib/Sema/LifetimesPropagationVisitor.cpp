@@ -110,7 +110,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
   if (debugEnabled) debugLifetimes("[VisitArraySubscriptExpr]");
   Visit(const_cast<clang::Expr *>(expr->getIdx()));
   Visit(const_cast<clang::Expr *>(expr->getBase()));
-  PointsTo.InsertExprLifetimes(expr, expr->getBase());
+  PointsTo.InsertExprPointsTo(expr, expr->getBase());
   clang::QualType found_type = PointsTo.GetExprType(expr->getBase());
   if (!found_type.isNull()) {
     PointsTo.InsertExprType(expr, found_type);
@@ -136,10 +136,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   }
 
   Visit(lhs);
-  PointsTo.InsertExprLifetimes(op, lhs);
+  PointsTo.InsertExprPointsTo(op, lhs);
 
   Visit(rhs);
-  PointsTo.InsertExprLifetimes(op, rhs);
+  PointsTo.InsertExprPointsTo(op, rhs);
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
 
@@ -162,7 +162,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
-    PointsTo.InsertExprLifetimes(call, nullptr);
+    PointsTo.InsertExprPointsTo(call, nullptr);
 
     clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
     auto &all_func_info = Analyzer->GetFunctionInfo();
@@ -259,7 +259,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
           continue;
         }
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-          PointsTo.InsertExprLifetimes(cast, child_expr);
+          PointsTo.InsertExprPointsTo(cast, child_expr);
           clang::QualType found_type = PointsTo.GetExprType(child_expr);
           if (!found_type.isNull()) {
             PointsTo.InsertExprType(cast, found_type);
@@ -324,7 +324,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
           continue;
         }
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-          PointsTo.InsertExprLifetimes(cast, child_expr);
+          PointsTo.InsertExprPointsTo(cast, child_expr);
           clang::QualType found_type = PointsTo.GetExprType(child_expr);
           if (!found_type.isNull()) {
             PointsTo.InsertExprType(cast, found_type);
@@ -363,8 +363,8 @@ LifetimesPropagationVisitor::VisitConditionalOperator(
   const auto *false_expr = op->getFalseExpr();
   Visit(const_cast<clang::Expr *>(true_expr));
   Visit(const_cast<clang::Expr *>(false_expr));
-  PointsTo.InsertExprLifetimes(op, true_expr);
-  PointsTo.InsertExprLifetimes(op, false_expr);
+  PointsTo.InsertExprPointsTo(op, true_expr);
+  PointsTo.InsertExprPointsTo(op, false_expr);
   return std::nullopt;
 }
 
@@ -380,7 +380,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
 
   if (decl_ref->isGLValue() || decl_ref->getType()->isBuiltinType())
     return std::nullopt;
-  PointsTo.InsertExprLifetimes(decl_ref, nullptr);
+  PointsTo.InsertExprPointsTo(decl_ref, nullptr);
 
   return std::nullopt;
 }
@@ -428,7 +428,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
     if (child == nullptr) continue;
     Visit(const_cast<clang::Stmt *>(child));
     if (const auto *child_expr = clang::dyn_cast<clang::Expr>(child)) {
-      PointsTo.InsertExprLifetimes(expr, child_expr);
+      PointsTo.InsertExprPointsTo(expr, child_expr);
     }
   }
   return std::nullopt;
@@ -440,7 +440,31 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
 
   const clang::Expr *base = member_expr->getBase();
   Visit(const_cast<clang::Expr *>(base));
-  PointsTo.InsertExprLifetimes(member_expr, base);
+  PointsTo.InsertExprPointsTo(member_expr, base);
+  auto &points_to = PointsTo.GetExprPointsTo(base);
+
+  if (const auto *decl_ref_expr = clang::dyn_cast<clang::DeclRefExpr>(base)) {
+    if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(
+            decl_ref_expr->getDecl()->getCanonicalDecl())) {
+      PointsTo.InsertExprLifetime(
+          member_expr, State.GetLifetimeOrLocal(var_decl, var_decl->getType()));
+    }
+  } else {
+    for (const auto *child : points_to) {
+      if (child == nullptr) continue;
+      if (const auto *decl_ref_expr =
+              clang::dyn_cast<clang::DeclRefExpr>(child)) {
+        if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(
+                decl_ref_expr->getDecl()->getCanonicalDecl())) {
+          PointsTo.InsertExprLifetime(
+              member_expr,
+              State.GetLifetimeOrLocal(var_decl, var_decl->getType()));
+        }
+      }
+    }
+  }
+
+  // TODO delete this
   PointsTo.InsertExprType(member_expr, base->getType());
   return std::nullopt;
 }
@@ -487,7 +511,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
     if (const auto *child_expr = dyn_cast<clang::Expr>(child)) {
-      PointsTo.InsertExprLifetimes(op, child_expr);
+      PointsTo.InsertExprPointsTo(op, child_expr);
     }
   }
 
@@ -517,7 +541,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryOperator(
     }
 
     if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
-      PointsTo.InsertExprLifetimes(op, child_expr);
+      PointsTo.InsertExprPointsTo(op, child_expr);
     }
   }
   return std::nullopt;
