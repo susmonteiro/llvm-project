@@ -55,7 +55,7 @@ class LifetimeAnnotationsAnalyzer {
     for (const auto &info : var_stmt) {
       for (const auto &rhs_var : stmt_var[info.stmt]) {
         if (var == rhs_var) continue;
-        res += rhs_var->getNameAsString() + ' ';
+        res += "(" + info.type.getAsString() + ")" + rhs_var->getNameAsString() + ' ';
       }
     }
     res += '\n';

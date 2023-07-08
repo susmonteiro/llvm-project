@@ -20,14 +20,16 @@ void TransferFuncCall(const clang::VarDecl *lhs,
                       PointsToMap &PointsTo,
                       LifetimeAnnotationsAnalysis &state) {
   auto &call_info = PointsTo.GetCallExprInfo(call_expr);
-  while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
+  clang::QualType func_type = call_expr->getType().getCanonicalType();
+  while ((lhs_type->isPointerType() || lhs_type->isReferenceType()) &&
+         (func_type->isPointerType() || func_type->isReferenceType())) {
     if (state.IsLifetimeNotset(lhs, lhs_type)) {
-      auto &current_type_call_info = call_info[lhs_type];
+      auto &current_type_call_info = call_info[func_type];
       if (current_type_call_info.is_local) {
-        state.CreateLifetimeDependency(lhs, lhs_type, loc, lhs_type);
+        state.CreateLifetimeDependency(lhs, lhs_type, loc, func_type);
         state.CreateStmtLifetime(loc, LOCAL);
       } else if (current_type_call_info.is_static) {
-        state.CreateLifetimeDependency(lhs, lhs_type, loc, lhs_type);
+        state.CreateLifetimeDependency(lhs, lhs_type, loc, func_type);
         state.CreateStmtLifetime(loc, STATIC);
       } else {
         for (const auto &[arg, arg_type] : current_type_call_info.info) {
@@ -47,6 +49,7 @@ void TransferFuncCall(const clang::VarDecl *lhs,
       }
     }
     lhs_type = lhs_type->getPointeeType();
+    func_type = func_type->getPointeeType();
   }
 }
 
@@ -334,6 +337,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
           clang::QualType found_type = PointsTo.GetExprType(child_expr);
           if (!found_type.isNull()) {
             PointsTo.InsertExprType(cast, found_type);
+          } else {
+            PointsTo.InsertExprType(cast, child_expr->getType());
           }
         }
       }
@@ -397,18 +402,18 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
-      clang::QualType type = var_decl->getType().getCanonicalType();
-      if (!type->isPointerType() && !type->isReferenceType()) {
+      clang::QualType lhs_type = var_decl->getType().getCanonicalType();
+      if (!lhs_type->isPointerType() && !lhs_type->isReferenceType()) {
         continue;
       }
 
       ObjectLifetimes objectLifetimes;
       if (var_decl->isStaticLocal()) {
         objectLifetimes =
-            ObjectLifetimes(Lifetime(STATIC, type.getCanonicalType()));
-        if (type->isPointerType()) {
+            ObjectLifetimes(Lifetime(STATIC, lhs_type.getCanonicalType()));
+        if (lhs_type->isPointerType()) {
           objectLifetimes.InsertPointeeObject(
-              Lifetime(STATIC, type->getPointeeType().getCanonicalType()));
+              Lifetime(STATIC, lhs_type->getPointeeType().getCanonicalType()));
         }
         State.CreateVariable(var_decl, objectLifetimes);
         return std::nullopt;
@@ -420,7 +425,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
-        TransferRHS(var_decl, init, type, type, decl_stmt, PointsTo, State);
+        TransferRHS(var_decl, init, lhs_type, lhs_type, decl_stmt, PointsTo,
+                    State);
       }
     }
   }
