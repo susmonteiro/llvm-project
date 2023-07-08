@@ -16,6 +16,7 @@ class ObjectLifetimes {
   ObjectLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
 
   Lifetime& GetLifetime(clang::QualType& type) {
+    type = type.getCanonicalType();
     for (auto& pointee : PointeeObjects) {
       if (pointee.GetType() == type) {
         return pointee;
