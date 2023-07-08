@@ -35,8 +35,7 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
     const clang::VarDecl *var_decl, clang::QualType type) {
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
-    debugWarn("Creating variable");
-    CreateVariable(var_decl, Lifetime(LOCAL, type));
+    CreateVariable(var_decl, Lifetime(LOCAL, type.getCanonicalType()));
   }
   return VariableLifetimes[var_decl].GetLifetimeOrLocal(type);
 }

@@ -16,7 +16,6 @@ class ObjectLifetimes {
   ObjectLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
 
   Lifetime& GetLifetime(clang::QualType& type) {
-    type = type.getCanonicalType();
     for (auto& pointee : PointeeObjects) {
       if (pointee.GetType() == type) {
         return pointee;
@@ -40,14 +39,14 @@ class ObjectLifetimes {
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
   bool HasLifetimeLocal() {
-    for (Lifetime &lifetime : PointeeObjects) {
+    for (Lifetime& lifetime : PointeeObjects) {
       if (lifetime.IsLocal()) return true;
     }
     return false;
   }
 
   bool HasLifetime(char id) {
-    for (Lifetime &lifetime : PointeeObjects) {
+    for (Lifetime& lifetime : PointeeObjects) {
       if (lifetime.GetId() == id) return true;
     }
     return false;
@@ -62,7 +61,6 @@ class ObjectLifetimes {
   Lifetime& InsertPointeeObject(clang::QualType type) {
     PointeeObjects.emplace_back(type);
     return GetLifetime(type);
-
   }
 
   std::string DebugString() const {
