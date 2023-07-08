@@ -25,6 +25,10 @@ void TransferFuncCall(const clang::VarDecl *lhs,
       auto &current_type_call_info = call_info[lhs_type];
       if (current_type_call_info.is_local) {
         state.CreateLifetimeDependency(lhs, lhs_type, loc, lhs_type);
+        state.CreateStmtLifetime(loc, LOCAL);
+      } else if (current_type_call_info.is_static) {
+        state.CreateLifetimeDependency(lhs, lhs_type, loc, lhs_type);
+        state.CreateStmtLifetime(loc, STATIC);
       } else {
         for (const auto &[arg, arg_type] : current_type_call_info.info) {
           const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
@@ -202,6 +206,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
       if (return_lifetime.IsNotSet()) {
         current_type_call_info.is_local = true;
+      } else if (return_lifetime.IsStatic()) {
+        current_type_call_info.is_static = true;
       } else {
         unsigned int i = -1;
         while (++i < func_info.GetNumParams()) {

@@ -140,7 +140,8 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
 
       auto &this_stmt_dependencies = stmt_dependencies[rhs_info.stmt];
       if (this_stmt_dependencies.empty()) {
-        Lifetime::InsertPossibleLifetimes(LOCAL, rhs_info.stmt,
+        char id = State.GetStmtLifetime(rhs_info.stmt);
+        Lifetime::InsertPossibleLifetimes(id, rhs_info.stmt,
                                           possible_lifetimes);
         continue;
       }

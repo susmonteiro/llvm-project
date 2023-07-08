@@ -25,6 +25,7 @@ typedef struct {
 typedef struct {
   llvm::DenseSet<CallExprInfo> info;
   bool is_local = false;
+  bool is_static = false;
 } Dependencies;
 
 using TypeToSet = llvm::DenseMap<clang::QualType, Dependencies>;

@@ -22,6 +22,8 @@ using VariableLifetimesVector =
 using StmtVarDependenciesMap =
     llvm::DenseMap<const clang::Stmt *, llvm::DenseSet<const clang::VarDecl *>>;
 
+using LifetimesMap = llvm::DenseMap<const clang::Stmt *, char>;
+
 struct LHSTypeStruct {
   const clang::VarDecl *var_decl;
   clang::QualType type;
@@ -88,12 +90,15 @@ class LifetimeAnnotationsAnalysis {
 
   VarStmtDependenciesMap &GetLifetimeDependencies();
   StmtVarDependenciesMap &GetStmtDependencies();
+  char GetStmtLifetime(const clang::Stmt *stmt);
 
   void CreateLifetimeDependency(const clang::VarDecl *from,
                                 clang::QualType from_type,
                                 const clang::Stmt *to, clang::QualType to_type);
 
   void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
+
+  void CreateStmtLifetime(const clang::Stmt *from, char id);
 
   void CreateDependencySimple(const clang::VarDecl *from,
                               clang::QualType from_type,
@@ -125,6 +130,7 @@ class LifetimeAnnotationsAnalysis {
   VariableLifetimesVector VariableLifetimes;
   VarStmtDependenciesMap LifetimeDependencies;
   StmtVarDependenciesMap StmtDependencies;
+  LifetimesMap StmtLifetimes;
   PointsToMap PointsTo;
   ObjectLifetimes ReturnLifetime;
 };
