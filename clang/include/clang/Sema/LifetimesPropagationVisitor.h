@@ -24,8 +24,7 @@ class LifetimesPropagationVisitor
       : Func(func),
         Analyzer(analyzer),
         State(state),
-        PointsTo(state.GetPointsTo()),
-        Factory(func) {}
+        PointsTo(state.GetPointsTo()) {}
 
   std::optional<std::string> VisitArraySubscriptExpr(
       const clang::ArraySubscriptExpr *expr);
@@ -55,7 +54,6 @@ class LifetimesPropagationVisitor
   LifetimeAnnotationsAnalyzer *Analyzer;
   LifetimeAnnotationsAnalysis &State;
   PointsToMap &PointsTo;
-  FunctionLifetimeFactory Factory;
   bool debugEnabled = true;  // TODO delete this
 };
 

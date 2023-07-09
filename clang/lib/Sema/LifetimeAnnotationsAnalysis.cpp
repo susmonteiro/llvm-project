@@ -4,7 +4,8 @@ namespace clang {
 
 LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis() {}
 LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis(
-    FunctionLifetimes &function_info) {
+    FunctionLifetimes &function_info, const clang::FunctionDecl *func)
+    : Factory(func) {
   const auto &params_lifetimes = function_info.GetParamsLifetimes();
   for (auto &pair : params_lifetimes) {
     VariableLifetimes.insert({pair.first, pair.second});
@@ -14,6 +15,23 @@ LifetimeAnnotationsAnalysis::LifetimeAnnotationsAnalysis(
 
 VariableLifetimesVector &LifetimeAnnotationsAnalysis::GetVariableLifetimes() {
   return VariableLifetimes;
+}
+
+ObjectLifetimes LifetimeAnnotationsAnalysis::GetVarDeclLifetime(
+    const clang::VarDecl *var_decl, FunctionLifetimeFactory &lifetime_factory) {
+  clang::QualType type = var_decl->getType().IgnoreParens();
+  clang::TypeLoc type_loc;
+  if (var_decl->getTypeSourceInfo()) {
+    type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
+  }
+  ObjectLifetimes objectsLifetimes;
+  if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
+                            .moveInto(objectsLifetimes)) {
+    // TODO error
+    return ObjectLifetimes();
+    // return std::move(err);
+  }
+  return objectsLifetimes;
 }
 
 ObjectLifetimes &LifetimeAnnotationsAnalysis::GetObjectLifetimes(
@@ -46,14 +64,24 @@ Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime(
 }
 
 bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
-    const clang::VarDecl *var_decl, clang::QualType &type) const {
+    const clang::VarDecl *var_decl, clang::QualType &type) {
   auto it = VariableLifetimes.find(var_decl);
+  ObjectLifetimes ol;
   if (it != VariableLifetimes.end()) {
-    ObjectLifetimes ol = it->second;
-    return ol.GetLifetime(type).IsNotSet();
+    ol = it->second;
   } else {
-    // TODO error?
-    return false;
+    ol = GetVarDeclLifetime(var_decl, Factory);
+    CreateVariable(var_decl, ol);
+  }
+  return ol.GetLifetime(type).IsNotSet();
+}
+
+void LifetimeAnnotationsAnalysis::CreateVariableIfNotFound(
+    const clang::VarDecl *var_decl, clang::QualType type) {
+  auto it = VariableLifetimes.find(var_decl);
+  if (it == VariableLifetimes.end()) {
+    ObjectLifetimes ol = GetVarDeclLifetime(var_decl, Factory);
+    CreateVariable(var_decl, ol);
   }
 }
 
@@ -71,6 +99,7 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
                                                    const clang::VarDecl *to,
                                                    clang::QualType to_type,
                                                    const clang::Stmt *loc) {
+  CreateVariableIfNotFound(to, to_type);
   if (IsLifetimeNotset(from, from_type)) {
     CreateLifetimeDependency(from, from_type, loc, to_type);
     CreateStmtDependency(loc, to);

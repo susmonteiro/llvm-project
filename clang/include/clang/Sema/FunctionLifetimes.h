@@ -30,6 +30,7 @@ using ParamsInfoVector = llvm::SmallVector<llvm::SmallVector<ParamInfo>>;
 
 class FunctionLifetimeFactory {
  public:
+  FunctionLifetimeFactory() {}
   FunctionLifetimeFactory(
       /* bool elision_enabled, */ const clang::FunctionDecl *func)
       : /* elision_enabled(elision_enabled), */ Func(func) {}

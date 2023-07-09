@@ -41,9 +41,13 @@ using VarStmtDependenciesMap =
 class LifetimeAnnotationsAnalysis {
  public:
   LifetimeAnnotationsAnalysis();
-  LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info);
+  LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info, const clang::FunctionDecl *func);
+
+  FunctionLifetimeFactory &GetLifetimeFactory() { return Factory; }
 
   VariableLifetimesVector &GetVariableLifetimes();
+  ObjectLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
+                                     FunctionLifetimeFactory &lifetime_factory);
   ObjectLifetimes &GetObjectLifetimes(const clang::VarDecl *var_decl);
   Lifetime &GetLifetime(const clang::VarDecl *var_decl, clang::QualType type);
   Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl,
@@ -51,7 +55,10 @@ class LifetimeAnnotationsAnalysis {
   Lifetime &GetReturnLifetime(clang::QualType &type);
 
   bool IsLifetimeNotset(const clang::VarDecl *var_decl,
-                        clang::QualType &type) const;
+                        clang::QualType &type);
+  
+  void CreateVariableIfNotFound(const clang::VarDecl *var_decl,
+                                clang::QualType type);
 
   PointsToMap &GetPointsTo() { return PointsTo; }
 
@@ -133,6 +140,8 @@ class LifetimeAnnotationsAnalysis {
   LifetimesMap StmtLifetimes;
   PointsToMap PointsTo;
   ObjectLifetimes ReturnLifetime;
+  FunctionLifetimeFactory Factory;
+
 };
 }  // namespace clang
 

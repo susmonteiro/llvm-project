@@ -65,7 +65,7 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
 void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(
     const FunctionDecl *func) {
   auto function_info = FunctionInfo[func];
-  State = LifetimeAnnotationsAnalysis(function_info);
+  State = LifetimeAnnotationsAnalysis(function_info, func);
   std::string func_name = func->getNameAsString();
 
   // step 1

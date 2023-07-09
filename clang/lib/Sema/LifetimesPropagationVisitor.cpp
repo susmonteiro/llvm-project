@@ -8,7 +8,7 @@ void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
                       LifetimeAnnotationsAnalysis &state) {
   if (const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr)) {
     if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
-            rhs_ref_decl->getDecl()->getCanonicalDecl())) {
+            rhs_ref_decl->getDecl()->getMostRecentDecl())) {
       state.CreateDependency(lhs, lhs_type, rhs_var_decl, rhs_type, loc);
     }
   }
@@ -77,22 +77,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   }
 }
 
-ObjectLifetimes GetVarDeclLifetime(const clang::VarDecl *var_decl,
-                                   FunctionLifetimeFactory &lifetime_factory) {
-  clang::QualType type = var_decl->getType().IgnoreParens();
-  clang::TypeLoc type_loc;
-  if (var_decl->getTypeSourceInfo()) {
-    type_loc = var_decl->getTypeSourceInfo()->getTypeLoc();
-  }
-  ObjectLifetimes objectsLifetimes;
-  if (llvm::Error err = lifetime_factory.CreateVarLifetimes(type, type_loc)
-                            .moveInto(objectsLifetimes)) {
-    // TODO error
-    return ObjectLifetimes();
-    // return std::move(err);
-  }
-  return objectsLifetimes;
-}
 
 void LifetimesPropagationVisitor::PropagateBinAssign(
     const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
@@ -418,7 +402,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         State.CreateVariable(var_decl, objectLifetimes);
         return std::nullopt;
       } else {
-        objectLifetimes = GetVarDeclLifetime(var_decl, Factory);
+        objectLifetimes = State.GetVarDeclLifetime(var_decl, State.GetLifetimeFactory());
         State.CreateVariable(var_decl, objectLifetimes);
       }
 
