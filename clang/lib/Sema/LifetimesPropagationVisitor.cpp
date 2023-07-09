@@ -211,7 +211,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
             // TODO == or contains?
             if (param_lifetime == return_lifetime) {
               current_type_call_info.info.insert(
-                  {arg, param_lifetime.GetType().getCanonicalType()});
+                  {arg, arg->getType().getCanonicalType()});
             }
           }
         }

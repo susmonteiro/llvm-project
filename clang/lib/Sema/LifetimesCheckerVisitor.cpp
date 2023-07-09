@@ -334,7 +334,10 @@ void LifetimesCheckerVisitor::CompareAndCheck(
                   << Lifetime::GetLifetimeName(LOCAL) << stmt->getSourceRange();
             }
           } else {
-            S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here) << rhs_lifetime.GetLifetimeName() << rhs_var_decl->getSourceRange();
+            S.Diag(rhs_var_decl->getBeginLoc(),
+                   diag::note_lifetime_declared_here)
+                << rhs_lifetime.GetLifetimeName()
+                << rhs_var_decl->getSourceRange();
           }
         } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
           factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
