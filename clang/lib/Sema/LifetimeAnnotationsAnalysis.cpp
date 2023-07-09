@@ -49,6 +49,16 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
   return VariableLifetimes[var_decl].GetLifetime(type);
 }
 
+Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeWithSameNumberIndirections(
+    const clang::VarDecl *var_decl, clang::QualType type) {
+  VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
+  if (it == VariableLifetimes.end()) {
+    CreateVariable(var_decl, var_decl->getType().getCanonicalType());
+  }
+  return VariableLifetimes[var_decl].GetLifetimeWithSameNumberIndirections(
+      type);
+}
+
 Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
     const clang::VarDecl *var_decl, clang::QualType type) {
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);

@@ -15,6 +15,10 @@ class ObjectLifetimes {
   ObjectLifetimes() {}
   ObjectLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
 
+  Lifetime& GetLifetimeWithSameNumberIndirections(clang::QualType type) {
+    return GetLifetime(Lifetime::GetNumIndirections(type));
+  }
+
   Lifetime& GetLifetime(clang::QualType& type) {
     type = type.getCanonicalType();
     for (auto& pointee : PointeeObjects) {
@@ -24,6 +28,19 @@ class ObjectLifetimes {
     }
     // TODO error?
     return InsertPointeeObject(type);
+  }
+
+  Lifetime& GetLifetime(unsigned int num_indirections) {
+    for (auto& pointee : PointeeObjects) {
+      if (pointee.GetNumIndirections() == num_indirections) {
+        return pointee;
+      }
+    }
+
+    assert(PointeeObjects.size() > 0);
+    Lifetime& any_lifetime = PointeeObjects[0];
+    return InsertPointeeObject(
+        Lifetime(NOTSET, any_lifetime.GetNumIndirections()));
   }
 
   Lifetime& GetLifetimeOrLocal(clang::QualType& type) {
@@ -54,8 +71,11 @@ class ObjectLifetimes {
   }
 
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
-    clang::QualType type = lifetime.GetType();
     PointeeObjects.emplace_back(lifetime);
+    clang::QualType type = lifetime.GetType();
+    if (type.isNull()) {
+      return GetLifetime(lifetime.GetNumIndirections());
+    }
     return GetLifetime(type);
   }
 

@@ -5,39 +5,40 @@ namespace clang {
 constexpr llvm::StringRef STATIC_NAME = "static";
 constexpr llvm::StringRef LOCAL_NAME = "local";
 
-Lifetime::Lifetime(char id) {
-  if (id == NOTSET || id == LOCAL || id == STATIC) {
-    Id = id;
-  } else if (id >= 'a' && id <= 'z') {
-    Id = CharToId(id);
-  } else {
-    // TODO error
-    // TODO change this
-    Id = NOTSET;
-  }
-}
+Lifetime::Lifetime(char id) { InitializeId(id); }
 
-// TODO change this
-Lifetime::Lifetime(char id, clang::QualType type) : LifetimeType(type) {
-  if (id == NOTSET || id == LOCAL || id == STATIC) {
-    Id = id;
-  } else if (id >= 'a' && id <= 'z') {
-    Id = CharToId(id);
-  } else {
-    // TODO error
-    // TODO change this
-    Id = NOTSET;
-  }
+Lifetime::Lifetime(char id, clang::QualType type)
+    : LifetimeType(type),
+      NumIndirections(Lifetime::GetNumIndirections(type)) {
+  InitializeId(id);
 }
 
 Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
-    : LifetimeType(type) {
+    : LifetimeType(type),
+      NumIndirections(Lifetime::GetNumIndirections(type)) {
   if (name.equals(STATIC_NAME)) {
     Id = STATIC;
   } else if (name.equals(LOCAL_NAME)) {
     Id = LOCAL;
   } else if (name.size() == 1 && name.front() >= 'a' && name.front() <= 'z') {
     Id = CharToId(name.front());
+  } else {
+    // TODO error
+    // TODO change this
+    Id = NOTSET;
+  }
+}
+
+Lifetime::Lifetime(char id, unsigned int num_indirections) {
+  InitializeId(id);
+  SetNumIndirections(num_indirections);
+}
+
+void Lifetime::InitializeId(char id) {
+  if (id == NOTSET || id == LOCAL || id == STATIC) {
+    Id = id;
+  } else if (id >= 'a' && id <= 'z') {
+    Id = CharToId(id);
   } else {
     // TODO error
     // TODO change this
@@ -61,7 +62,7 @@ bool Lifetime::ContainsLocal() const {
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
 
-unsigned int Lifetime::GetNumberIndirections(clang::QualType type) {
+unsigned int Lifetime::GetNumIndirections(clang::QualType type) {
   unsigned int num_indirections_lhs = 0;
   type = type.getCanonicalType();
   while (type->isPointerType() || type->isReferenceType()) {
@@ -110,7 +111,10 @@ std::string Lifetime::GetLifetimeName(char id) {
 
 std::string Lifetime::DebugString() const {
   std::string res = "[Type]: ";
-  res += LifetimeType.getAsString();
+  if (LifetimeType.isNull())
+    res += std::string(NumIndirections, '*');
+  else
+    res += LifetimeType.getAsString();
   res += "\t\t[Lifetime] -> " + GetLifetimeName() + "; ";
 
   if (IsNotSet()) {

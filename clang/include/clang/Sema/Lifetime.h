@@ -30,8 +30,13 @@ class Lifetime {
   Lifetime(llvm::StringRef name, clang::QualType type);
   Lifetime(char id);
   Lifetime(char id, clang::QualType type);
-  Lifetime(clang::QualType &type) : LifetimeType(type) {}
+  Lifetime(clang::QualType &type)
+      : LifetimeType(type),
+        NumIndirections(Lifetime::GetNumIndirections(type)) {}
+  Lifetime(unsigned int num_indirections) : NumIndirections(num_indirections) {}
+  Lifetime(char id, unsigned int num_indirections);
 
+  void InitializeId(char id);
   // Returns whether this lifetime is valid
   bool IsSet() const;
   bool IsNotSet() const;
@@ -52,15 +57,27 @@ class Lifetime {
 
   static char CharToId(char id) { return id < OFFSET ? id : id - 'a' + OFFSET; }
   static char IdToChar(char id) { return id < OFFSET ? id : id + 'a' - OFFSET; }
-  static unsigned int GetNumberIndirections(clang::QualType type);
+  static unsigned int GetNumIndirections(clang::QualType type);
+  unsigned int GetNumIndirections() const { return NumIndirections; }
   static clang::QualType GetTypeFromNumberIndirections(
       clang::QualType type, unsigned int number_indirections);
+  static clang::QualType GenerateType(clang::QualType type,
+                                      unsigned int num_indirections);
 
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }
   void SetId(char id) { Id = id; }
   clang::QualType GetType() const { return LifetimeType; }
-  void SetType(clang::QualType type) { LifetimeType = type; }
+  void SetNumIndirections(clang::QualType type) {
+    NumIndirections = Lifetime::GetNumIndirections(type);
+  }
+  void SetNumIndirections(unsigned int num_indirections) {
+    NumIndirections = num_indirections;
+  }
+  void SetType(clang::QualType type) {
+    LifetimeType = type;
+    SetNumIndirections(type);
+  }
 
   bool EmptyPossibleLifetimes() const;
   void ProcessPossibleLifetimes();
@@ -148,6 +165,7 @@ class Lifetime {
 
   LifetimesVector PossibleLifetimes;
   clang::QualType LifetimeType;
+  unsigned int NumIndirections;
   int ShortestLifetimes = 0;
   char Id = NOTSET;
 };

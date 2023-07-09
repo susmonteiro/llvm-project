@@ -77,7 +77,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   }
 }
 
-
 void LifetimesPropagationVisitor::PropagateBinAssign(
     const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
     const clang::BinaryOperator *op) const {
@@ -402,7 +401,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         State.CreateVariable(var_decl, objectLifetimes);
         return std::nullopt;
       } else {
-        objectLifetimes = State.GetVarDeclLifetime(var_decl, State.GetLifetimeFactory());
+        objectLifetimes =
+            State.GetVarDeclLifetime(var_decl, State.GetLifetimeFactory());
         State.CreateVariable(var_decl, objectLifetimes);
       }
 
@@ -440,21 +440,23 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   auto &points_to = PointsTo.GetExprPointsTo(base);
 
   if (const auto *decl_ref_expr = clang::dyn_cast<clang::DeclRefExpr>(base)) {
-    if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(
+    if (const auto *base_decl = clang::dyn_cast<clang::VarDecl>(
             decl_ref_expr->getDecl()->getCanonicalDecl())) {
-      PointsTo.InsertExprLifetime(
-          member_expr, State.GetLifetimeOrLocal(var_decl, var_decl->getType()));
+      Lifetime &member_lifetime = State.GetLifetimeWithSameNumberIndirections(
+          base_decl, member_expr->getType());
+      PointsTo.InsertExprLifetime(member_expr, member_lifetime);
     }
   } else {
     for (const auto *child : points_to) {
       if (child == nullptr) continue;
       if (const auto *decl_ref_expr =
               clang::dyn_cast<clang::DeclRefExpr>(child)) {
-        if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(
+        if (const auto *base_decl = clang::dyn_cast<clang::VarDecl>(
                 decl_ref_expr->getDecl()->getCanonicalDecl())) {
-          PointsTo.InsertExprLifetime(
-              member_expr,
-              State.GetLifetimeOrLocal(var_decl, var_decl->getType()));
+          Lifetime &member_lifetime =
+              State.GetLifetimeWithSameNumberIndirections(
+                  base_decl, member_expr->getType());
+          PointsTo.InsertExprLifetime(member_expr, member_lifetime);
         }
       }
     }

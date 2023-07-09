@@ -86,9 +86,9 @@ class PointsToMap {
     }
   }
 
-  Lifetime* GetExprLifetime(const clang::Expr* expr) {
-    return ExprToLifetime[expr];
-  }
+  // Lifetime* GetExprLifetime(const clang::Expr* expr) {
+  //   return ExprToLifetime[expr];
+  // }
 
   TypeToSet& GetCallExprInfo(const clang::CallExpr* expr) {
     return CallExprToInfo[expr];

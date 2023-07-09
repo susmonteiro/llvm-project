@@ -384,7 +384,7 @@ void FunctionLifetimes::ProcessParams() {
   unsigned int idx = 0;
   for (const auto& param : Params) {
     clang::QualType type = param->getType().getCanonicalType();
-    unsigned int num_indirections = Lifetime::GetNumberIndirections(type);
+    unsigned int num_indirections = Lifetime::GetNumIndirections(type);
     if (num_indirections > 0) {
       if (num_indirections >= ParamsInfo.size()) {
         ParamsInfo.resize(num_indirections + 1);

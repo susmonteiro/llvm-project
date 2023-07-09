@@ -41,7 +41,8 @@ using VarStmtDependenciesMap =
 class LifetimeAnnotationsAnalysis {
  public:
   LifetimeAnnotationsAnalysis();
-  LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info, const clang::FunctionDecl *func);
+  LifetimeAnnotationsAnalysis(FunctionLifetimes &function_info,
+                              const clang::FunctionDecl *func);
 
   FunctionLifetimeFactory &GetLifetimeFactory() { return Factory; }
 
@@ -50,13 +51,14 @@ class LifetimeAnnotationsAnalysis {
                                      FunctionLifetimeFactory &lifetime_factory);
   ObjectLifetimes &GetObjectLifetimes(const clang::VarDecl *var_decl);
   Lifetime &GetLifetime(const clang::VarDecl *var_decl, clang::QualType type);
+  Lifetime &GetLifetimeWithSameNumberIndirections(
+      const clang::VarDecl *var_decl, clang::QualType type);
   Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl,
                                clang::QualType type);
   Lifetime &GetReturnLifetime(clang::QualType &type);
 
-  bool IsLifetimeNotset(const clang::VarDecl *var_decl,
-                        clang::QualType &type);
-  
+  bool IsLifetimeNotset(const clang::VarDecl *var_decl, clang::QualType &type);
+
   void CreateVariableIfNotFound(const clang::VarDecl *var_decl,
                                 clang::QualType type);
 
@@ -82,7 +84,7 @@ class LifetimeAnnotationsAnalysis {
     PropagatePossibleLifetimes(to, from_lifetimes, to_type);
   }
 
-  void CreateVariable(const clang::VarDecl *var_decl, clang::QualType &type) {
+  void CreateVariable(const clang::VarDecl *var_decl, clang::QualType type) {
     VariableLifetimes[var_decl] = ObjectLifetimes(Lifetime(type));
   }
 
@@ -141,7 +143,6 @@ class LifetimeAnnotationsAnalysis {
   PointsToMap PointsTo;
   ObjectLifetimes ReturnLifetime;
   FunctionLifetimeFactory Factory;
-
 };
 }  // namespace clang
 
