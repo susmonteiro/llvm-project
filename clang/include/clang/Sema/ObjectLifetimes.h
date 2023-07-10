@@ -37,10 +37,10 @@ class ObjectLifetimes {
       }
     }
 
-    assert(PointeeObjects.size() > 0);
-    Lifetime& any_lifetime = PointeeObjects[0];
-    return InsertPointeeObject(
-        Lifetime(NOTSET, any_lifetime.GetNumIndirections()));
+    if (num_indirections == 0) {
+      return InsertPointeeObject(Lifetime(LOCAL, num_indirections));
+    }
+    return InsertPointeeObject(Lifetime(NOTSET, num_indirections));
   }
 
   Lifetime& GetLifetimeOrLocal(clang::QualType& type) {

@@ -61,8 +61,6 @@ class Lifetime {
   unsigned int GetNumIndirections() const { return NumIndirections; }
   static clang::QualType GetTypeFromNumberIndirections(
       clang::QualType type, unsigned int number_indirections);
-  static clang::QualType GenerateType(clang::QualType type,
-                                      unsigned int num_indirections);
 
   // Returns the numeric ID for the lifetime.
   char GetId() const { return Id; }

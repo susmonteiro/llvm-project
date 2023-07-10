@@ -72,9 +72,14 @@ class PointsToMap {
   }
   size_t PointsToSize() const { return ExprPointsTo.size(); }
 
-  llvm::SmallSet<const clang::Expr*, 2> &GetExprPointsTo(
+  llvm::SmallSet<const clang::Expr*, 2>& GetExprPointsTo(
       const clang::Expr* expr) {
     return ExprPointsTo[expr];
+  }
+
+  llvm::SmallSet<const clang::VarDecl*, 2>& GetExprDecls(
+      const clang::Expr* expr) {
+    return ExprToDecl[expr];
   }
 
   clang::QualType GetExprType(const clang::Expr* expr) {
@@ -98,12 +103,22 @@ class PointsToMap {
 
   bool IsEmpty(const clang::Expr* expr) { return ExprPointsTo[expr].empty(); }
 
-  void InsertExprPointsTo(const clang::Expr* parent,
-                           const clang::Expr* child) {
+  void InsertExprPointsTo(const clang::Expr* parent, const clang::Expr* child) {
     ExprPointsTo[parent].insert(child);
     const auto child_points_to = ExprPointsTo[child];
     // propagate points-to
     ExprPointsTo[parent].insert(child_points_to.begin(), child_points_to.end());
+  }
+
+  void InsertExprDecl(const clang::Expr* expr, const clang::VarDecl* decl) {
+    ExprToDecl[expr].insert(decl);
+  }
+
+  void InsertExprDecl(const clang::Expr* parent, const clang::Expr* child) {
+    const auto child_decls = ExprToDecl[child];
+    if (!child_decls.empty()) {
+      ExprToDecl[parent].insert(child_decls.begin(), child_decls.end());
+    }
   }
 
   void InsertExprType(const clang::Expr* expr, clang::QualType type) {
@@ -117,6 +132,8 @@ class PointsToMap {
  private:
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::Expr*, 2>>
       ExprPointsTo;
+  llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::VarDecl*, 2>>
+      ExprToDecl;
   llvm::DenseMap<const clang::Expr*, clang::QualType> ExprToType;
   llvm::DenseMap<const clang::Expr*, Lifetime*> ExprToLifetime;
   CallExprInfoMap CallExprToInfo;

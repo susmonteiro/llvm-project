@@ -147,14 +147,10 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
 
 const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
     const clang::Expr *arg) const {
-  const auto &arg_points_to = PointsTo.GetExprPointsTo(arg->IgnoreParens());
-  for (const auto &expr : arg_points_to) {
-    if (expr == nullptr) continue;
-    if (const auto *decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr)) {
-      return dyn_cast<clang::VarDecl>(decl_ref_expr->getDecl());
-    } else if (const auto *member_expr = dyn_cast<clang::MemberExpr>(arg)) {
-      return dyn_cast<clang::VarDecl>(member_expr->getMemberDecl());
-    }
+  const auto &arg_points_to = PointsTo.GetExprDecls(arg->IgnoreParens());
+  assert(arg_points_to.size() <= 1U);
+  for (const auto &decl : arg_points_to) {
+    return decl;
   }
   // debugWarn("Arg is not a declrefexpr or memberexpr");
   return nullptr;
@@ -374,20 +370,12 @@ void LifetimesCheckerVisitor::CompareAndCheck(
       }
 
       for (const auto &[arg, arg_type] : current_type_call_info.info) {
-        const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
-        for (const auto &expr : arg_points_to) {
-          if (expr == nullptr) continue;
-          if (const auto *rhs_ref_decl =
-                  clang::dyn_cast<clang::DeclRefExpr>(expr)) {
-            if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
-                    rhs_ref_decl->getDecl()->getCanonicalDecl())) {
-              Lifetime &arg_lifetime =
-                  State.GetLifetimeOrLocal(rhs_var_decl, arg_type);
-              if (arg_lifetime < lhs_lifetime) {
-                factory(lhs_var_decl, rhs_var_decl, op, expr, stmt,
-                        lhs_lifetime, arg_lifetime);
-              }
-            }
+        const auto &arg_points_to = PointsTo.GetExprDecls(arg);
+        for (const auto &decl : arg_points_to) {
+          Lifetime &arg_lifetime = State.GetLifetimeOrLocal(decl, arg_type);
+          if (arg_lifetime < lhs_lifetime) {
+            factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
+                    arg_lifetime);
           }
         }
       }
