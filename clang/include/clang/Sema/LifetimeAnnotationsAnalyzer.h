@@ -44,18 +44,18 @@ class LifetimeAnnotationsAnalyzer {
   }
 
   std::string DebugDependencies(
-      const clang::VarDecl *var, clang::QualType type,
+      const clang::VarDecl *var, unsigned int num_indirections,
       llvm::DenseSet<RHSTypeStruct> var_stmt,
       llvm::DenseMap<const clang::Stmt *,
                      llvm::DenseSet<const clang::VarDecl *>>
           stmt_var) {
     std::string res;
     res += "Dependencies of " + var->getNameAsString() + ": ";
-    res += "[Type]: " + type.getAsString() + "\t[vars]: ";
+    res += "[Type]: " + std::string(num_indirections, '*') + "\t[vars]: ";
     for (const auto &info : var_stmt) {
       for (const auto &rhs_var : stmt_var[info.stmt]) {
         if (var == rhs_var) continue;
-        res += "(" + info.type.getAsString() + ")" + rhs_var->getNameAsString() + ' ';
+        res += "(" + std::string(info.num_indirections, '*') + ")" + rhs_var->getNameAsString() + ' ';
       }
     }
     res += '\n';

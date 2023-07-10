@@ -49,6 +49,16 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
   return VariableLifetimes[var_decl].GetLifetime(type);
 }
 
+Lifetime &LifetimeAnnotationsAnalysis::GetLifetime(
+    const clang::VarDecl *var_decl, unsigned int num_indirections) {
+  VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
+  if (it == VariableLifetimes.end()) {
+    // TODO error
+    CreateVariable(var_decl, Lifetime(num_indirections));
+  }
+  return VariableLifetimes[var_decl].GetLifetime(num_indirections);
+}
+
 Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeWithSameNumberIndirections(
     const clang::VarDecl *var_decl, clang::QualType type) {
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
@@ -75,6 +85,11 @@ Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime(
 
 bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
     const clang::VarDecl *var_decl, clang::QualType &type) {
+  return IsLifetimeNotset(var_decl, Lifetime::GetNumIndirections(type));
+}
+
+bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
+    const clang::VarDecl *var_decl, unsigned int num_indirections) {
   auto it = VariableLifetimes.find(var_decl);
   ObjectLifetimes ol;
   if (it != VariableLifetimes.end()) {
@@ -83,7 +98,7 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
     ol = GetVarDeclLifetime(var_decl, Factory);
     CreateVariable(var_decl, ol);
   }
-  return ol.GetLifetime(type).IsNotSet();
+  return ol.GetLifetime(num_indirections).IsNotSet();
 }
 
 void LifetimeAnnotationsAnalysis::CreateVariableIfNotFound(
@@ -98,8 +113,17 @@ void LifetimeAnnotationsAnalysis::CreateVariableIfNotFound(
 void LifetimeAnnotationsAnalysis::CreateDependencySimple(
     const clang::VarDecl *from, clang::QualType from_type,
     const clang::VarDecl *to, clang::QualType to_type, const clang::Stmt *loc) {
-  if (IsLifetimeNotset(from, from_type)) {
-    CreateLifetimeDependency(from, from_type, loc, to_type);
+  CreateDependencySimple(from, Lifetime::GetNumIndirections(from_type), to,
+                        Lifetime::GetNumIndirections(to_type), loc);
+}
+
+void LifetimeAnnotationsAnalysis::CreateDependencySimple(
+    const clang::VarDecl *from, unsigned int from_num_indirections,
+    const clang::VarDecl *to, unsigned int to_num_indirections,
+    const clang::Stmt *loc) {
+  if (IsLifetimeNotset(from, from_num_indirections)) {
+    CreateLifetimeDependency(from, from_num_indirections, loc,
+                             to_num_indirections);
     CreateStmtDependency(loc, to);
   }
 }
@@ -110,31 +134,39 @@ void LifetimeAnnotationsAnalysis::CreateDependency(const clang::VarDecl *from,
                                                    clang::QualType to_type,
                                                    const clang::Stmt *loc) {
   CreateVariableIfNotFound(to, to_type);
-  if (IsLifetimeNotset(from, from_type)) {
-    CreateLifetimeDependency(from, from_type, loc, to_type);
+  unsigned int from_num_indirections = Lifetime::GetNumIndirections(from_type);
+  unsigned int to_num_indirections = Lifetime::GetNumIndirections(to_type);
+
+  if (IsLifetimeNotset(from, from_num_indirections)) {
+    CreateLifetimeDependency(from, from_num_indirections, loc,
+                             to_num_indirections);
     CreateStmtDependency(loc, to);
   }
 
-  if ((!from_type->isPointerType() && !from_type->isReferenceType()) ||
-      (!to_type->isPointerType() && !to_type->isReferenceType())) {
+  // TODO not necessarily true
+  // assert(from_num_indirections == to_num_indirections &&
+  //        "Indirections must be equal");
+
+  if (from_num_indirections == 0 || to_num_indirections == 0) {
     return;
   }
 
-  from_type = from_type->getPointeeType();
-  to_type = to_type->getPointeeType();
+  from_num_indirections--;
+  to_num_indirections--;
 
-  while ((from_type->isPointerType() || from_type->isReferenceType()) &&
-         (to_type->isPointerType() || to_type->isReferenceType())) {
+  while (from_num_indirections > 0 && to_num_indirections > 0) {
     if (IsLifetimeNotset(from, from_type)) {
-      CreateLifetimeDependency(from, from_type, loc, to_type);
+      CreateLifetimeDependency(from, from_num_indirections, loc,
+                               to_num_indirections);
       CreateStmtDependency(loc, to);
     }
     if (IsLifetimeNotset(to, from_type)) {
-      CreateLifetimeDependency(to, to_type, loc, from_type);
+      CreateLifetimeDependency(to, to_num_indirections, loc,
+                               from_num_indirections);
       CreateStmtDependency(loc, from);
     }
-    from_type = from_type->getPointeeType();
-    to_type = to_type->getPointeeType();
+    from_num_indirections--;
+    to_num_indirections--;
   }
 }
 
@@ -153,8 +185,15 @@ char LifetimeAnnotationsAnalysis::GetStmtLifetime(const clang::Stmt *stmt) {
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
     const clang::VarDecl *from, clang::QualType from_type,
     const clang::Stmt *to, clang::QualType to_type) {
-  LifetimeDependencies[LHSTypeStruct{from, from_type}].insert(
-      RHSTypeStruct{to, to_type});
+  CreateLifetimeDependency(from, Lifetime::GetNumIndirections(from_type), to,
+                           Lifetime::GetNumIndirections(to_type));
+}
+
+void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
+    const clang::VarDecl *from, unsigned int from_num_indirections,
+    const clang::Stmt *to, unsigned int to_num_indirections) {
+  LifetimeDependencies[LHSTypeStruct{from, from_num_indirections}].insert(
+      RHSTypeStruct{to, to_num_indirections});
 }
 
 void LifetimeAnnotationsAnalysis::CreateStmtDependency(
@@ -171,13 +210,13 @@ llvm::DenseMap<LHSTypeStruct, llvm::DenseSet<LHSTypeStruct>>
 LifetimeAnnotationsAnalysis::TransposeDependencies() {
   llvm::DenseMap<LHSTypeStruct, llvm::DenseSet<LHSTypeStruct>> result;
   for (const auto &info_lhs : LifetimeDependencies) {
-    clang::QualType lhs_type = info_lhs.first.type;
+    unsigned int lhs_num_indirections = info_lhs.first.num_indirections;
     for (const auto &info_rhs : info_lhs.second) {
-      clang::QualType rhs_type = info_rhs.type;
+      unsigned int rhs_num_indirections = info_rhs.num_indirections;
       for (const auto &child : StmtDependencies[info_rhs.stmt]) {
-        if (IsLifetimeNotset(child, lhs_type) &&
+        if (IsLifetimeNotset(child, lhs_num_indirections) &&
             info_lhs.first.var_decl != child)
-          result[LHSTypeStruct{child, rhs_type}].insert(info_lhs.first);
+          result[LHSTypeStruct{child, rhs_num_indirections}].insert(info_lhs.first);
       }
     }
   }
@@ -217,11 +256,11 @@ std::string LifetimeAnnotationsAnalysis::DebugString() {
   str += "\n>> Dependencies\n\n";
   for (const auto &info_lhs : LifetimeDependencies) {
     str += info_lhs.first.var_decl->getNameAsString() + ": ";
-    str += "[type] " + info_lhs.first.type.getAsString() + "\t\t[vars] ";
+    str += "[type] " + std::string(info_lhs.first.num_indirections, '*') + "\t\t[vars] ";
     for (const auto &info_rhs : info_lhs.second) {
       for (const auto &var : StmtDependencies[info_rhs.stmt]) {
         if (info_lhs.first.var_decl == var) continue;
-        str += info_rhs.type.getAsString() + ' ' + var->getNameAsString() + ' ';
+        str += std::string(info_rhs.num_indirections, '*') + ' ' + var->getNameAsString() + ' ';
       }
     }
     str += '\n';
@@ -233,7 +272,7 @@ std::string LifetimeAnnotationsAnalysis::WorklistDebugString(
     std::vector<LHSTypeStruct> &worklist) {
   std::string res;
   for (const auto &el : worklist) {
-    res += '{' + el.type.getAsString() + ' ' + el.var_decl->getNameAsString() +
+    res += '{' + std::string(el.num_indirections, '*') + ' ' + el.var_decl->getNameAsString() +
            "}, ";
   }
   res += '\n';

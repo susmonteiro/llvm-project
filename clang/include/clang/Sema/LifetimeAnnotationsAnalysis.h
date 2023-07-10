@@ -26,12 +26,12 @@ using LifetimesMap = llvm::DenseMap<const clang::Stmt *, char>;
 
 struct LHSTypeStruct {
   const clang::VarDecl *var_decl;
-  clang::QualType type;
+  unsigned int num_indirections;
 };
 
 struct RHSTypeStruct {
   const clang::Stmt *stmt;
-  clang::QualType type;
+  unsigned int num_indirections;
 };
 
 using VarStmtDependenciesMap =
@@ -51,6 +51,8 @@ class LifetimeAnnotationsAnalysis {
                                      FunctionLifetimeFactory &lifetime_factory);
   ObjectLifetimes &GetObjectLifetimes(const clang::VarDecl *var_decl);
   Lifetime &GetLifetime(const clang::VarDecl *var_decl, clang::QualType type);
+  Lifetime &GetLifetime(const clang::VarDecl *var_decl,
+                        unsigned int num_indirections);
   Lifetime &GetLifetimeWithSameNumberIndirections(
       const clang::VarDecl *var_decl, clang::QualType type);
   Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl,
@@ -58,6 +60,8 @@ class LifetimeAnnotationsAnalysis {
   Lifetime &GetReturnLifetime(clang::QualType &type);
 
   bool IsLifetimeNotset(const clang::VarDecl *var_decl, clang::QualType &type);
+  bool IsLifetimeNotset(const clang::VarDecl *var_decl,
+                        unsigned int num_indirections);
 
   void CreateVariableIfNotFound(const clang::VarDecl *var_decl,
                                 clang::QualType type);
@@ -69,20 +73,18 @@ class LifetimeAnnotationsAnalysis {
     return GetLifetime(var_decl, type).GetPossibleLifetimes();
   }
 
-  void PropagatePossibleLifetimes(const clang::VarDecl *target,
-                                  const LifetimesVector &possible_lifetimes,
-                                  clang::QualType type) {
-    GetLifetime(target, type).InsertPossibleLifetimes(possible_lifetimes);
+    const LifetimesVector &GetPossibleLifetimes(const clang::VarDecl *var_decl,
+                                              unsigned int num_indirections) {
+    return GetLifetime(var_decl, num_indirections).GetPossibleLifetimes();
   }
 
-  void PropagatePossibleLifetimes(const clang::VarDecl *to,
-                                  clang::QualType &to_type,
-                                  const clang::VarDecl *from,
-                                  clang::QualType &from_type) {
-    // TODO maybe same type is enough
-    const auto &from_lifetimes = GetPossibleLifetimes(from, from_type);
-    PropagatePossibleLifetimes(to, from_lifetimes, to_type);
+
+  void PropagatePossibleLifetimes(const clang::VarDecl *target,
+                                  const LifetimesVector &possible_lifetimes,
+                                  unsigned int num_indirections) {
+    GetLifetime(target, num_indirections).InsertPossibleLifetimes(possible_lifetimes);
   }
+
 
   void CreateVariable(const clang::VarDecl *var_decl, clang::QualType type) {
     VariableLifetimes[var_decl] = ObjectLifetimes(Lifetime(type));
@@ -105,6 +107,11 @@ class LifetimeAnnotationsAnalysis {
                                 clang::QualType from_type,
                                 const clang::Stmt *to, clang::QualType to_type);
 
+  void CreateLifetimeDependency(const clang::VarDecl *from,
+                                unsigned int from_num_indirections,
+                                const clang::Stmt *to,
+                                unsigned int to_num_indirections);
+
   void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
 
   void CreateStmtLifetime(const clang::Stmt *from, char id);
@@ -112,6 +119,11 @@ class LifetimeAnnotationsAnalysis {
   void CreateDependencySimple(const clang::VarDecl *from,
                               clang::QualType from_type,
                               const clang::VarDecl *to, clang::QualType to_type,
+                              const clang::Stmt *loc);
+  void CreateDependencySimple(const clang::VarDecl *from,
+                              unsigned int from_num_indirections,
+                              const clang::VarDecl *to,
+                              unsigned int to_num_indirections,
                               const clang::Stmt *loc);
 
   void CreateDependency(const clang::VarDecl *from, clang::QualType from_type,
@@ -150,45 +162,44 @@ namespace llvm {
 template <>
 struct DenseMapInfo<clang::LHSTypeStruct> {
   static inline clang::LHSTypeStruct getEmptyKey() {
-    return clang::LHSTypeStruct{nullptr, clang::QualType()};
+    return clang::LHSTypeStruct{nullptr, 0};
   }
 
   static inline clang::LHSTypeStruct getTombstoneKey() {
-    return clang::LHSTypeStruct{reinterpret_cast<clang::VarDecl *>(-1),
-                                clang::QualType()};
+    return clang::LHSTypeStruct{reinterpret_cast<clang::VarDecl *>(-1), 0};
   }
 
   static unsigned getHashValue(const clang::LHSTypeStruct &pair) {
     return llvm::hash_combine(
         llvm::DenseMapInfo<const clang::VarDecl *>::getHashValue(pair.var_decl),
-        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.type));
+        llvm::DenseMapInfo<unsigned int>::getHashValue(pair.num_indirections));
   }
 
   static bool isEqual(const clang::LHSTypeStruct &lhs,
                       const clang::LHSTypeStruct &rhs) {
-    return lhs.var_decl == rhs.var_decl && lhs.type == rhs.type;
+    return lhs.var_decl == rhs.var_decl &&
+           lhs.num_indirections == rhs.num_indirections;
   }
 };
 template <>
 struct DenseMapInfo<clang::RHSTypeStruct> {
   static inline clang::RHSTypeStruct getEmptyKey() {
-    return clang::RHSTypeStruct{nullptr, clang::QualType()};
+    return clang::RHSTypeStruct{nullptr, 0};
   }
 
   static inline clang::RHSTypeStruct getTombstoneKey() {
-    return clang::RHSTypeStruct{reinterpret_cast<clang::Stmt *>(-1),
-                                clang::QualType()};
+    return clang::RHSTypeStruct{reinterpret_cast<clang::Stmt *>(-1), 0};
   }
 
   static unsigned getHashValue(const clang::RHSTypeStruct &pair) {
     return llvm::hash_combine(
         llvm::DenseMapInfo<const clang::Stmt *>::getHashValue(pair.stmt),
-        llvm::DenseMapInfo<clang::QualType>::getHashValue(pair.type));
+        llvm::DenseMapInfo<unsigned int>::getHashValue(pair.num_indirections));
   }
 
   static bool isEqual(const clang::RHSTypeStruct &lhs,
                       const clang::RHSTypeStruct &rhs) {
-    return lhs.stmt == rhs.stmt && lhs.type == rhs.type;
+    return lhs.stmt == rhs.stmt && lhs.num_indirections == rhs.num_indirections;
   }
 };
 }  // namespace llvm
