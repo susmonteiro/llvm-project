@@ -48,10 +48,6 @@ class ObjectLifetimes {
     return GetLifetimeOrLocal(num_indirections);
   }
 
-  Lifetime& GetLifetimeWithSameNumberIndirections(clang::QualType type) {
-    return GetLifetime(Lifetime::GetNumIndirections(type));
-  }
-
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
 
   bool HasLifetimeLocal() {

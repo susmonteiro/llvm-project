@@ -46,7 +46,7 @@ class LifetimesPropagationVisitor
   std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
   void PropagateBinAssign(const clang::Expr *lhs, const clang::Expr *rhs,
-                          const clang::VarDecl *lhs_decl,
+                          const clang::Expr *expr,
                           const clang::BinaryOperator *op) const;
 
  private:

@@ -66,8 +66,7 @@ class LifetimeAnnotationsAnalysis {
   bool IsLifetimeNotset(const clang::VarDecl *var_decl,
                         unsigned int num_indirections);
 
-  void CreateVariableIfNotFound(const clang::VarDecl *var_decl,
-                                clang::QualType type);
+  void CreateVariableIfNotFound(const clang::VarDecl *var_decl);
 
   PointsToMap &GetPointsTo() { return PointsTo; }
 
@@ -130,6 +129,12 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateDependency(const clang::VarDecl *from, clang::QualType from_type,
                         const clang::VarDecl *to, clang::QualType to_type,
+                        const clang::Stmt *loc);
+
+  void CreateDependency(const clang::VarDecl *from,
+                        unsigned int lhs_num_indirections,
+                        const clang::VarDecl *to,
+                        unsigned int rhs_num_indirections,
                         const clang::Stmt *loc);
 
   void SetDependencies(VarStmtDependenciesMap dependencies) {

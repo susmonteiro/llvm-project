@@ -2,22 +2,6 @@
 
 namespace clang {
 
-void CreateDependency(const clang::Expr *expr, const clang::VarDecl *lhs,
-                      clang::QualType lhs_type, clang::QualType rhs_type,
-                      const clang::Stmt *loc,
-                      LifetimeAnnotationsAnalysis &state) {
-  if (const auto *rhs_ref_decl = clang::dyn_cast<clang::DeclRefExpr>(expr)) {
-    if (const auto *rhs_var_decl = clang::dyn_cast<clang::VarDecl>(
-            rhs_ref_decl->getDecl()->getMostRecentDecl())) {
-      state.CreateDependency(lhs, lhs_type, rhs_var_decl, rhs_type, loc);
-    }
-    // TODO check this
-    // } else if (const auto *member_expr =
-    //                clang::dyn_cast<clang::MemberExpr>(expr)) {
-    //   CreateDependency(member_expr, lhs, lhs_type, rhs_type, loc, state);
-  }
-}
-
 void TransferFuncCall(const clang::VarDecl *lhs,
                       const clang::CallExpr *call_expr,
                       clang::QualType lhs_type, const clang::Stmt *loc,
@@ -59,32 +43,41 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  clang::QualType lhs_type, clang::QualType base_type,
                  const clang::Stmt *loc, PointsToMap &PointsTo,
                  LifetimeAnnotationsAnalysis &state) {
+  debugLifetimes("TransferRHS", lhs->getNameAsString());
   clang::QualType rhs_type = PointsTo.GetExprType(rhs);
   rhs_type = rhs_type.isNull() ? base_type : rhs_type;
 
   if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
     TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
-  } else if (const auto *member_expr =
-                 clang::dyn_cast<clang::MemberExpr>(rhs)) {
-    // TODO
-    // CreateDependency(member_expr, lhs, lhs_type, rhs_type, loc, state);
+  } else if (clang::isa<clang::MemberExpr>(rhs)) {
+    auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
+    for (const auto *rhs_decl : rhs_points_to) {
+      state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
+    }
   }
 
   const auto &points_to_expr = PointsTo.GetExprPointsTo(rhs);
 
-  // TODO
   for (const auto &expr : points_to_expr) {
     if (expr != nullptr) {
       if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
         TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
-      } else if (const auto *member_expr =
-                     clang::dyn_cast<clang::MemberExpr>(expr)) {
-        // TODO
+      } else if (clang::isa<clang::MemberExpr>(expr)) {
+        auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
+        for (const auto *rhs_decl : rhs_points_to) {
+          state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
+        }
       }
     }
   }
 
   const auto &points_to_decl = PointsTo.GetExprDecls(rhs);
+
+  // TODO check if the callexpr or memberexpr first
+  // TODO these should not be taken from GetExprDecls but instead from
+  // GetExprPointsTo
+  // TODO VisitMemberExpr -> insert children in GetExprDecls and not in
+  // GetExprPointsTo
 
   for (const auto &decl : points_to_decl) {
     // TODO most recent decl
@@ -93,15 +86,30 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
 }
 
 void LifetimesPropagationVisitor::PropagateBinAssign(
-    const clang::Expr *lhs, const clang::Expr *rhs,
-    const clang::VarDecl *lhs_decl, const clang::BinaryOperator *op) const {
-  clang::QualType found_type = PointsTo.GetExprType(lhs);
-  clang::QualType base_type = lhs->getType().getCanonicalType();
-  if (found_type.isNull()) {
-    TransferRHS(lhs_decl, rhs, base_type, base_type, op, PointsTo, State);
+    const clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
+    const clang::BinaryOperator *op) const {
+  debugLifetimes("PropagateBinAssign");
+  // TODO delete this
+  assert(rhs != nullptr && "RHS cannot be nullptr");
+  if (expr == nullptr) return;
+
+  const clang::VarDecl *lhs_decl;
+  if (clang::isa<clang::MemberExpr>(expr)) {
+    auto &points_to = PointsTo.GetExprDecls(expr);
+    // TODO delete this
+    assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
+    lhs_decl = *points_to.begin();
+  } else if (const auto *lhs_decl_ref_expr =
+                 dyn_cast<clang::DeclRefExpr>(expr)) {
+    if (!(lhs_decl = dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl()))) {
+      return;
+    }
   } else {
-    TransferRHS(lhs_decl, rhs, found_type, base_type, op, PointsTo, State);
+    return;
   }
+  // TODO maybe don't use types
+  clang::QualType base_type = lhs->getType().getCanonicalType();
+  TransferRHS(lhs_decl, rhs, base_type, base_type, op, PointsTo, State);
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
@@ -143,10 +151,11 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   PointsTo.InsertExprPointsTo(op, rhs);
   PointsTo.InsertExprDecl(op, rhs);
 
-  const auto &lhs_points_to = PointsTo.GetExprDecls(lhs);
+  const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
 
-  for (const auto &decl : lhs_points_to) {
-    PropagateBinAssign(lhs, rhs, decl, op);
+  PropagateBinAssign(lhs, rhs, lhs, op);
+  for (const auto &expr : lhs_points_to) {
+    PropagateBinAssign(lhs, rhs, expr, op);
   }
 
   return std::nullopt;
@@ -460,10 +469,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   // TODO
   auto &points_to = PointsTo.GetExprDecls(base);
   if (points_to.size() > 1) debugWarn("More than one decl in MemberExpr");
+  // TODO delete this
+  assert(points_to.size() == 1);
+
+  PointsTo.InsertExprDecl(member_expr, base);
 
   for (const auto *decl : points_to) {
-    Lifetime &member_lifetime = State.GetLifetimeWithSameNumberIndirections(
-        decl, member_expr->getType());
+    Lifetime &member_lifetime = State.GetLifetime(decl, member_expr->getType());
     PointsTo.InsertExprLifetime(member_expr, member_lifetime);
   }
 
