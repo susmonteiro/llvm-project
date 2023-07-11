@@ -19,7 +19,7 @@ namespace clang {
 typedef struct {
   // decl = nullptr -> lifetime $local
   const clang::Expr* arg;
-  clang::QualType rtype;
+  unsigned int num_indirections;
 } CallExprInfo;
 
 typedef struct {
@@ -28,7 +28,7 @@ typedef struct {
   bool is_static = false;
 } Dependencies;
 
-using TypeToSet = llvm::DenseMap<clang::QualType, Dependencies>;
+using TypeToSet = llvm::DenseMap<unsigned int, Dependencies>;
 using CallExprInfoMap = llvm::DenseMap<const clang::CallExpr*, TypeToSet>;
 
 // Maintains the points-to sets needed for the analysis of a function.
@@ -146,21 +146,20 @@ namespace llvm {
 template <>
 struct DenseMapInfo<clang::CallExprInfo, void> {
   static clang::CallExprInfo getEmptyKey() {
-    return clang::CallExprInfo{nullptr, clang::QualType()};
+    return clang::CallExprInfo{nullptr, 0};
   }
 
   static clang::CallExprInfo getTombstoneKey() {
-    return clang::CallExprInfo{reinterpret_cast<const clang::Expr*>(-1),
-                               clang::QualType()};
+    return clang::CallExprInfo{reinterpret_cast<const clang::Expr*>(-1), 0};
   }
 
   static unsigned getHashValue(const clang::CallExprInfo& info) {
-    return llvm::hash_value(info.arg);
+    return llvm::hash_combine(info.arg, info.num_indirections);
   }
 
   static bool isEqual(const clang::CallExprInfo& lhs,
                       const clang::CallExprInfo& rhs) {
-    return lhs.arg == rhs.arg && lhs.rtype == rhs.rtype;
+    return lhs.arg == rhs.arg && lhs.num_indirections == rhs.num_indirections;
   }
 };
 

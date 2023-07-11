@@ -57,7 +57,10 @@ class LifetimeAnnotationsAnalysis {
       const clang::VarDecl *var_decl, clang::QualType type);
   Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl,
                                clang::QualType type);
+  Lifetime &GetLifetimeOrLocal(const clang::VarDecl *var_decl,
+                               unsigned int num_indirections);
   Lifetime &GetReturnLifetime(clang::QualType &type);
+  Lifetime &GetReturnLifetime(unsigned int num_indirections);
 
   bool IsLifetimeNotset(const clang::VarDecl *var_decl, clang::QualType &type);
   bool IsLifetimeNotset(const clang::VarDecl *var_decl,
@@ -73,18 +76,17 @@ class LifetimeAnnotationsAnalysis {
     return GetLifetime(var_decl, type).GetPossibleLifetimes();
   }
 
-    const LifetimesVector &GetPossibleLifetimes(const clang::VarDecl *var_decl,
+  const LifetimesVector &GetPossibleLifetimes(const clang::VarDecl *var_decl,
                                               unsigned int num_indirections) {
     return GetLifetime(var_decl, num_indirections).GetPossibleLifetimes();
   }
 
-
   void PropagatePossibleLifetimes(const clang::VarDecl *target,
                                   const LifetimesVector &possible_lifetimes,
                                   unsigned int num_indirections) {
-    GetLifetime(target, num_indirections).InsertPossibleLifetimes(possible_lifetimes);
+    GetLifetime(target, num_indirections)
+        .InsertPossibleLifetimes(possible_lifetimes);
   }
-
 
   void CreateVariable(const clang::VarDecl *var_decl, clang::QualType type) {
     VariableLifetimes[var_decl] = ObjectLifetimes(Lifetime(type));

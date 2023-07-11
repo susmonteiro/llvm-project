@@ -15,43 +15,41 @@ class ObjectLifetimes {
   ObjectLifetimes() {}
   ObjectLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
 
-  Lifetime& GetLifetimeWithSameNumberIndirections(clang::QualType type) {
-    return GetLifetime(Lifetime::GetNumIndirections(type));
-  }
-
-  Lifetime& GetLifetime(clang::QualType& type) {
-    type = type.getCanonicalType();
-    for (auto& pointee : PointeeObjects) {
-      if (pointee.GetType() == type) {
-        return pointee;
+  Lifetime& GetLifetime(unsigned int num_indirections, char id) {
+    if (num_indirections >= PointeeObjects.size()) {
+      PointeeObjects.resize(num_indirections + 1);
+    }
+    Lifetime& lifetime = PointeeObjects[num_indirections];
+    if (lifetime.IsNull()) {
+      if (num_indirections == 0 && id == NOTSET) {
+        return InsertPointeeObject(Lifetime(LOCAL, num_indirections));
+      } else {
+        return InsertPointeeObject(Lifetime(id, num_indirections));
       }
     }
-    // TODO error?
-    return InsertPointeeObject(type);
+    return lifetime;
   }
 
   Lifetime& GetLifetime(unsigned int num_indirections) {
-    for (auto& pointee : PointeeObjects) {
-      if (pointee.GetNumIndirections() == num_indirections) {
-        return pointee;
-      }
-    }
+    return GetLifetime(num_indirections, NOTSET);
+  }
 
-    if (num_indirections == 0) {
-      return InsertPointeeObject(Lifetime(LOCAL, num_indirections));
-    }
-    return InsertPointeeObject(Lifetime(NOTSET, num_indirections));
+  Lifetime& GetLifetimeOrLocal(unsigned int num_indirections) {
+    return GetLifetime(num_indirections, LOCAL);
+  }
+
+  Lifetime& GetLifetime(clang::QualType& type) {
+    unsigned int num_indirections = Lifetime::GetNumIndirections(type);
+    return GetLifetime(num_indirections);
   }
 
   Lifetime& GetLifetimeOrLocal(clang::QualType& type) {
-    type = type.getCanonicalType();
-    for (auto& pointee : PointeeObjects) {
-      if (pointee.GetType() == type) {
-        return pointee;
-      }
-    }
-    Lifetime& lifetime = InsertPointeeObject(Lifetime(LOCAL, type));
-    return lifetime;
+    unsigned int num_indirections = Lifetime::GetNumIndirections(type);
+    return GetLifetimeOrLocal(num_indirections);
+  }
+
+  Lifetime& GetLifetimeWithSameNumberIndirections(clang::QualType type) {
+    return GetLifetime(Lifetime::GetNumIndirections(type));
   }
 
   llvm::SmallVector<Lifetime>& GetLifetimes() { return PointeeObjects; }
@@ -71,17 +69,21 @@ class ObjectLifetimes {
   }
 
   Lifetime& InsertPointeeObject(Lifetime lifetime) {
-    PointeeObjects.emplace_back(lifetime);
-    clang::QualType type = lifetime.GetType();
-    if (type.isNull()) {
-      return GetLifetime(lifetime.GetNumIndirections());
+    unsigned int num_indirections = lifetime.GetNumIndirections();
+    if (num_indirections >= PointeeObjects.size()) {
+      PointeeObjects.resize(num_indirections + 1);
     }
-    return GetLifetime(type);
+    PointeeObjects[num_indirections] = lifetime;
+    return PointeeObjects[num_indirections];
   }
 
   Lifetime& InsertPointeeObject(clang::QualType type) {
-    PointeeObjects.emplace_back(type);
-    return GetLifetime(type);
+    unsigned num_indirections = Lifetime::GetNumIndirections(type);
+    if (num_indirections >= PointeeObjects.size()) {
+      PointeeObjects.resize(num_indirections + 1);
+    }
+    PointeeObjects[num_indirections] = Lifetime(NOTSET, type);
+    return PointeeObjects[num_indirections];
   }
 
   std::string DebugString() const {

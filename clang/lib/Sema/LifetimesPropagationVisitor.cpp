@@ -25,27 +25,33 @@ void TransferFuncCall(const clang::VarDecl *lhs,
                       LifetimeAnnotationsAnalysis &state) {
   auto &call_info = PointsTo.GetCallExprInfo(call_expr);
   clang::QualType func_type = call_expr->getType().getCanonicalType();
-  while ((lhs_type->isPointerType() || lhs_type->isReferenceType()) &&
-         (func_type->isPointerType() || func_type->isReferenceType())) {
-    if (state.IsLifetimeNotset(lhs, lhs_type)) {
-      auto &current_type_call_info = call_info[func_type];
+  unsigned int lhs_num_indirections = Lifetime::GetNumIndirections(lhs_type);
+  unsigned int func_num_indirections = Lifetime::GetNumIndirections(func_type);
+
+  while (lhs_num_indirections > 0 && func_num_indirections > 0) {
+    if (state.IsLifetimeNotset(lhs, lhs_num_indirections)) {
+      auto &current_type_call_info = call_info[func_num_indirections];
       if (current_type_call_info.is_local) {
-        state.CreateLifetimeDependency(lhs, lhs_type, loc, func_type);
+        state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
+                                       func_num_indirections);
         state.CreateStmtLifetime(loc, LOCAL);
       } else if (current_type_call_info.is_static) {
-        state.CreateLifetimeDependency(lhs, lhs_type, loc, func_type);
+        state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
+                                       func_num_indirections);
         state.CreateStmtLifetime(loc, STATIC);
       } else {
-        for (const auto &[arg, arg_type] : current_type_call_info.info) {
+        for (const auto &[arg, arg_num_indirections] :
+             current_type_call_info.info) {
           const auto &arg_points_to = PointsTo.GetExprDecls(arg);
           for (const auto &decl : arg_points_to) {
-            state.CreateDependencySimple(lhs, lhs_type, decl, arg_type, loc);
+            state.CreateDependencySimple(lhs, lhs_num_indirections, decl,
+                                         arg_num_indirections, loc);
           }
         }
       }
     }
-    lhs_type = lhs_type->getPointeeType();
-    func_type = func_type->getPointeeType();
+    lhs_num_indirections--;
+    func_num_indirections--;
   }
 }
 
@@ -188,9 +194,12 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     ObjectLifetimes return_ol = func_info.GetReturnLifetime();
     auto &call_info = PointsTo.GetCallExprInfo(call);
-    while (func_type->isPointerType() || func_type->isReferenceType()) {
+    unsigned int func_num_indirections =
+        Lifetime::GetNumIndirections(func_type);
+    while (func_num_indirections > 0) {
       Lifetime &return_lifetime = return_ol.GetLifetime(func_type);
-      auto &current_type_call_info = call_info[func_type];
+      assert(!return_lifetime.IsNull());
+      auto &current_type_call_info = call_info[func_num_indirections];
 
       if (return_lifetime.IsNotSet()) {
         current_type_call_info.is_local = true;
@@ -212,12 +221,12 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
             // TODO == or contains?
             if (param_lifetime == return_lifetime) {
               current_type_call_info.info.insert(
-                  {arg, arg->getType().getCanonicalType()});
+                  {arg, Lifetime::GetNumIndirections(arg->getType())});
             }
           }
         }
       }
-      func_type = func_type->getPointeeType();
+      func_num_indirections--;
     }
   }
   return std::nullopt;
@@ -385,7 +394,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
   PointsTo.InsertExprPointsTo(decl_ref, nullptr);
   if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
     PointsTo.InsertExprDecl(decl_ref, var_decl);
-  } 
+  }
   return std::nullopt;
 }
 

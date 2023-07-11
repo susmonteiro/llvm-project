@@ -213,8 +213,8 @@ void simple_function_call(int* $a x, int *$b y) {
   p = correct_simple_return(x); // no warning
   p = incorrect_simple_return(x); // no warning
   p = correct_simple_return(y); // expected-warning {{assignment requires that '$b' outlives '$a'}} \
-          // expected-note@-3 {{declared with lifetime '$a' here}} \
-          // expected-note@-4 {{declared with lifetime '$b' here}}
+                                // expected-note@-3 {{declared with lifetime '$a' here}} \
+                                // expected-note@-4 {{declared with lifetime '$b' here}}
 }
 
 int *$a correct_function_call_two_args_1(int *$a x, int *$b y) {

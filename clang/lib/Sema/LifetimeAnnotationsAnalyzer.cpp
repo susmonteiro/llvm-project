@@ -42,7 +42,7 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
   auto &params_lifetimes = func_lifetimes.GetParamsLifetimes();
   ObjectLifetimes return_lifetime = func_lifetimes.GetReturnLifetime();
   for (Lifetime &rl : return_lifetime.GetLifetimes()) {
-    if (rl.IsStatic() || rl.IsNotSet() || rl.IsLocal()) continue;
+    if (rl.IsStatic() || rl.IsNotSet() || rl.IsLocal() || rl.IsNull()) continue;
     auto it = params_lifetimes.begin();
     while (it != params_lifetimes.end() &&
            !it->second.HasLifetime(rl.GetId())) {

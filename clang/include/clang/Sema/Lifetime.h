@@ -19,9 +19,10 @@ using LifetimesVector = llvm::SmallVector<StmtDenseSet>;
 constexpr char NOTSET = 0;
 constexpr char INVALID_ID_TOMBSTONE = 1;
 constexpr char INVALID_EMPTY = 2;
-constexpr char LOCAL = 3;
-constexpr char STATIC = 4;
-constexpr char OFFSET = 5;
+constexpr char NULL_LIFETIME = 3;
+constexpr char LOCAL = 4;
+constexpr char STATIC = 5;
+constexpr char OFFSET = 6;
 
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
@@ -32,8 +33,10 @@ class Lifetime {
   Lifetime(char id, clang::QualType type);
   Lifetime(clang::QualType &type)
       : LifetimeType(type),
-        NumIndirections(Lifetime::GetNumIndirections(type)) {}
-  Lifetime(unsigned int num_indirections) : NumIndirections(num_indirections) {}
+        NumIndirections(Lifetime::GetNumIndirections(type)),
+        Id(NOTSET) {}
+  Lifetime(unsigned int num_indirections)
+      : NumIndirections(num_indirections), Id(NOTSET) {}
   Lifetime(char id, unsigned int num_indirections);
 
   void InitializeId(char id);
@@ -48,6 +51,9 @@ class Lifetime {
   // Returns whether this lifetime is a local lifetime.
   bool IsLocal() const;
   bool ContainsLocal() const;
+
+  // Returns whether this lifetime is null
+  bool IsNull() const;
 
   // Sets the Id to $static
   void SetStatic();
@@ -163,9 +169,9 @@ class Lifetime {
 
   LifetimesVector PossibleLifetimes;
   clang::QualType LifetimeType;
-  unsigned int NumIndirections;
+  unsigned int NumIndirections = 0;
   int ShortestLifetimes = 0;
-  char Id = NOTSET;
+  char Id = NULL_LIFETIME;
 };
 }  // namespace clang
 

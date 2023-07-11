@@ -260,7 +260,7 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
   // debugLifetimes("Size of lifetime_params", lifetime_params.size());
 
   for (size_t i = 0; i < lifetime_params.size(); ++i) {
-    Lifetime l(canonical_type);
+    Lifetime l(NOTSET, canonical_type);
     const clang::Expr* lifetime_name = nullptr;
     if (i < lifetime_names.size()) {
       lifetime_name = lifetime_names[i];
@@ -311,7 +311,7 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
     lifetime_name = lifetime_names.front();
   }
 
-  Lifetime lifetime(canonical_type);
+  Lifetime lifetime(NOTSET, canonical_type);
   if (llvm::Error err =
           lifetime_factory(lifetime_name, canonical_type).moveInto(lifetime)) {
     return std::move(err);
@@ -347,7 +347,7 @@ LifetimeFactory FunctionLifetimeFactory::ReturnLifetimeFactory() const {
   return [this](const clang::Expr* name, clang::QualType type
                 /*,&input_lifetime */) -> llvm::Expected<Lifetime> {
     clang::QualType canonical_type = type.getCanonicalType();
-    Lifetime lifetime(canonical_type);
+    Lifetime lifetime(NOTSET, canonical_type);
     if (name) {
       if (llvm::Error err =
               LifetimeFromName(name, canonical_type).moveInto(lifetime)) {
@@ -364,7 +364,7 @@ LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
   return [this](const clang::Expr* name,
                 clang::QualType type) -> llvm::Expected<Lifetime> {
     clang::QualType canonical_type = type.getCanonicalType();
-    Lifetime lifetime(canonical_type);
+    Lifetime lifetime(NOTSET, canonical_type);
     if (name) {
       if (llvm::Error err =
               LifetimeFromName(name, canonical_type).moveInto(lifetime)) {

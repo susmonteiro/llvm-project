@@ -8,14 +8,12 @@ constexpr llvm::StringRef LOCAL_NAME = "local";
 Lifetime::Lifetime(char id) { InitializeId(id); }
 
 Lifetime::Lifetime(char id, clang::QualType type)
-    : LifetimeType(type),
-      NumIndirections(Lifetime::GetNumIndirections(type)) {
+    : LifetimeType(type), NumIndirections(Lifetime::GetNumIndirections(type)) {
   InitializeId(id);
 }
 
 Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
-    : LifetimeType(type),
-      NumIndirections(Lifetime::GetNumIndirections(type)) {
+    : LifetimeType(type), NumIndirections(Lifetime::GetNumIndirections(type)) {
   if (name.equals(STATIC_NAME)) {
     Id = STATIC;
   } else if (name.equals(LOCAL_NAME)) {
@@ -62,6 +60,8 @@ bool Lifetime::ContainsLocal() const {
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
 
+bool Lifetime::IsNull() const { return Id == NULL_LIFETIME; }
+
 unsigned int Lifetime::GetNumIndirections(clang::QualType type) {
   unsigned int num_indirections_lhs = 0;
   type = type.getCanonicalType();
@@ -99,6 +99,9 @@ std::string Lifetime::GetLifetimeName(char id) {
       break;
     case LOCAL:
       return "$local";
+      break;
+    case NULL_LIFETIME:
+      return "NULL";
       break;
     default:
       if (id >= 'a' && id <= 'z')
@@ -181,6 +184,8 @@ std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
 }
 
 bool Lifetime::operator==(const Lifetime &Other) const {
+  if (IsNull() || Other.IsNull()) return false;
+  
   if (Id != Other.GetId()) {
     return (Id == NOTSET && EmptyPossibleLifetimes()) ||
            (Other.GetId() == NOTSET && Other.EmptyPossibleLifetimes());

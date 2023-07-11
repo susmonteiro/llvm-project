@@ -71,16 +71,25 @@ Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeWithSameNumberIndirections(
 
 Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
     const clang::VarDecl *var_decl, clang::QualType type) {
+  return GetLifetimeOrLocal(var_decl, Lifetime::GetNumIndirections(type));
+}
+
+Lifetime &LifetimeAnnotationsAnalysis::GetLifetimeOrLocal(
+    const clang::VarDecl *var_decl, unsigned int num_indirections) {
   VariableLifetimesVector::iterator it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
-    CreateVariable(var_decl, Lifetime(LOCAL, type.getCanonicalType()));
+    CreateVariable(var_decl, Lifetime(LOCAL, num_indirections));
   }
-  return VariableLifetimes[var_decl].GetLifetimeOrLocal(type);
+  return VariableLifetimes[var_decl].GetLifetimeOrLocal(num_indirections);
 }
 
 Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime(
     clang::QualType &type) {
   return ReturnLifetime.GetLifetime(type);
+}
+
+Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime(unsigned int num_indirections) {
+  return ReturnLifetime.GetLifetime(num_indirections);
 }
 
 bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
