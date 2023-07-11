@@ -312,45 +312,54 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     // there can only be one pointer/reference variable
     if (const auto *rhs_var_decl =
             dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
-      while (lhs_type->isPointerType() || lhs_type->isReferenceType()) {
+      unsigned int lhs_num_indirections =
+          Lifetime::GetNumIndirections(lhs_type);
+      unsigned int rhs_num_indirections =
+          Lifetime::GetNumIndirections(rhs_type);
+      while (lhs_num_indirections > 0 && rhs_num_indirections > 0) {
         Lifetime &lhs_lifetime =
-            is_return ? State.GetReturnLifetime(lhs_type)
-                      : State.GetLifetime(lhs_var_decl, lhs_type);
+            is_return ? State.GetReturnLifetime(lhs_num_indirections)
+                      : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
         Lifetime &rhs_lifetime =
-            State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
+            State.GetLifetimeOrLocal(rhs_var_decl, rhs_num_indirections);
 
         if (is_return && rhs_lifetime.IsLocal()) {
-          S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
-              << rhs_type.getCanonicalType() << expr->getSourceRange();
-          const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
-          if (maybe_stmts.has_value()) {
-            const auto &stmts = maybe_stmts.value();
-            for (const auto &stmt : stmts) {
-              S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
-                  << Lifetime::GetLifetimeName(LOCAL) << stmt->getSourceRange();
+          rhs_type = rhs_lifetime.GetType();
+          if (!rhs_type.isNull()) {
+            S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
+                << rhs_type.getCanonicalType() << expr->getSourceRange();
+            const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
+            if (maybe_stmts.has_value()) {
+              const auto &stmts = maybe_stmts.value();
+              for (const auto &stmt : stmts) {
+                S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
+                    << Lifetime::GetLifetimeName(LOCAL)
+                    << stmt->getSourceRange();
+              }
+            } else {
+              S.Diag(rhs_var_decl->getBeginLoc(),
+                     diag::note_lifetime_declared_here)
+                  << rhs_lifetime.GetLifetimeName()
+                  << rhs_var_decl->getSourceRange();
             }
           } else {
-            S.Diag(rhs_var_decl->getBeginLoc(),
-                   diag::note_lifetime_declared_here)
-                << rhs_lifetime.GetLifetimeName()
-                << rhs_var_decl->getSourceRange();
+            assert(true && "Do something about this -> no rhs_type");
           }
         } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
           factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
                   rhs_lifetime);
         }
-
-        lhs_type = lhs_type->getPointeeType();
-        rhs_type = rhs_type->getPointeeType();
+        lhs_num_indirections--;
+        rhs_num_indirections--;
       }
     }
   } else if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
     auto &call_info = PointsTo.GetCallExprInfo(call_expr);
     unsigned int lhs_num_indirections = Lifetime::GetNumIndirections(lhs_type);
     while (lhs_num_indirections > 0) {
-      Lifetime &lhs_lifetime = is_return
-                                   ? State.GetReturnLifetime(lhs_num_indirections)
-                                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
+      Lifetime &lhs_lifetime =
+          is_return ? State.GetReturnLifetime(lhs_num_indirections)
+                    : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
       if (lhs_lifetime.IsNotSet()) {
         lhs_num_indirections--;
         continue;
@@ -369,10 +378,12 @@ void LifetimesCheckerVisitor::CompareAndCheck(
         }
       }
 
-      for (const auto &[arg, arg_num_indiretions] : current_type_call_info.info) {
+      for (const auto &[arg, arg_num_indiretions] :
+           current_type_call_info.info) {
         const auto &arg_points_to = PointsTo.GetExprDecls(arg);
         for (const auto &decl : arg_points_to) {
-          Lifetime &arg_lifetime = State.GetLifetimeOrLocal(decl, arg_num_indiretions);
+          Lifetime &arg_lifetime =
+              State.GetLifetimeOrLocal(decl, arg_num_indiretions);
           if (arg_lifetime < lhs_lifetime) {
             factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
                     arg_lifetime);
