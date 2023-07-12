@@ -57,7 +57,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   }
 
   const auto &points_to_expr = PointsTo.GetExprPointsTo(rhs);
-
   for (const auto &expr : points_to_expr) {
     if (expr != nullptr) {
       if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
@@ -75,8 +74,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
 
   // TODO check if the callexpr or memberexpr first
   // TODO these should not be taken from GetExprDecls but instead from
-  // GetExprPointsTo
-  // TODO VisitMemberExpr -> insert children in GetExprDecls and not in
   // GetExprPointsTo
 
   for (const auto &decl : points_to_decl) {

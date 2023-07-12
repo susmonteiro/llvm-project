@@ -11,10 +11,9 @@
 #include "llvm/Support/Error.h"
 
 namespace clang {
-using PrintNotesFactory =
-    std::function<void(const clang::VarDecl *, const clang::Decl *,
-                       const clang::BinaryOperator *, const clang::Expr *,
-                       const clang::Stmt *, Lifetime &, Lifetime &)>;
+using PrintNotesFactory = std::function<void(
+    const clang::VarDecl *, const clang::Decl *, const clang::BinaryOperator *,
+    const clang::Expr *, const clang::Stmt *, Lifetime &, Lifetime &)>;
 
 class LifetimesCheckerVisitorFactory {
  public:
@@ -64,16 +63,14 @@ class LifetimesCheckerVisitor
   const clang::VarDecl *GetDeclFromArg(const clang::Expr *arg) const;
 
   void VerifyBinAssign(
-      clang::QualType lhs_type, clang::QualType base_type,
-      const clang::Expr *rhs, const clang::Expr *expr,
-      const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to,
-      const clang::BinaryOperator *op, PrintNotesFactory factory) const;
+      clang::Expr *lhs, const clang::Expr *rhs, const clang::Expr *expr,
+      const clang::BinaryOperator *op,
+      const llvm::SmallSet<const clang::Expr *, 2U> &lhs_points_to) const;
 
   void VerifyMaxLifetimes(
-      const clang::Expr *lhs, const clang::Expr *rhs,
+      const clang::UnaryOperator *deref_op, const clang::Expr *rhs,
       const clang::BinaryOperator *op,
-      const llvm::SmallSet<const clang::Expr *, 2U> &lhs_points_to,
-      const llvm::SmallSet<const clang::Expr *, 2U> &rhs_points_to) const;
+      const llvm::SmallSet<const clang::Expr *, 2U> &lhs_points_to) const;
 
   void CallExprChecker(const clang::CallExpr *call,
                        const clang::FunctionDecl *direct_callee,
@@ -82,6 +79,12 @@ class LifetimesCheckerVisitor
                        Lifetime &first_lifetime, Lifetime &second_lifetime,
                        unsigned int first_num_indirections,
                        unsigned int second_num_indirections, int msg) const;
+
+  void DeclChecker(const clang::VarDecl *lhs_var_decl, clang::QualType lhs_type,
+                   const clang::Expr *expr, const clang::VarDecl *rhs_var_decl,
+                   clang::QualType rhs_type, const clang::Stmt *stmt,
+                   const clang::BinaryOperator *op, bool is_return,
+                   PrintNotesFactory factory) const;
 
   void CompareAndCheck(const clang::VarDecl *lhs_var_decl,
                        clang::QualType lhs_type, const clang::Expr *expr,
