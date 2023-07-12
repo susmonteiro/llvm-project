@@ -12,8 +12,11 @@ namespace clang {
 
 class ObjectLifetimes {
  public:
-  ObjectLifetimes() {}
-  ObjectLifetimes(Lifetime lifetime) { InsertPointeeObject(lifetime); }
+  ObjectLifetimes() { InsertPointeeObject(Lifetime(LOCAL, 0)); }
+  ObjectLifetimes(Lifetime lifetime) {
+    InsertPointeeObject(Lifetime(LOCAL, 0));
+    InsertPointeeObject(lifetime);
+  }
 
   Lifetime& GetLifetime(unsigned int num_indirections, char id) {
     if (num_indirections >= PointeeObjects.size()) {
@@ -52,7 +55,7 @@ class ObjectLifetimes {
 
   bool HasLifetimeLocal() {
     for (Lifetime& lifetime : PointeeObjects) {
-      if (lifetime.IsLocal()) return true;
+      if (lifetime.IsLocal() && lifetime.GetNumIndirections() != 0) return true;
     }
     return false;
   }
