@@ -11810,20 +11810,10 @@ def err_wasm_funcref_not_wasm : Error<
   "invalid use of '__funcref' keyword outside the WebAssembly triple">;
 
 // Lifetime annotations
-// TODO remove this
-def warn_if_condition_too_complex : Warning<
-  "condition of the 'if' statement is too complex">,
-	InGroup<ComplexCondition>, DefaultIgnore;
-
 def print_lifetime_annotations : Warning<
   "lifetime annotations of current function">, 
   InGroup<PrintLifetimes>, DefaultIgnore;
 
-def warn_return_undefined_lifetime : Warning<
-  "cannot return an undefined lifetime">, 
-  InGroup<PrintLifetimes>, DefaultIgnore;
-
-// TODO change the variables
 def warn_return_lifetimes_differ : Warning<
   "function should return data with lifetime '%0' but it is returning data with lifetime '%1'">;
 def warn_assign_lifetimes_differ : Warning<
@@ -11831,9 +11821,10 @@ def warn_assign_lifetimes_differ : Warning<
 def warn_decl_lifetimes_differ : Warning<
   "initialization requires that '%1' outlives '%0'">;
 def warn_arg_lifetimes_differ : Warning<
-  "argument %0 requires that '%2' outlives '%1'">;
+  "argument requires that '%1' outlives '%0'">;
+  // here
 def warn_func_params_lifetimes_equal : Warning<
-  "when calling function %0, the lifetimes of arguments %1 and %2 should be the same">;
+  "when calling function %0, the lifetimes of %1 and %2 should be the same">;
 def warn_func_params_lifetimes_shorter : Warning<
   "when calling function %0, the lifetime of %1 cannot be shorter than the lifetime of %2">;
 def warn_func_return_lifetime_local : Warning<
@@ -11841,9 +11832,10 @@ def warn_func_return_lifetime_local : Warning<
 def warn_func_return_unknown_lifetime : Warning<
   "at least one parameter must be annotated with '%0'">;
 def warn_cannot_return_local : Warning<
-  "cannot return data of type %0 with lifetime '$local'">;
+  "cannot return data with lifetime '%0$local'">;
 def note_lifetime_of : Note<
-  "lifetime of %0 is '%1'">;
-def note_lifetime_declared_here : Note<"declared with lifetime '%0' here">;
+  "lifetime is '%0'">;
+def note_lifetime_declared_here : Note<
+  "declared with lifetime '%0' here">;
 
 } // end of sema component.

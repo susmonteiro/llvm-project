@@ -14,6 +14,15 @@ std::string GenerateArgName(const clang::VarDecl *arg,
          '\'';
 }
 
+std::string GenerateLifetimeName(Lifetime &lifetime) {
+  return std::string(lifetime.GetNumIndirections(), '*') +
+         lifetime.GetLifetimeName();
+}
+
+std::string GenerateLifetimeName(char id, unsigned int num_indirections) {
+  return std::string(num_indirections, '*') + Lifetime::GetLifetimeName(id);
+}
+
 void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
                                                 const clang::Decl *var_decl,
                                                 int msg) const {
@@ -40,15 +49,17 @@ void LifetimesCheckerVisitorFactory::PrintNotes(Lifetime &lifetime,
                                                 clang::SourceLocation loc,
                                                 clang::SourceRange range,
                                                 int msg, char id) const {
+  unsigned int num_indirections = lifetime.GetNumIndirections();
   const auto &maybe_stmts = lifetime.GetStmts(id);
   if (maybe_stmts.has_value()) {
     const auto &stmts = maybe_stmts.value();
     for (const auto &stmt : stmts) {
       S.Diag(stmt->getBeginLoc(), msg)
-          << Lifetime::GetLifetimeName(id) << stmt->getSourceRange();
+          << GenerateLifetimeName(id, num_indirections)
+          << stmt->getSourceRange();
     }
   } else {
-    S.Diag(loc, msg) << lifetime.GetLifetimeName() << range;
+    S.Diag(loc, msg) << GenerateLifetimeName(lifetime) << range;
   }
 }
 
@@ -63,12 +74,14 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
     if (rhs_lifetime.IsNotSet()) {
       unsigned int possible_lifetimes_size =
           rhs_lifetime.GetPossibleLifetimes().size();
+      unsigned int num_indirections = rhs_lifetime.GetNumIndirections();
       for (unsigned int i = OFFSET; i < possible_lifetimes_size; i++) {
         if (!rhs_lifetime.ContainsShortestLifetime(i) ||
             (char)i == lhs_lifetime.GetId())
           continue;
         S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-            << lhs_lifetime.GetLifetimeName() << Lifetime::GetLifetimeName(i)
+            << GenerateLifetimeName(lhs_lifetime)
+            << GenerateLifetimeName(i, num_indirections)
             << op->getSourceRange();
         PrintNotes(rhs_lifetime, rhs_var_decl,
                    diag::note_lifetime_declared_here, i);
@@ -76,8 +89,8 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
       PrintNotes(lhs_lifetime, lhs_var_decl, diag::note_lifetime_declared_here);
     } else {
       S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-          << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
-          << op->getSourceRange();
+          << GenerateLifetimeName(lhs_lifetime)
+          << GenerateLifetimeName(rhs_lifetime) << op->getSourceRange();
       PrintNotes(rhs_lifetime, rhs_var_decl, diag::note_lifetime_declared_here);
       PrintNotes(lhs_lifetime, lhs_var_decl, diag::note_lifetime_declared_here);
     }
@@ -95,13 +108,15 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
     if (rhs_lifetime.IsNotSet()) {
       unsigned int init_possible_lifetimes_size =
           rhs_lifetime.GetPossibleLifetimes().size();
+      unsigned int num_indirections = rhs_lifetime.GetNumIndirections();
       for (unsigned int i = 0; i < init_possible_lifetimes_size; i++) {
         if (!rhs_lifetime.ContainsShortestLifetime(i) ||
             (char)i == lhs_lifetime.GetId())
           continue;
         S.Diag(lhs_var_decl->getInit()->getExprLoc(),
                diag::warn_decl_lifetimes_differ)
-            << lhs_lifetime.GetLifetimeName() << Lifetime::GetLifetimeName(i)
+            << GenerateLifetimeName(lhs_lifetime)
+            << GenerateLifetimeName(i, num_indirections)
             << lhs_var_decl->getInit()->getSourceRange();
         PrintNotes(rhs_lifetime, rhs_var_decl,
                    diag::note_lifetime_declared_here, i);
@@ -109,7 +124,8 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
     } else {
       S.Diag(lhs_var_decl->getInitializingDeclaration()->getLocation(),
              diag::warn_decl_lifetimes_differ)
-          << lhs_lifetime.GetLifetimeName() << rhs_lifetime.GetLifetimeName()
+          << GenerateLifetimeName(lhs_lifetime)
+          << GenerateLifetimeName(rhs_lifetime)
           << lhs_var_decl->getInitializingDeclaration()->getSourceRange();
       PrintNotes(rhs_lifetime, rhs_var_decl, diag::note_lifetime_declared_here);
     }
@@ -126,19 +142,22 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
     if (var_lifetime.IsNotSet()) {
       unsigned int var_possible_lifetimes_size =
           var_lifetime.GetPossibleLifetimes().size();
+      unsigned int num_indirections = var_lifetime.GetNumIndirections();
       for (unsigned int i = 0; i < var_possible_lifetimes_size; i++) {
         if (!var_lifetime.ContainsShortestLifetime(i) ||
             (char)i == return_lifetime.GetId())
           continue;
         S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
-            << return_lifetime.GetLifetimeName() << Lifetime::GetLifetimeName(i)
+            << GenerateLifetimeName(return_lifetime)
+            << GenerateLifetimeName(i, num_indirections)
             << return_stmt->getSourceRange();
         PrintNotes(var_lifetime, var_decl, diag::note_lifetime_declared_here,
                    (char)i);
       }
     } else {
       S.Diag(expr->getExprLoc(), diag::warn_return_lifetimes_differ)
-          << return_lifetime.GetLifetimeName() << var_lifetime.GetLifetimeName()
+          << GenerateLifetimeName(return_lifetime)
+          << GenerateLifetimeName(var_lifetime)
           << return_stmt->getSourceRange();
       PrintNotes(var_lifetime, var_decl, diag::note_lifetime_declared_here);
     }
@@ -246,26 +265,32 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
           while (++i < lhs_possible_lifetimes_size) {
             if (lhs_lifetime.GetPossibleLifetime(i)->empty()) continue;
             Lifetime specific_lifetime(Lifetime::IdToChar(i));
+            unsigned int lhs_num_indirections =
+                lhs_lifetime.GetNumIndirections();
             if (rhs_lifetime < specific_lifetime) {
               if (rhs_lifetime.IsNotSet()) {
                 unsigned int possible_lifetimes_size =
                     rhs_lifetime.GetPossibleLifetimes().size();
                 const auto &stmts = lhs_lifetime.GetStmts(i);
-                for (unsigned int i = OFFSET; i < possible_lifetimes_size;
-                     i++) {
-                  if (!rhs_lifetime.ContainsShortestLifetime(i) ||
-                      (char)i == specific_lifetime.GetId())
+                unsigned int rhs_num_indirections =
+                    rhs_lifetime.GetNumIndirections();
+                for (unsigned int j = OFFSET; j < possible_lifetimes_size;
+                     j++) {
+                  if (!rhs_lifetime.ContainsShortestLifetime(j) ||
+                      (char)j == specific_lifetime.GetId())
                     continue;
                   S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-                      << specific_lifetime.GetLifetimeName()
-                      << Lifetime::GetLifetimeName(i) << op->getSourceRange();
+                      << GenerateLifetimeName(i, lhs_num_indirections)
+                      << GenerateLifetimeName(j, rhs_num_indirections)
+                      << op->getSourceRange();
                   Factory.PrintNotes(rhs_lifetime, rhs_var_decl,
-                                     diag::note_lifetime_declared_here, i);
+                                     diag::note_lifetime_declared_here, j);
                 }
               } else {
                 S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
-                    << specific_lifetime.GetLifetimeName()
-                    << rhs_lifetime.GetLifetimeName() << op->getSourceRange();
+                    << GenerateLifetimeName(i, lhs_num_indirections)
+                    << GenerateLifetimeName(rhs_lifetime)
+                    << op->getSourceRange();
                 Factory.PrintNotes(rhs_lifetime, rhs_var_decl,
                                    diag::note_lifetime_declared_here);
               }
@@ -284,10 +309,11 @@ void LifetimesCheckerVisitor::CallExprChecker(
     const clang::VarDecl *first_arg, const clang::VarDecl *second_arg,
     Lifetime &first_lifetime, Lifetime &second_lifetime,
     unsigned int first_num_indirections, unsigned int second_num_indirections,
-    int msg) const {
+    unsigned int num_indirections, int msg) const {
   S.Diag(call->getExprLoc(), msg)
-      << direct_callee << GenerateArgName(first_arg, first_num_indirections)
-      << GenerateArgName(second_arg, second_num_indirections)
+      << direct_callee
+      << GenerateArgName(first_arg, first_num_indirections - num_indirections)
+      << GenerateArgName(second_arg, second_num_indirections - num_indirections)
       << call->getSourceRange();
   unsigned int first_arg_size = first_lifetime.GetPossibleLifetimes().size();
   unsigned int second_arg_size = second_lifetime.GetPossibleLifetimes().size();
@@ -297,12 +323,12 @@ void LifetimesCheckerVisitor::CallExprChecker(
       if ((i >= second_arg_size ||
            !second_lifetime.ContainsShortestLifetime(i)) &&
           (i < first_arg_size && first_lifetime.ContainsShortestLifetime(i))) {
-        PrintNotes(first_arg, first_lifetime, i, first_num_indirections);
+        PrintNotes(first_arg, first_lifetime, i, num_indirections);
       } else if ((i >= first_arg_size ||
                   !first_lifetime.ContainsShortestLifetime(i)) &&
                  (i < second_arg_size &&
                   second_lifetime.ContainsShortestLifetime(i))) {
-        PrintNotes(second_arg, second_lifetime, i, second_num_indirections);
+        PrintNotes(second_arg, second_lifetime, i, num_indirections);
       }
     }
   } else if (first_lifetime.IsNotSet()) {
@@ -310,20 +336,20 @@ void LifetimesCheckerVisitor::CallExprChecker(
       if ((char)i == second_lifetime.GetId() ||
           !first_lifetime.ContainsShortestLifetime(i))
         continue;
-      PrintNotes(first_arg, first_lifetime, i, first_num_indirections);
+      PrintNotes(first_arg, first_lifetime, i, num_indirections);
     }
-    PrintNotes(second_arg, second_lifetime, second_num_indirections);
+    PrintNotes(second_arg, second_lifetime, num_indirections);
   } else if (second_lifetime.IsNotSet()) {
     for (unsigned int i = 0; i < second_arg_size; i++) {
       if ((char)i == first_lifetime.GetId() ||
           !second_lifetime.ContainsShortestLifetime(i))
         continue;
-      PrintNotes(second_arg, second_lifetime, i, second_num_indirections);
+      PrintNotes(second_arg, second_lifetime, i, num_indirections);
     }
-    PrintNotes(first_arg, first_lifetime, first_num_indirections);
+    PrintNotes(first_arg, first_lifetime, num_indirections);
   } else {
-    PrintNotes(second_arg, second_lifetime, second_num_indirections);
-    PrintNotes(first_arg, first_lifetime, first_num_indirections);
+    PrintNotes(second_arg, second_lifetime, num_indirections);
+    PrintNotes(first_arg, first_lifetime, num_indirections);
   }
 }
 
@@ -343,24 +369,21 @@ void LifetimesCheckerVisitor::DeclChecker(
         State.GetLifetimeOrLocal(rhs_var_decl, rhs_num_indirections);
 
     if (is_return && rhs_lifetime.IsLocal()) {
-      rhs_type = rhs_lifetime.GetType();
-      if (!rhs_type.isNull()) {
-        S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
-            << rhs_type.getCanonicalType() << expr->getSourceRange();
-        const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
-        if (maybe_stmts.has_value()) {
-          const auto &stmts = maybe_stmts.value();
-          for (const auto &stmt : stmts) {
-            S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
-                << Lifetime::GetLifetimeName(LOCAL) << stmt->getSourceRange();
-          }
-        } else {
-          S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here)
-              << rhs_lifetime.GetLifetimeName()
-              << rhs_var_decl->getSourceRange();
+      S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
+          << std::string(rhs_lifetime.GetNumIndirections(), '*')
+          << expr->getSourceRange();
+      const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
+      if (maybe_stmts.has_value()) {
+        const auto &stmts = maybe_stmts.value();
+        for (const auto &stmt : stmts) {
+          S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
+              << GenerateLifetimeName(LOCAL, rhs_lifetime.GetNumIndirections())
+              << stmt->getSourceRange();
         }
       } else {
-        assert(true && "Do something about this -> no rhs_type");
+        S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here)
+            << GenerateLifetimeName(rhs_lifetime)
+            << rhs_var_decl->getSourceRange();
       }
     } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
       factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
@@ -376,6 +399,7 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     const clang::Expr *expr, const clang::Expr *rhs, clang::QualType rhs_type,
     const clang::Stmt *stmt, const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
+  // TODO maybe dont need lhs_type and rhs_type
   if (expr == nullptr) return;
   if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
     auto &call_info = PointsTo.GetCallExprInfo(call_expr);
@@ -392,7 +416,8 @@ void LifetimesCheckerVisitor::CompareAndCheck(
       if (current_type_call_info.is_local) {
         if (is_return) {
           S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
-              << rhs_type.getCanonicalType() << expr->getSourceRange();
+              << std::string(Lifetime::GetNumIndirections(rhs_type), '*')
+              << expr->getSourceRange();
         } else {
           Lifetime arg_lifetime(LOCAL);
           if (Lifetime(LOCAL) < lhs_lifetime) {
@@ -448,8 +473,8 @@ void LifetimesCheckerVisitor::PrintNotes(const clang::VarDecl *var_decl,
     const auto &stmts = maybe_stmts.value();
     for (const auto &stmt : stmts) {
       S.Diag(stmt->getBeginLoc(), diag::note_lifetime_of)
-          << GenerateArgName(var_decl, num_indirections)
-          << Lifetime::GetLifetimeName(id) << stmt->getSourceRange();
+          << GenerateLifetimeName(id, num_indirections)
+          << stmt->getSourceRange();
     }
   } else {
     PrintNotes(var_decl, id, num_indirections);
@@ -460,8 +485,8 @@ void LifetimesCheckerVisitor::PrintNotes(const clang::VarDecl *var_decl,
                                          char id,
                                          unsigned int num_indirections) const {
   S.Diag(var_decl->getLocation(), diag::note_lifetime_of)
-      << GenerateArgName(var_decl, num_indirections)
-      << Lifetime::GetLifetimeName(id) << var_decl->getSourceRange();
+      << GenerateLifetimeName(id, num_indirections)
+      << var_decl->getSourceRange();
 }
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
@@ -560,12 +585,15 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               Lifetime &current_arg_lifetime =
                   State.GetLifetime(current_arg, current_arg_type);
               if (first_arg_lifetime != current_arg_lifetime) {
-                CallExprChecker(
-                    call, direct_callee, first_arg, current_arg,
-                    first_arg_lifetime, current_arg_lifetime,
-                    first_param_info->num_indirections - num_indirections,
-                    it->num_indirections - num_indirections,
-                    diag::warn_func_params_lifetimes_equal);
+                debugInfo("Higher indirection level");
+                debugLifetimes("Param", first_param_info->num_indirections);
+                debugLifetimes("Other", it->num_indirections);
+                debugLifetimes("General", num_indirections);
+                CallExprChecker(call, direct_callee, first_arg, current_arg,
+                                first_arg_lifetime, current_arg_lifetime,
+                                first_param_info->num_indirections,
+                                it->num_indirections, num_indirections,
+                                diag::warn_func_params_lifetimes_equal);
                 return std::nullopt;
               }
             }
@@ -602,12 +630,16 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             Lifetime &arg_lifetime =
                 State.GetLifetimeOrLocal(arg_decl, arg_type);
             if (current_arg_lifetime < arg_lifetime) {
-              CallExprChecker(
-                  call, direct_callee, current_arg, arg_decl,
-                  current_arg_lifetime, arg_lifetime,
-                  param_info.num_indirections - num_indirections,
-                  other_param_info.num_indirections - num_indirections,
-                  diag::warn_func_params_lifetimes_shorter);
+              debugInfo("Current indirection level");
+              debugLifetimes("Param", param_info.num_indirections);
+              debugLifetimes("Other", other_param_info.num_indirections);
+              debugLifetimes("General", num_indirections);
+              CallExprChecker(call, direct_callee, current_arg, arg_decl,
+                              current_arg_lifetime, arg_lifetime,
+                              param_info.num_indirections,
+                              other_param_info.num_indirections,
+                              num_indirections,
+                              diag::warn_func_params_lifetimes_shorter);
             }
           }
         }
@@ -637,27 +669,21 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               for (unsigned int i = 0; i < arg_possible_lifetimes_size; i++) {
                 if (!arg_lifetime.ContainsShortestLifetime(i)) continue;
                 S.Diag(arg->getExprLoc(), diag::warn_arg_lifetimes_differ)
-                    << GenerateArgName(arg_decl, param_info.num_indirections -
-                                                     num_indirections)
-                    << Lifetime::GetLifetimeName(STATIC)
-                    << Lifetime::GetLifetimeName(i) << call->getSourceRange();
-                PrintNotes(arg_decl, arg_lifetime, i,
-                           param_info.num_indirections - num_indirections);
+                    << GenerateLifetimeName(STATIC, num_indirections)
+                    << GenerateLifetimeName(i, num_indirections)
+                    << call->getSourceRange();
+                PrintNotes(arg_decl, arg_lifetime, i, num_indirections);
               }
-              PrintNotes(param_info.param, STATIC,
-                         param_info.num_indirections - num_indirections);
+              PrintNotes(param_info.param, STATIC, num_indirections);
 
             } else {
               S.Diag(arg->getExprLoc(), diag::warn_arg_lifetimes_differ)
-                  << GenerateArgName(arg_decl, param_info.num_indirections -
-                                                   num_indirections)
-                  << Lifetime::GetLifetimeName(STATIC)
-                  << arg_lifetime.GetLifetimeName() << call->getSourceRange();
-              PrintNotes(arg_decl, arg_lifetime,
-                         param_info.num_indirections - num_indirections);
+                  << GenerateLifetimeName(STATIC, num_indirections)
+                  << GenerateLifetimeName(arg_lifetime)
+                  << call->getSourceRange();
+              PrintNotes(arg_decl, arg_lifetime, num_indirections);
             }
-            PrintNotes(param_info.param, STATIC,
-                       param_info.num_indirections - num_indirections);
+            PrintNotes(param_info.param, STATIC, num_indirections);
           }
         }
       }

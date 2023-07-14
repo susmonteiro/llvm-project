@@ -870,16 +870,6 @@ public:
 };
 } // namespace
 
-void DiagnoseComplexCondition(const Expr *Cond, Sema &S) {
-  // We pass the AST of the if condition so that the function can determine if
-  // the condition is indeed too complex or not
-
-  // Cond->getExprLoc() -> specifies where we want the warning to appear
-  // Cond->getSourceRange() -> region we want highlighted
-  S.Diag(Cond->getExprLoc(), diag::warn_if_condition_too_complex)
-      << Cond->getSourceRange();
-}
-
 StmtResult Sema::ActOnIfStmt(SourceLocation IfLoc,
                              IfStatementKind StatementKind,
                              SourceLocation LParenLoc, Stmt *InitStmt,
@@ -894,18 +884,7 @@ StmtResult Sema::ActOnIfStmt(SourceLocation IfLoc,
       StatementKind == IfStatementKind::ConstevalNonNegated ||
       StatementKind == IfStatementKind::ConstevalNegated;
 
-  Expr *CondExpr = Cond.get().second;
-
-  // TODO try with Diag
-  // TODO remove this
-  // ** This is for debug
-  // llvm::dbgs() << "In ActOnIfStmt, we found the condition:\n";
-  // CondExpr->dump();
-
-  // ** This is for the user warning
-  if (!Diags.isIgnored(diag::warn_if_condition_too_complex,
-                       CondExpr->getExprLoc()))
-    DiagnoseComplexCondition(CondExpr, *this);
+  Expr *CondExpr = Cond.get().second;  
 
   assert((CondExpr || ConstevalOrNegatedConsteval) &&
          "If statement: missing condition");
