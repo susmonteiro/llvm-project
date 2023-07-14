@@ -81,15 +81,15 @@ class LifetimesCheckerVisitor
                        unsigned int second_num_indirections,
                        unsigned int num_indirections, int msg) const;
 
-  void DeclChecker(const clang::VarDecl *lhs_var_decl, clang::QualType lhs_type,
+  void DeclChecker(const clang::VarDecl *lhs_var_decl, unsigned int lhs_num_indirections,
                    const clang::Expr *expr, const clang::VarDecl *rhs_var_decl,
-                   clang::QualType rhs_type, const clang::Stmt *stmt,
+                   unsigned int rhs_num_indirections, const clang::Stmt *stmt,
                    const clang::BinaryOperator *op, bool is_return,
                    PrintNotesFactory factory) const;
 
   void CompareAndCheck(const clang::VarDecl *lhs_var_decl,
-                       clang::QualType lhs_type, const clang::Expr *expr,
-                       const clang::Expr *rhs, clang::QualType rhs_type,
+                       unsigned int lhs_num_indirections, const clang::Expr *expr,
+                       const clang::Expr *rhs, unsigned int rhs_num_indirections,
                        const clang::Stmt *stmt, const clang::BinaryOperator *op,
                        bool return_lifetime, PrintNotesFactory factory) const;
 
