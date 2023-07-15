@@ -12,10 +12,12 @@
 namespace clang {
 
 struct ParamInfo {
+  // TODO remove type from struct
   clang::QualType type;
   const clang::ParmVarDecl *param;
   unsigned int index;
-  unsigned int num_indirections;
+  unsigned int original_num_indirections;
+  unsigned int current_num_indirections;
 };
 
 using LifetimeFactory = std::function<llvm::Expected<Lifetime>(
@@ -56,8 +58,6 @@ class FunctionLifetimeFactory {
   LifetimeFactory VarLifetimeFactory() const;
 
  private:
-  // TODO elision
-  // bool elision_enabled;
   const clang::FunctionDecl *Func;
 };
 
@@ -98,6 +98,14 @@ class FunctionLifetimes {
     return object_lifetimes.GetLifetimeOrLocal(type);
   }
 
+  Lifetime &GetParamLifetime(const clang::ParmVarDecl *param, unsigned int num_indirections) {
+    auto it = ParamsLifetimes.find(param);
+    assert(it != ParamsLifetimes.end());
+
+    ObjectLifetimes object_lifetimes = it->second;
+    return object_lifetimes.GetLifetimeOrLocal(num_indirections);
+  }
+
   ObjectLifetimes &GetReturnLifetime() { return ReturnLifetime; }
   Lifetime &GetReturnLifetime(clang::QualType &type) {
     return ReturnLifetime.GetLifetime(type);
@@ -126,18 +134,12 @@ class FunctionLifetimes {
       const FunctionLifetimeFactory &lifetime_factory);
 
  private:
-  // ? is it better to have optionals or a Lifetime that basically means no
-  // lifetime
-
   // stores param lifetimes in order
   std::vector<const clang::ParmVarDecl *> Params;
   ParamsInfoVector ParamsInfo;
   ParamsLifetimesMap ParamsLifetimes;
   ObjectLifetimes ReturnLifetime;
   int FuncId;
-
-  // TODO this
-  // std::optional<ValueLifetimes> this_lifetimes_;
 
   static llvm::Expected<FunctionLifetimes> Create(
       const clang::FunctionDecl *func, clang::TypeLoc type_loc,

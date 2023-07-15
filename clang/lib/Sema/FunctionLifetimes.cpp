@@ -390,7 +390,7 @@ void FunctionLifetimes::ProcessParams() {
         ParamsInfo.resize(num_indirections + 1);
       }
       ParamsInfo[num_indirections].emplace_back(
-          ParamInfo{type, param, idx, num_indirections});
+          ParamInfo{type, param, idx, num_indirections, num_indirections});
     }
     idx++;
   }
