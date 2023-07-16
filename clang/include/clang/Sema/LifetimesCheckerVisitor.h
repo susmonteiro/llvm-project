@@ -77,8 +77,8 @@ class LifetimesCheckerVisitor
                        const clang::VarDecl *first_arg,
                        const clang::VarDecl *second_arg,
                        Lifetime &first_lifetime, Lifetime &second_lifetime,
-                       unsigned int first_num_indirections,
-                       unsigned int second_num_indirections,
+                       int first_num_indirections,
+                       int second_num_indirections,
                        unsigned int num_indirections, int msg) const;
 
   void DeclChecker(const clang::VarDecl *lhs_var_decl, unsigned int lhs_num_indirections,

@@ -8,8 +8,10 @@
 
 namespace clang {
 
-std::string GenerateArgName(const clang::VarDecl *arg,
-                            unsigned int num_indirections) {
+std::string GenerateArgName(const clang::VarDecl *arg, int num_indirections) {
+  if (num_indirections < 0)
+    return '\'' + std::string(-num_indirections, '&') + arg->getNameAsString() +
+           '\'';
   return '\'' + std::string(num_indirections, '*') + arg->getNameAsString() +
          '\'';
 }
@@ -314,7 +316,7 @@ void LifetimesCheckerVisitor::CallExprChecker(
     const clang::CallExpr *call, const clang::FunctionDecl *direct_callee,
     const clang::VarDecl *first_arg, const clang::VarDecl *second_arg,
     Lifetime &first_lifetime, Lifetime &second_lifetime,
-    unsigned int first_num_indirections, unsigned int second_num_indirections,
+    int first_num_indirections, int second_num_indirections,
     unsigned int num_indirections, int msg) const {
   S.Diag(call->getExprLoc(), msg)
       << direct_callee << GenerateArgName(first_arg, first_num_indirections)
@@ -573,10 +575,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         Lifetime &first_lifetime =
             State.GetLifetime(first_decl, num_indirections);
 
-        unsigned first_num_indirections =
+        int first_num_indirections =
             first_param_info->original_num_indirections - num_indirections +
-            (Lifetime::GetNumIndirections(
-                 first_decl->getType()) -
+            (Lifetime::GetNumIndirections(first_decl->getType()) -
              Lifetime::GetNumIndirections(first_expr->getType()));
 
         while (++it != params.end()) {
@@ -584,10 +585,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             const auto *second_expr = call->getArg(it->index);
             const auto *second_decl = GetDeclFromArg(second_expr);
             if (second_decl != nullptr) {
-              unsigned second_num_indirections =
+              int second_num_indirections =
                   it->original_num_indirections - num_indirections +
-                  (Lifetime::GetNumIndirections(
-                       second_decl->getType()) -
+                  (Lifetime::GetNumIndirections(second_decl->getType()) -
                    Lifetime::GetNumIndirections(second_expr->getType()));
               Lifetime &second_lifetime =
                   State.GetLifetime(second_decl, num_indirections);
@@ -624,10 +624,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           Lifetime &first_lifetime =
               State.GetLifetimeOrLocal(first_decl, num_indirections);
 
-          unsigned first_num_indirections =
+          int first_num_indirections =
               first_param_info.original_num_indirections - num_indirections +
-              (Lifetime::GetNumIndirections(
-                   first_decl->getType()) -
+              (Lifetime::GetNumIndirections(first_decl->getType()) -
                Lifetime::GetNumIndirections(first_expr->getType()));
 
           for (const auto &second_param_info : filtered_params) {
@@ -637,11 +636,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             Lifetime &second_lifetime =
                 State.GetLifetimeOrLocal(second_decl, num_indirections);
             if (first_lifetime < second_lifetime) {
-              unsigned second_num_indirections =
+              int second_num_indirections =
                   second_param_info.original_num_indirections -
                   num_indirections +
-                  (Lifetime::GetNumIndirections(
-                       second_decl->getType()) -
+                  (Lifetime::GetNumIndirections(second_decl->getType()) -
                    Lifetime::GetNumIndirections(second_expr->getType()));
               CallExprChecker(call, direct_callee, first_decl, second_decl,
                               first_lifetime, second_lifetime,
