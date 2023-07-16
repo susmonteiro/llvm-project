@@ -748,34 +748,38 @@ void function_calls_2(int *$a x, int *$b y, int *$a z, int *$c w, int *$d v) {
                 // expected-note@-41 {{lifetime is '*$c'}} \
                 // expected-note@-29 {{lifetime is '*$a'}} \
                 // expected-note@-28 {{lifetime is '*$b'}}
-  fn33(xx, *xyw);
-  // FIXME -> *yw is read with type int** instead of type int*
-  fn33(xx, *yw);  // 'expected-warning {{when calling function 'fn33', the lifetime of '*yw' cannot be shorter than the lifetime of '*xx'}} \
-                // 'expected-note@-32 {{lifetime is '**$b'}} \
-                // 'expected-note@-31 {{lifetime is '**$c'}} \
-                // 'expected-note@-35 {{lifetime is '**$a'}} \
-                // 'expected-note@-37 {{lifetime is '**$a'}}
-  fn33(xx, p);  // expected-warning {{when calling function 'fn33', the lifetime of 'p' cannot be shorter than the lifetime of '*xx'}} \
-                // expected-note@-51 {{lifetime is '*$b'}} \
-                // expected-note@-50 {{lifetime is '*$c'}} \
-                // expected-note@-42 {{lifetime is '*$a'}} \
+  fn33(xx, *xyw); // expected-warning {{when calling function 'fn33', the lifetime of '*xyw' cannot be shorter than the lifetime of '*xx'}} \
+                // expected-note@-28 {{lifetime is '*$b'}} \
+                // expected-note@-27 {{lifetime is '*$c'}} \
+                // expected-note@-35 {{lifetime is '*$a'}} \
+                // expected-note@-34 {{lifetime is '*$a'}}
+                
+  fn33(xx, *yw);  // expected-warning {{when calling function 'fn33', the lifetime of '*yw' cannot be shorter than the lifetime of '*xx'}} \
+                // expected-note@-37 {{lifetime is '*$b'}} \
+                // expected-note@-36 {{lifetime is '*$c'}} \
+                // expected-note@-40 {{lifetime is '*$a'}} \
                 // expected-note@-41 {{lifetime is '*$a'}}
-  fn33(xy, q);  // expected-warning {{when calling function 'fn33', the lifetime of 'q' cannot be shorter than the lifetime of '*xy'}} \
+  fn33(xx, p);  // expected-warning {{when calling function 'fn33', the lifetime of 'p' cannot be shorter than the lifetime of '*xx'}} \
+                // expected-note@-55 {{lifetime is '*$b'}} \
                 // expected-note@-54 {{lifetime is '*$c'}} \
-                // expected-note@-53 {{lifetime is '*$d'}} \
-                // expected-note@-45 {{lifetime is '*$a'}} \
-                // expected-note@-44 {{lifetime is '*$b'}}
+                // expected-note@-46 {{lifetime is '*$a'}} \
+                // expected-note@-45 {{lifetime is '*$a'}}
+  fn33(xy, q);  // expected-warning {{when calling function 'fn33', the lifetime of 'q' cannot be shorter than the lifetime of '*xy'}} \
+                // expected-note@-58 {{lifetime is '*$c'}} \
+                // expected-note@-57 {{lifetime is '*$d'}} \
+                // expected-note@-49 {{lifetime is '*$a'}} \
+                // expected-note@-48 {{lifetime is '*$b'}}
   fn42(xx, xy); // expected-warning {{when calling function 'fn42', the lifetimes of '*xx' and '*xy' should be the same}} \
-                // expected-note@-52 {{lifetime is '*$a}} \
-                // expected-note@-51 {{lifetime is '*$a}} \
-                // expected-note@-49 {{lifetime is '*$b}}
+                // expected-note@-56 {{lifetime is '*$a}} \
+                // expected-note@-55 {{lifetime is '*$a}} \
+                // expected-note@-53 {{lifetime is '*$b}}
   fn42(xy, xy);
   fn42(xy, xx); // expected-warning {{when calling function 'fn42', the lifetimes of '*xy' and '*xx' should be the same}} \
-                // expected-note@-57 {{lifetime is '*$a}} \
-                // expected-note@-56 {{lifetime is '*$a}} \
-                // expected-note@-54 {{lifetime is '*$b}}
+                // expected-note@-61 {{lifetime is '*$a}} \
+                // expected-note@-60 {{lifetime is '*$a}} \
+                // expected-note@-58 {{lifetime is '*$b}}
   fn42(xy, xyw); // expected-warning {{when calling function 'fn42', the lifetimes of '*xy' and '*xyw' should be the same}} \
-                // expected-note@-53 {{lifetime is '*$c}}
+                // expected-note@-57 {{lifetime is '*$c}}
 }
 
 int *$a arrays(int *$b *$c arr) { // expected-warning {{at least one parameter must be annotated with '$a'}}

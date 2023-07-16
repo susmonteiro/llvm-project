@@ -317,9 +317,8 @@ void LifetimesCheckerVisitor::CallExprChecker(
     unsigned int first_num_indirections, unsigned int second_num_indirections,
     unsigned int num_indirections, int msg) const {
   S.Diag(call->getExprLoc(), msg)
-      << direct_callee
-      << GenerateArgName(first_arg, first_num_indirections - num_indirections)
-      << GenerateArgName(second_arg, second_num_indirections - num_indirections)
+      << direct_callee << GenerateArgName(first_arg, first_num_indirections)
+      << GenerateArgName(second_arg, second_num_indirections)
       << call->getSourceRange();
   unsigned int first_arg_size = first_lifetime.GetPossibleLifetimes().size();
   unsigned int second_arg_size = second_lifetime.GetPossibleLifetimes().size();
@@ -346,16 +345,16 @@ void LifetimesCheckerVisitor::CallExprChecker(
     }
     PrintNotes(second_arg, second_lifetime, num_indirections);
   } else if (second_lifetime.IsNotSet()) {
+    PrintNotes(first_arg, first_lifetime, num_indirections);
     for (unsigned int i = 0; i < second_arg_size; i++) {
       if ((char)i == first_lifetime.GetId() ||
           !second_lifetime.ContainsShortestLifetime(i))
         continue;
       PrintNotes(second_arg, second_lifetime, i, num_indirections);
     }
-    PrintNotes(first_arg, first_lifetime, num_indirections);
   } else {
-    PrintNotes(second_arg, second_lifetime, num_indirections);
     PrintNotes(first_arg, first_lifetime, num_indirections);
+    PrintNotes(second_arg, second_lifetime, num_indirections);
   }
 }
 
@@ -547,10 +546,12 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         assert(!param_info.type.isNull());
         clang::QualType param_type = param_info.type->getPointeeType();
         params_set[param_info.index].type = param_type;
+        // TODO check if current_num_indirections is needed
+        // TODO maybe use just num_indirections
         params_set[param_info.index].current_num_indirections--;
-
-        Lifetime &param_lifetime = func_info.GetParamLifetime(
-            param_info.param, param_info.current_num_indirections);
+        assert(num_indirections == param_info.current_num_indirections);
+        Lifetime &param_lifetime =
+            func_info.GetParamLifetime(param_info.param, num_indirections);
         char lifetime_id = param_lifetime.GetId();
         if ((unsigned int)lifetime_id >= param_lifetimes.size()) {
           param_lifetimes.resize(lifetime_id + 1);
@@ -562,36 +563,44 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       for (const auto &params : param_lifetimes) {
         if (params.size() < 2) continue;
 
-        // ! param_lifetimes should have ParamInfo sorted
+        // param_lifetimes have ParamInfo sorted
         auto it = params.begin();
         const ParamInfo *first_param_info = it;
-        const auto *first_arg_expr = call->getArg(first_param_info->index);
-        const auto *first_arg = GetDeclFromArg(first_arg_expr);
-        if (first_arg == nullptr) continue;
+        const auto *first_expr = call->getArg(first_param_info->index);
+        const auto *first_decl = GetDeclFromArg(first_expr);
+        if (first_decl == nullptr) continue;
 
-        clang::QualType first_arg_type = PointsTo.GetExprType(first_arg_expr);
-        first_arg_type =
-            first_arg_type.isNull() ? first_param_info->type : first_arg_type;
+        clang::QualType first_type = PointsTo.GetExprType(first_expr);
+        first_type = first_type.isNull() ? first_param_info->type : first_type;
 
-        Lifetime &first_arg_lifetime =
-            State.GetLifetime(first_arg, first_param_info->current_num_indirections);
+        Lifetime &first_lifetime =
+            State.GetLifetime(first_decl, num_indirections);
+
+        unsigned first_num_indirections =
+            first_param_info->original_num_indirections - num_indirections +
+            (Lifetime::GetNumIndirections(
+                 first_decl->getType().getCanonicalType()) -
+             Lifetime::GetNumIndirections(first_expr->getType()));
 
         while (++it != params.end()) {
           if (it->index != first_param_info->index) {
-            const auto *current_arg_expr = call->getArg(it->index);
-            const auto *current_arg = GetDeclFromArg(current_arg_expr);
-            if (current_arg != nullptr) {
-              clang::QualType current_arg_type =
-                  PointsTo.GetExprType(current_arg_expr);
-              current_arg_type =
-                  current_arg_type.isNull() ? it->type : current_arg_type;
-              Lifetime &current_arg_lifetime =
-                  State.GetLifetime(current_arg, it->current_num_indirections);
-              if (first_arg_lifetime != current_arg_lifetime) {
-                CallExprChecker(call, direct_callee, first_arg, current_arg,
-                                first_arg_lifetime, current_arg_lifetime,
-                                first_param_info->original_num_indirections,
-                                it->original_num_indirections, num_indirections,
+            const auto *second_expr = call->getArg(it->index);
+            const auto *second_decl = GetDeclFromArg(second_expr);
+            if (second_decl != nullptr) {
+              clang::QualType second_type = PointsTo.GetExprType(second_expr);
+              second_type = second_type.isNull() ? it->type : second_type;
+              unsigned second_num_indirections =
+                  it->original_num_indirections - num_indirections +
+                  (Lifetime::GetNumIndirections(
+                       second_decl->getType().getCanonicalType()) -
+                   Lifetime::GetNumIndirections(second_expr->getType()));
+              Lifetime &second_lifetime =
+                  State.GetLifetime(second_decl, num_indirections);
+              if (first_lifetime != second_lifetime) {
+                CallExprChecker(call, direct_callee, first_decl, second_decl,
+                                first_lifetime, second_lifetime,
+                                first_num_indirections, second_num_indirections,
+                                num_indirections,
                                 diag::warn_func_params_lifetimes_equal);
                 return std::nullopt;
               }
@@ -602,41 +611,51 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
       // check lifetimes of current indirection level
       if (!param_lifetimes.empty()) {
-        for (const auto &param_info : params_info_vec[num_indirections]) {
-          Lifetime &current_lifetime =
-              func_info.GetParamLifetime(param_info.param, param_info.current_num_indirections);
-          char current_id = current_lifetime.GetId();
+        for (const auto &first_param_info : params_info_vec[num_indirections]) {
+          assert(num_indirections == first_param_info.current_num_indirections);
+          Lifetime &param_lifetime = func_info.GetParamLifetime(
+              first_param_info.param, num_indirections);
+          char param_lifetime_id = param_lifetime.GetId();
 
-          if (param_lifetimes.size() <= (unsigned int)current_id) {
+          if (param_lifetimes.size() <= (unsigned int)param_lifetime_id) {
             continue;
           }
 
-          const auto &filtered_params = param_lifetimes[current_id];
-          const auto *current_arg_expr = call->getArg(param_info.index);
-          const auto *current_arg = GetDeclFromArg(current_arg_expr);
-          if (current_arg == nullptr) continue;
-          clang::QualType arg_type = PointsTo.GetExprType(current_arg_expr);
+          const auto &filtered_params = param_lifetimes[param_lifetime_id];
+          const auto *first_expr = call->getArg(first_param_info.index);
+          const auto *first_decl = GetDeclFromArg(first_expr);
+          if (first_decl == nullptr) continue;
+          clang::QualType first_type = PointsTo.GetExprType(first_expr);
           // TODO redo this
-          arg_type = arg_type.isNull()
-                         ? current_arg->getType().getCanonicalType()
-                         : arg_type;
+          first_type = first_type.isNull()
+                           ? first_decl->getType().getCanonicalType()
+                           : first_type;
 
-          unsigned int arg_num_indirections =
-              Lifetime::GetNumIndirections(arg_type);
+          Lifetime &first_lifetime =
+              State.GetLifetimeOrLocal(first_decl, num_indirections);
 
-          Lifetime &current_arg_lifetime =
-              State.GetLifetimeOrLocal(current_arg, arg_num_indirections);
-          for (const auto &other_param_info : filtered_params) {
-            const auto *arg = call->getArg(other_param_info.index);
-            const auto *arg_decl = GetDeclFromArg(arg);
-            if (arg_decl == nullptr) continue;
-            Lifetime &arg_lifetime =
-                State.GetLifetimeOrLocal(arg_decl, arg_num_indirections);
-            if (current_arg_lifetime < arg_lifetime) {
-              CallExprChecker(call, direct_callee, current_arg, arg_decl,
-                              current_arg_lifetime, arg_lifetime,
-                              param_info.original_num_indirections,
-                              other_param_info.original_num_indirections,
+          unsigned first_num_indirections =
+              first_param_info.original_num_indirections - num_indirections +
+              (Lifetime::GetNumIndirections(
+                   first_decl->getType().getCanonicalType()) -
+               Lifetime::GetNumIndirections(first_expr->getType()));
+
+          for (const auto &second_param_info : filtered_params) {
+            const auto *second_expr = call->getArg(second_param_info.index);
+            const auto *second_decl = GetDeclFromArg(second_expr);
+            if (second_decl == nullptr) continue;
+            Lifetime &second_lifetime =
+                State.GetLifetimeOrLocal(second_decl, num_indirections);
+            if (first_lifetime < second_lifetime) {
+              unsigned second_num_indirections =
+                  second_param_info.original_num_indirections -
+                  num_indirections +
+                  (Lifetime::GetNumIndirections(
+                       second_decl->getType().getCanonicalType()) -
+                   Lifetime::GetNumIndirections(second_expr->getType()));
+              CallExprChecker(call, direct_callee, first_decl, second_decl,
+                              first_lifetime, second_lifetime,
+                              first_num_indirections, second_num_indirections,
                               num_indirections,
                               diag::warn_func_params_lifetimes_shorter);
             }
@@ -655,21 +674,22 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         if (param_info.param == nullptr) continue;
         // TODO delete this
         assert(!param_info.type.isNull());
+        assert(num_indirections == param_info.current_num_indirections);
         Lifetime &param_lifetime =
-            func_info.GetParamLifetime(param_info.param, param_info.current_num_indirections);
+            func_info.GetParamLifetime(param_info.param, num_indirections);
         if (param_lifetime.IsStatic()) {
-          const auto *arg = call->getArg(param_info.index);
-          const auto *arg_decl = GetDeclFromArg(arg);
+          const auto *arg_expr = call->getArg(param_info.index);
+          const auto *arg_decl = GetDeclFromArg(arg_expr);
           if (arg_decl == nullptr) continue;
           Lifetime &arg_lifetime =
-              State.GetLifetimeOrLocal(arg_decl, param_info.current_num_indirections);
+              State.GetLifetimeOrLocal(arg_decl, num_indirections);
           if (!arg_lifetime.IsStatic()) {
             if (arg_lifetime.IsNotSet()) {
               unsigned int arg_possible_lifetimes_size =
                   arg_lifetime.GetPossibleLifetimes().size();
               for (unsigned int i = 0; i < arg_possible_lifetimes_size; i++) {
                 if (!arg_lifetime.ContainsShortestLifetime(i)) continue;
-                S.Diag(arg->getExprLoc(), diag::warn_arg_lifetimes_differ)
+                S.Diag(arg_expr->getExprLoc(), diag::warn_arg_lifetimes_differ)
                     << GenerateLifetimeName(STATIC, num_indirections)
                     << GenerateLifetimeName(i, num_indirections)
                     << call->getSourceRange();
@@ -678,7 +698,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               PrintNotes(param_info.param, STATIC, num_indirections);
 
             } else {
-              S.Diag(arg->getExprLoc(), diag::warn_arg_lifetimes_differ)
+              S.Diag(arg_expr->getExprLoc(), diag::warn_arg_lifetimes_differ)
                   << GenerateLifetimeName(STATIC, num_indirections)
                   << GenerateLifetimeName(arg_lifetime)
                   << call->getSourceRange();
