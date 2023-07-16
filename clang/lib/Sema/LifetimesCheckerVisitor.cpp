@@ -570,16 +570,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         const auto *first_decl = GetDeclFromArg(first_expr);
         if (first_decl == nullptr) continue;
 
-        clang::QualType first_type = PointsTo.GetExprType(first_expr);
-        first_type = first_type.isNull() ? first_param_info->type : first_type;
-
         Lifetime &first_lifetime =
             State.GetLifetime(first_decl, num_indirections);
 
         unsigned first_num_indirections =
             first_param_info->original_num_indirections - num_indirections +
             (Lifetime::GetNumIndirections(
-                 first_decl->getType().getCanonicalType()) -
+                 first_decl->getType()) -
              Lifetime::GetNumIndirections(first_expr->getType()));
 
         while (++it != params.end()) {
@@ -587,12 +584,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             const auto *second_expr = call->getArg(it->index);
             const auto *second_decl = GetDeclFromArg(second_expr);
             if (second_decl != nullptr) {
-              clang::QualType second_type = PointsTo.GetExprType(second_expr);
-              second_type = second_type.isNull() ? it->type : second_type;
               unsigned second_num_indirections =
                   it->original_num_indirections - num_indirections +
                   (Lifetime::GetNumIndirections(
-                       second_decl->getType().getCanonicalType()) -
+                       second_decl->getType()) -
                    Lifetime::GetNumIndirections(second_expr->getType()));
               Lifetime &second_lifetime =
                   State.GetLifetime(second_decl, num_indirections);
@@ -625,11 +620,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           const auto *first_expr = call->getArg(first_param_info.index);
           const auto *first_decl = GetDeclFromArg(first_expr);
           if (first_decl == nullptr) continue;
-          clang::QualType first_type = PointsTo.GetExprType(first_expr);
-          // TODO redo this
-          first_type = first_type.isNull()
-                           ? first_decl->getType().getCanonicalType()
-                           : first_type;
 
           Lifetime &first_lifetime =
               State.GetLifetimeOrLocal(first_decl, num_indirections);
@@ -637,7 +627,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           unsigned first_num_indirections =
               first_param_info.original_num_indirections - num_indirections +
               (Lifetime::GetNumIndirections(
-                   first_decl->getType().getCanonicalType()) -
+                   first_decl->getType()) -
                Lifetime::GetNumIndirections(first_expr->getType()));
 
           for (const auto &second_param_info : filtered_params) {
@@ -651,7 +641,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                   second_param_info.original_num_indirections -
                   num_indirections +
                   (Lifetime::GetNumIndirections(
-                       second_decl->getType().getCanonicalType()) -
+                       second_decl->getType()) -
                    Lifetime::GetNumIndirections(second_expr->getType()));
               CallExprChecker(call, direct_callee, first_decl, second_decl,
                               first_lifetime, second_lifetime,
