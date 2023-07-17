@@ -17,11 +17,12 @@ void TransferFuncCall(const clang::VarDecl *lhs,
       auto &current_type_call_info = call_info[func_num_indirections];
       if (current_type_call_info.is_local) {
         state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
-                                       func_num_indirections);
+                                       func_num_indirections, LOCAL);
         state.CreateStmtLifetime(loc, LOCAL);
       } else if (current_type_call_info.is_static) {
         state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
-                                       func_num_indirections);
+                                       func_num_indirections, STATIC);
+        // TODO delete stmt lifetimes
         state.CreateStmtLifetime(loc, STATIC);
       } else {
         for (const auto &[arg, arg_num_indirections] :
@@ -47,7 +48,12 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   clang::QualType rhs_type = PointsTo.GetExprType(rhs);
   rhs_type = rhs_type.isNull() ? base_type : rhs_type;
 
-  if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
+  char maybe_lifetime = PointsTo.GetExprLifetime(rhs);
+  if (maybe_lifetime != NOTSET) {
+    state.CreateLifetimeDependency(lhs, lhs_type, loc, rhs_type,
+                                   maybe_lifetime);
+    state.CreateStmtLifetime(loc, LOCAL);
+  } else if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
     TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
   } else if (clang::isa<clang::MemberExpr>(rhs)) {
     auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
@@ -59,7 +65,13 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   const auto &points_to_expr = PointsTo.GetExprPointsTo(rhs);
   for (const auto &expr : points_to_expr) {
     if (expr != nullptr) {
-      if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
+      char maybe_lifetime = PointsTo.GetExprLifetime(expr);
+      if (maybe_lifetime != NOTSET) {
+        state.CreateLifetimeDependency(lhs, lhs_type, loc, rhs_type,
+                                       maybe_lifetime);
+        state.CreateStmtLifetime(loc, LOCAL);
+      } else if (const auto *call_expr =
+                     clang::dyn_cast<clang::CallExpr>(expr)) {
         TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
       } else if (clang::isa<clang::MemberExpr>(expr)) {
         auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
@@ -471,10 +483,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
 
   PointsTo.InsertExprDecl(member_expr, base);
 
-  for (const auto *decl : points_to) {
-    Lifetime &member_lifetime = State.GetLifetime(decl, member_expr->getType());
-    PointsTo.InsertExprLifetime(member_expr, member_lifetime);
-  }
 
   // TODO delete this
   PointsTo.InsertExprType(member_expr, base->getType());
@@ -528,10 +536,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     }
   }
 
-  for (const auto &child : PointsTo.GetExprDecls(op)) {
-    State.GetObjectLifetimes(child).InsertPointeeObject(
-        Lifetime(LOCAL, op->getType().getCanonicalType()));
-  }
+  PointsTo.InsertExprLifetime(op, LOCAL);
 
   return std::nullopt;
 }

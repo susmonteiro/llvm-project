@@ -265,8 +265,10 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
           clang::QualType rhs_type = PointsTo.GetExprType(rhs);
           rhs_type = rhs_type.isNull() ? deref_op->getType().getCanonicalType()
                                        : rhs_type;
-          Lifetime &rhs_lifetime =
-              State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
+          char id = PointsTo.GetExprLifetime(rhs_decl_ref_expr);
+          Lifetime rhs_lifetime =
+              id != NOTSET ? Lifetime(id, rhs_type)
+                           : State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
           unsigned int i = LOCAL - 1;
           unsigned int lhs_possible_lifetimes_size =
               lhs_lifetime.GetPossibleLifetimes().size();
@@ -366,13 +368,43 @@ void LifetimesCheckerVisitor::DeclChecker(
     unsigned int rhs_num_indirections, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
+  char id = PointsTo.GetExprLifetime(expr);
+  if (id != NOTSET) {
+    Lifetime &lhs_lifetime =
+        is_return ? State.GetReturnLifetime(lhs_num_indirections)
+                  : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
+    Lifetime rhs_lifetime = Lifetime(id, rhs_num_indirections);
+    if (is_return && rhs_lifetime.IsLocal()) {
+      S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
+          << std::string(rhs_lifetime.GetNumIndirections(), '*')
+          << expr->getSourceRange();
+      const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
+      if (maybe_stmts.has_value()) {
+        const auto &stmts = maybe_stmts.value();
+        for (const auto &stmt : stmts) {
+          S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
+              << GenerateLifetimeName(LOCAL, rhs_lifetime.GetNumIndirections())
+              << stmt->getSourceRange();
+        }
+      } else {
+        S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here)
+            << GenerateLifetimeName(rhs_lifetime)
+            << rhs_var_decl->getSourceRange();
+      }
+    } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
+      factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
+              rhs_lifetime);
+    }
+    lhs_num_indirections--;
+    rhs_num_indirections--;
+  }
+
   while (lhs_num_indirections > 0 && rhs_num_indirections > 0) {
     Lifetime &lhs_lifetime =
         is_return ? State.GetReturnLifetime(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
-    Lifetime &rhs_lifetime =
+    Lifetime rhs_lifetime =
         State.GetLifetimeOrLocal(rhs_var_decl, rhs_num_indirections);
-
     if (is_return && rhs_lifetime.IsLocal()) {
       S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
           << std::string(rhs_lifetime.GetNumIndirections(), '*')
@@ -405,6 +437,8 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     unsigned int rhs_num_indirections, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
+  debugLifetimes("LHS num_indirections", lhs_num_indirections);
+  debugLifetimes("RHS num_indirections", rhs_num_indirections);
   assert(lhs_num_indirections == rhs_num_indirections);
   // TODO if this is always true, only need to receive one num_indirections
   if (expr == nullptr) return;
@@ -437,8 +471,11 @@ void LifetimesCheckerVisitor::CompareAndCheck(
            current_type_call_info.info) {
         const auto &arg_points_to = PointsTo.GetExprDecls(arg);
         for (const auto &decl : arg_points_to) {
-          Lifetime &arg_lifetime =
-              State.GetLifetimeOrLocal(decl, arg_num_indiretions);
+          char id = PointsTo.GetExprLifetime(arg);
+          Lifetime arg_lifetime =
+              id != NOTSET
+                  ? Lifetime(id, arg_num_indiretions)
+                  : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
           if (arg_lifetime < lhs_lifetime) {
             factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
                     arg_lifetime);

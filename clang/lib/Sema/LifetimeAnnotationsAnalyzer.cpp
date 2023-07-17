@@ -102,8 +102,9 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
   // DEBUG
   debugLifetimes("=== dependencies_ ===");
   for (const auto &pair : children) {
-    debugLifetimes(DebugDependencies(pair.first.var_decl, pair.first.num_indirections,
-                                     pair.second, stmt_dependencies));
+    debugLifetimes(DebugDependencies(pair.first.var_decl,
+                                     pair.first.num_indirections, pair.second,
+                                     stmt_dependencies));
   }
 
   auto worklist = State.InitializeWorklist();
@@ -124,7 +125,8 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     unsigned int lhs_num_indirections = el.num_indirections;
     // DEBUG
 
-    debugLifetimes("\nPropagation of", std::string(lhs_num_indirections, '*') + ' ' +
+    debugLifetimes("\nPropagation of", std::string(lhs_num_indirections, '*') +
+                                           ' ' +
                                            current_var->getNameAsString());
 
     // each entry of the vector corresponds to a lifetime char
@@ -138,16 +140,16 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
       unsigned int rhs_num_indirections = rhs_info.num_indirections;
       stmts.insert(rhs_info);
 
-      auto &this_stmt_dependencies = stmt_dependencies[rhs_info.stmt];
-      if (this_stmt_dependencies.empty()) {
-        char id = State.GetStmtLifetime(rhs_info.stmt);
-        Lifetime::InsertPossibleLifetimes(id, rhs_info.stmt,
-                                          possible_lifetimes);
-        continue;
+      if (rhs_info.extra_lifetime >= LOCAL) {
+        Lifetime::InsertPossibleLifetimes(rhs_info.extra_lifetime,
+                                          rhs_info.stmt, possible_lifetimes);
       }
+
+      auto &this_stmt_dependencies = stmt_dependencies[rhs_info.stmt];
       for (const auto &var_decl : this_stmt_dependencies) {
         if (var_decl == current_var) continue;
-        Lifetime &rhs_lifetime = State.GetLifetime(var_decl, rhs_num_indirections);
+        Lifetime &rhs_lifetime =
+            State.GetLifetime(var_decl, rhs_num_indirections);
 
         if (rhs_lifetime.IsNotSet()) {
           auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
@@ -182,8 +184,9 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
     // DEBUG
     debugLifetimes("=== children ===");
     for (const auto &pair : new_children) {
-      debugLifetimes(DebugDependencies(pair.first.var_decl, pair.first.num_indirections,
-                                       pair.second, stmt_dependencies));
+      debugLifetimes(DebugDependencies(pair.first.var_decl,
+                                       pair.first.num_indirections, pair.second,
+                                       stmt_dependencies));
     }
   }
 

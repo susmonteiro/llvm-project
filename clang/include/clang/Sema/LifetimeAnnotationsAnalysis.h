@@ -32,6 +32,7 @@ struct LHSTypeStruct {
 struct RHSTypeStruct {
   const clang::Stmt *stmt;
   unsigned int num_indirections;
+  char extra_lifetime;
 };
 
 using VarStmtDependenciesMap =
@@ -106,7 +107,18 @@ class LifetimeAnnotationsAnalysis {
 
   void CreateLifetimeDependency(const clang::VarDecl *from,
                                 clang::QualType from_type,
+                                const clang::Stmt *to, clang::QualType to_type,
+                                char lifetime);
+
+  void CreateLifetimeDependency(const clang::VarDecl *from,
+                                clang::QualType from_type,
                                 const clang::Stmt *to, clang::QualType to_type);
+
+  void CreateLifetimeDependency(const clang::VarDecl *from,
+                                unsigned int from_num_indirections,
+                                const clang::Stmt *to,
+                                unsigned int to_num_indirections,
+                                char lifetime);
 
   void CreateLifetimeDependency(const clang::VarDecl *from,
                                 unsigned int from_num_indirections,

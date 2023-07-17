@@ -191,6 +191,13 @@ char LifetimeAnnotationsAnalysis::GetStmtLifetime(const clang::Stmt *stmt) {
 
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
     const clang::VarDecl *from, clang::QualType from_type,
+    const clang::Stmt *to, clang::QualType to_type, char lifetime) {
+  CreateLifetimeDependency(from, Lifetime::GetNumIndirections(from_type), to,
+                           Lifetime::GetNumIndirections(to_type), lifetime);
+}
+
+void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
+    const clang::VarDecl *from, clang::QualType from_type,
     const clang::Stmt *to, clang::QualType to_type) {
   CreateLifetimeDependency(from, Lifetime::GetNumIndirections(from_type), to,
                            Lifetime::GetNumIndirections(to_type));
@@ -198,9 +205,16 @@ void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
 
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
     const clang::VarDecl *from, unsigned int from_num_indirections,
+    const clang::Stmt *to, unsigned int to_num_indirections, char lifetime) {
+  LifetimeDependencies[LHSTypeStruct{from, from_num_indirections}].insert(
+      RHSTypeStruct{to, to_num_indirections, lifetime});
+}
+
+void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
+    const clang::VarDecl *from, unsigned int from_num_indirections,
     const clang::Stmt *to, unsigned int to_num_indirections) {
   LifetimeDependencies[LHSTypeStruct{from, from_num_indirections}].insert(
-      RHSTypeStruct{to, to_num_indirections});
+      RHSTypeStruct{to, to_num_indirections, NOTSET});
 }
 
 void LifetimeAnnotationsAnalysis::CreateStmtDependency(

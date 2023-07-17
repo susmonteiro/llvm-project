@@ -393,7 +393,6 @@ void multiple_indirections(int *$a *$b *$c *$d x) {
   **p = **x;
   ***p = ***x;
   ****p = ****x;
-  *(&p) = *(&x);
 }
 
 void simple_unary_operator(int *$a p) {
