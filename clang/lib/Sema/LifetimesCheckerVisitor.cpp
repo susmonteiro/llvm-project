@@ -184,8 +184,13 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
   if (expr == nullptr) return;
 
   if (clang::isa<clang::MemberExpr>(expr)) {
+    expr->dump();
     auto &points_to = PointsTo.GetExprDecls(expr);
     // TODO delete this
+    debugLifetimes("Size of points to", points_to.size());
+    for (const auto &idk : points_to) {
+      debugLifetimes("MemberExpr points to", idk->getNameAsString());
+    }
     assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
     const auto *lhs_var_decl = *points_to.begin();
 
@@ -801,13 +806,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   }
 
   const auto &return_value = return_stmt->getRetValue()->IgnoreParens();
-  clang::QualType return_value_type = PointsTo.GetExprType(return_value);
-  return_value_type =
-      return_value_type.isNull() ? return_type : return_value_type;
-
-  unsigned value_num_indirections =
-      Lifetime::GetNumIndirections(return_value_type);
-
   // TODO remove this
   if (PointsTo.IsEmpty(return_value) &&
       !clang::isa<clang::DeclRefExpr>(return_value)) {
@@ -816,13 +814,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   }
 
   CompareAndCheck(nullptr, return_num_indirections, return_value, return_value,
-                  value_num_indirections, return_stmt, nullptr, true,
+                  return_num_indirections, return_stmt, nullptr, true,
                   Factory.ReturnStmtFactory());
 
   const auto &return_expr = PointsTo.GetExprPointsTo(return_value);
   for (const auto &expr : return_expr) {
     CompareAndCheck(nullptr, return_num_indirections, expr, return_value,
-                    value_num_indirections, return_stmt, nullptr, true,
+                    return_num_indirections, return_stmt, nullptr, true,
                     Factory.ReturnStmtFactory());
   }
   return std::nullopt;

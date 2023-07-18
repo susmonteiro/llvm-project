@@ -423,25 +423,26 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
   for (const clang::Decl *decl : decl_stmt->decls()) {
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
       clang::QualType lhs_type = var_decl->getType().getCanonicalType();
+
+      ObjectLifetimes objectLifetimes;
+      if (var_decl->isStaticLocal()) {
+        unsigned int num_indirections =
+            Lifetime::GetNumIndirections(lhs_type);
+        while (num_indirections > 0) {
+          objectLifetimes.InsertPointeeObject(
+              Lifetime(STATIC, num_indirections--));
+        }
+        State.CreateVariable(var_decl, objectLifetimes);
+        return std::nullopt;
+      }
+
       if (!lhs_type->isPointerType() && !lhs_type->isReferenceType()) {
         continue;
       }
 
-      ObjectLifetimes objectLifetimes;
-      if (var_decl->isStaticLocal()) {
-        objectLifetimes =
-            ObjectLifetimes(Lifetime(STATIC, lhs_type.getCanonicalType()));
-        if (lhs_type->isPointerType()) {
-          objectLifetimes.InsertPointeeObject(
-              Lifetime(STATIC, lhs_type->getPointeeType().getCanonicalType()));
-        }
-        State.CreateVariable(var_decl, objectLifetimes);
-        return std::nullopt;
-      } else {
-        objectLifetimes =
-            State.GetVarDeclLifetime(var_decl, State.GetLifetimeFactory());
-        State.CreateVariable(var_decl, objectLifetimes);
-      }
+      objectLifetimes =
+          State.GetVarDeclLifetime(var_decl, State.GetLifetimeFactory());
+      State.CreateVariable(var_decl, objectLifetimes);
 
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
@@ -482,7 +483,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   assert(points_to.size() == 1);
 
   PointsTo.InsertExprDecl(member_expr, base);
-
 
   // TODO delete this
   PointsTo.InsertExprType(member_expr, base->getType());
@@ -533,6 +533,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     if (const auto *child_expr = dyn_cast<clang::Expr>(child)) {
       PointsTo.InsertExprPointsTo(op, child_expr);
       PointsTo.InsertExprDecl(op, child_expr);
+    }
+  }
+
+  for (const auto *decl : PointsTo.GetExprDecls(op)) {
+    if (decl->isStaticLocal()) {
+      PointsTo.InsertExprLifetime(op, STATIC);
+      return std::nullopt;
     }
   }
 
