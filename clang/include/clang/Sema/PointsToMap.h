@@ -29,7 +29,7 @@ typedef struct {
 } Dependencies;
 
 using TypeToSet = llvm::DenseMap<unsigned int, Dependencies>;
-using CallExprInfoMap = llvm::DenseMap<const clang::CallExpr*, TypeToSet>;
+using CallExprInfoMap = llvm::DenseMap<const clang::Expr*, TypeToSet>;
 
 // Maintains the points-to sets needed for the analysis of a function.
 // A `PointsToMap` stores points-to sets for
@@ -100,7 +100,7 @@ class PointsToMap {
     }
   }
 
-  TypeToSet& GetCallExprInfo(const clang::CallExpr* expr) {
+  TypeToSet& GetCallExprInfo(const clang::Expr* expr) {
     return CallExprToInfo[expr];
   }
 
@@ -138,6 +138,10 @@ class PointsToMap {
     for (const auto &child : ExprPointsTo[expr]) {
       ExprToLifetime[child] = lifetime;
     }
+  }
+
+  void InsertCallExprInfo(const clang::Expr* parent, const clang::Expr* child) {
+    CallExprToInfo[parent] = CallExprToInfo[child];
   }
 
  private:

@@ -437,8 +437,8 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     unsigned int rhs_num_indirections, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
-  debugLifetimes("LHS num_indirections", lhs_num_indirections);
-  debugLifetimes("RHS num_indirections", rhs_num_indirections);
+  // debugLifetimes("LHS num_indirections", lhs_num_indirections);
+  // debugLifetimes("RHS num_indirections", rhs_num_indirections);
   assert(lhs_num_indirections == rhs_num_indirections);
   // TODO if this is always true, only need to receive one num_indirections
   if (expr == nullptr) return;

@@ -40,6 +40,19 @@ void TransferFuncCall(const clang::VarDecl *lhs,
   }
 }
 
+void TransferMemberExpr(const clang::VarDecl *lhs,
+                        const clang::MemberExpr *member_expr,
+                        clang::QualType lhs_type, clang::QualType rhs_type,
+                        const clang::Stmt *loc, PointsToMap &PointsTo,
+                        LifetimeAnnotationsAnalysis &state) {
+  debugInfo("TransferMemberExpr");
+  auto &rhs_points_to = PointsTo.GetExprDecls(member_expr);
+  assert(rhs_points_to.size() == 1);
+  for (const auto *rhs_decl : rhs_points_to) {
+    state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
+  }
+}
+
 void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  clang::QualType lhs_type, clang::QualType base_type,
                  const clang::Stmt *loc, PointsToMap &PointsTo,
@@ -55,11 +68,10 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
     state.CreateStmtLifetime(loc, LOCAL);
   } else if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
     TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
-  } else if (clang::isa<clang::MemberExpr>(rhs)) {
-    auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
-    for (const auto *rhs_decl : rhs_points_to) {
-      state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
-    }
+  } else if (const auto *member_expr =
+                 clang::dyn_cast<clang::MemberExpr>(rhs)) {
+    TransferMemberExpr(lhs, member_expr, lhs_type, rhs_type, loc, PointsTo,
+                       state);
   }
 
   const auto &points_to_expr = PointsTo.GetExprPointsTo(rhs);
@@ -73,11 +85,10 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
       } else if (const auto *call_expr =
                      clang::dyn_cast<clang::CallExpr>(expr)) {
         TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
-      } else if (clang::isa<clang::MemberExpr>(expr)) {
-        auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
-        for (const auto *rhs_decl : rhs_points_to) {
-          state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
-        }
+      } else if (const auto *member_expr =
+                     clang::dyn_cast<clang::MemberExpr>(expr)) {
+        TransferMemberExpr(lhs, member_expr, lhs_type, rhs_type, loc, PointsTo,
+                           state);
       }
     }
   }
@@ -426,8 +437,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
       ObjectLifetimes objectLifetimes;
       if (var_decl->isStaticLocal()) {
-        unsigned int num_indirections =
-            Lifetime::GetNumIndirections(lhs_type);
+        unsigned int num_indirections = Lifetime::GetNumIndirections(lhs_type);
         while (num_indirections > 0) {
           objectLifetimes.InsertPointeeObject(
               Lifetime(STATIC, num_indirections--));
@@ -475,16 +485,23 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
 
   const clang::Expr *base = member_expr->getBase();
   Visit(const_cast<clang::Expr *>(base));
-  PointsTo.InsertExprPointsTo(member_expr, base);
   // TODO check if this works from struct->struct->field
   // TODO
   auto &points_to = PointsTo.GetExprDecls(base);
   if (points_to.size() > 1) debugWarn("More than one decl in MemberExpr");
-  
+
   // TODO delete this
   bool has_func_call = false;
-  for (const auto *expr : PointsTo.GetExprPointsTo(member_expr)) {
-    if (expr != nullptr && clang::isa<clang::CallExpr>(expr)) {
+  if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(base)) {
+    has_func_call = true;
+    // TODO check if base also works
+    PointsTo.InsertCallExprInfo(member_expr, call_expr);
+  }
+  for (const auto *expr : PointsTo.GetExprPointsTo(base)) {
+    if (expr == nullptr) continue;
+    if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(
+            expr)) /* || clang::isa<clang::ArraySubscriptExpr>(expr))) */ {
+      PointsTo.InsertCallExprInfo(member_expr, call_expr);
       has_func_call = true;
       break;
     }
