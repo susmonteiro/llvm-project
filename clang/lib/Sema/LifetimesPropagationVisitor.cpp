@@ -475,13 +475,23 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
 
   const clang::Expr *base = member_expr->getBase();
   Visit(const_cast<clang::Expr *>(base));
+  PointsTo.InsertExprPointsTo(member_expr, base);
   // TODO check if this works from struct->struct->field
   // TODO
   auto &points_to = PointsTo.GetExprDecls(base);
   if (points_to.size() > 1) debugWarn("More than one decl in MemberExpr");
+  
   // TODO delete this
-  assert(points_to.size() == 1);
+  bool has_func_call = false;
+  for (const auto *expr : PointsTo.GetExprPointsTo(member_expr)) {
+    if (expr != nullptr && clang::isa<clang::CallExpr>(expr)) {
+      has_func_call = true;
+      break;
+    }
+  }
+  assert(points_to.size() == 1 || has_func_call);
 
+  if (points_to.size() < 1) return std::nullopt;
   PointsTo.InsertExprDecl(member_expr, base);
 
   // TODO delete this

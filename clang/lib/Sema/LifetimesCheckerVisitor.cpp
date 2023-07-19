@@ -184,13 +184,8 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
   if (expr == nullptr) return;
 
   if (clang::isa<clang::MemberExpr>(expr)) {
-    expr->dump();
     auto &points_to = PointsTo.GetExprDecls(expr);
     // TODO delete this
-    debugLifetimes("Size of points to", points_to.size());
-    for (const auto &idk : points_to) {
-      debugLifetimes("MemberExpr points to", idk->getNameAsString());
-    }
     assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
     const auto *lhs_var_decl = *points_to.begin();
 
