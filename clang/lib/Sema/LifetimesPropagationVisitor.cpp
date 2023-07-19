@@ -2,13 +2,10 @@
 
 namespace clang {
 
-void TransferFuncCall(const clang::VarDecl *lhs,
-                      const clang::CallExpr *call_expr,
-                      clang::QualType lhs_type, const clang::Stmt *loc,
-                      PointsToMap &PointsTo,
+void TransferFuncCall(const clang::VarDecl *lhs, clang::QualType lhs_type,
+                      clang::QualType func_type, clang::TypeToSet &call_info,
+                      const clang::Stmt *loc, PointsToMap &PointsTo,
                       LifetimeAnnotationsAnalysis &state) {
-  auto &call_info = PointsTo.GetCallExprInfo(call_expr);
-  clang::QualType func_type = call_expr->getType().getCanonicalType();
   unsigned int lhs_num_indirections = Lifetime::GetNumIndirections(lhs_type);
   unsigned int func_num_indirections = Lifetime::GetNumIndirections(func_type);
 
@@ -40,6 +37,16 @@ void TransferFuncCall(const clang::VarDecl *lhs,
   }
 }
 
+void TransferFuncCall(const clang::VarDecl *lhs,
+                      const clang::CallExpr *call_expr,
+                      clang::QualType lhs_type, const clang::Stmt *loc,
+                      PointsToMap &PointsTo,
+                      LifetimeAnnotationsAnalysis &state) {
+  auto &call_info = PointsTo.GetCallExprInfo(call_expr);
+  clang::QualType func_type = call_expr->getType().getCanonicalType();
+  TransferFuncCall(lhs, lhs_type, func_type, call_info, loc, PointsTo, state);
+}
+
 void TransferMemberExpr(const clang::VarDecl *lhs,
                         const clang::MemberExpr *member_expr,
                         clang::QualType lhs_type, clang::QualType rhs_type,
@@ -47,9 +54,15 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
                         LifetimeAnnotationsAnalysis &state) {
   debugInfo("TransferMemberExpr");
   auto &rhs_points_to = PointsTo.GetExprDecls(member_expr);
-  assert(rhs_points_to.size() == 1);
-  for (const auto *rhs_decl : rhs_points_to) {
-    state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
+  if (rhs_points_to.size() == 1) {
+    for (const auto *rhs_decl : rhs_points_to) {
+      state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
+    }
+  } else if (PointsTo.HasCallExprInfo(member_expr)) {
+    auto &call_info = PointsTo.GetCallExprInfo(member_expr);
+    TransferFuncCall(lhs, lhs_type, rhs_type, call_info, loc, PointsTo, state);
+  } else {
+    assert(true && "Should not reach here");
   }
 }
 
@@ -229,6 +242,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       Lifetime &return_lifetime = return_ol.GetLifetime(func_type);
       assert(!return_lifetime.IsNull());
       auto &current_type_call_info = call_info[func_num_indirections];
+      current_type_call_info.call_expr = call;
 
       if (return_lifetime.IsNotSet()) {
         current_type_call_info.is_local = true;

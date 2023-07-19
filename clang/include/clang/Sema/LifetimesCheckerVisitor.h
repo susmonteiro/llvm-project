@@ -72,13 +72,20 @@ class LifetimesCheckerVisitor
       const clang::BinaryOperator *op,
       const llvm::SmallSet<const clang::Expr *, 2U> &lhs_points_to) const;
 
-  void CallExprChecker(const clang::CallExpr *call,
-                       const clang::FunctionDecl *direct_callee,
-                       const clang::VarDecl *first_arg,
-                       const clang::VarDecl *second_arg,
-                       Lifetime &first_lifetime, Lifetime &second_lifetime,
-                       int first_num_indirections, int second_num_indirections,
-                       unsigned int num_indirections, int msg) const;
+  void ParamsCallExprChecker(
+      const clang::CallExpr *call, const clang::FunctionDecl *direct_callee,
+      const clang::VarDecl *first_arg, const clang::VarDecl *second_arg,
+      Lifetime &first_lifetime, Lifetime &second_lifetime,
+      int first_num_indirections, int second_num_indirections,
+      unsigned int num_indirections, int msg) const;
+
+  void CallExprChecker(const clang::VarDecl *lhs_var_decl,
+                       unsigned int lhs_num_indirections,
+                       const clang::Expr *expr,
+                       unsigned int rhs_num_indirections,
+                       const clang::Stmt *stmt, const clang::BinaryOperator *op,
+                       bool is_return, clang::TypeToSet &call_info,
+                       PrintNotesFactory factory) const;
 
   void DeclChecker(const clang::VarDecl *lhs_var_decl,
                    unsigned int lhs_num_indirections, const clang::Expr *expr,
@@ -88,8 +95,9 @@ class LifetimesCheckerVisitor
                    PrintNotesFactory factory) const;
 
   void CompareAndCheck(const clang::VarDecl *lhs_var_decl,
-                       unsigned int lhs_num_indirections, const clang::Expr *expr,
-                       const clang::Expr *rhs, unsigned int rhs_num_indirections,
+                       unsigned int lhs_num_indirections,
+                       const clang::Expr *expr, const clang::Expr *rhs,
+                       unsigned int rhs_num_indirections,
                        const clang::Stmt *stmt, const clang::BinaryOperator *op,
                        bool return_lifetime, PrintNotesFactory factory) const;
 

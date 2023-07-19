@@ -24,6 +24,7 @@ typedef struct {
 
 typedef struct {
   llvm::DenseSet<CallExprInfo> info;
+  const clang::CallExpr* call_expr;
   bool is_local = false;
   bool is_static = false;
 } Dependencies;
@@ -100,6 +101,10 @@ class PointsToMap {
     }
   }
 
+  bool HasCallExprInfo(const clang::Expr* expr) {
+    return CallExprToInfo.find(expr) != CallExprToInfo.end();
+  }
+
   TypeToSet& GetCallExprInfo(const clang::Expr* expr) {
     return CallExprToInfo[expr];
   }
@@ -135,7 +140,7 @@ class PointsToMap {
     assert(lifetime != NOTSET);
     ExprToLifetime[expr] = lifetime;
     // propagate downwards
-    for (const auto &child : ExprPointsTo[expr]) {
+    for (const auto& child : ExprPointsTo[expr]) {
       ExprToLifetime[child] = lifetime;
     }
   }

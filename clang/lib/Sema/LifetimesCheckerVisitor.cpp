@@ -314,7 +314,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
   }
 }
 
-void LifetimesCheckerVisitor::CallExprChecker(
+void LifetimesCheckerVisitor::ParamsCallExprChecker(
     const clang::CallExpr *call, const clang::FunctionDecl *direct_callee,
     const clang::VarDecl *first_arg, const clang::VarDecl *second_arg,
     Lifetime &first_lifetime, Lifetime &second_lifetime,
@@ -359,6 +359,51 @@ void LifetimesCheckerVisitor::CallExprChecker(
   } else {
     PrintNotes(first_arg, first_lifetime, num_indirections);
     PrintNotes(second_arg, second_lifetime, num_indirections);
+  }
+}
+
+void LifetimesCheckerVisitor::CallExprChecker(
+    const clang::VarDecl *lhs_var_decl, unsigned int lhs_num_indirections,
+    const clang::Expr *expr, unsigned int rhs_num_indirections,
+    const clang::Stmt *stmt, const clang::BinaryOperator *op, bool is_return,
+    clang::TypeToSet &call_info, PrintNotesFactory factory) const {
+  while (lhs_num_indirections > 0) {
+    Lifetime &lhs_lifetime =
+        is_return ? State.GetReturnLifetime(lhs_num_indirections)
+                  : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
+    if (lhs_lifetime.IsNotSet()) {
+      lhs_num_indirections--;
+      continue;
+    }
+    auto &current_type_call_info = call_info[lhs_num_indirections];
+    if (current_type_call_info.is_local) {
+      if (is_return) {
+        S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
+            << std::string(rhs_num_indirections, '*') << expr->getSourceRange();
+      } else {
+        Lifetime arg_lifetime(LOCAL);
+        if (Lifetime(LOCAL) < lhs_lifetime) {
+          factory(lhs_var_decl,
+                  current_type_call_info.call_expr->getCalleeDecl(), op, expr,
+                  stmt, lhs_lifetime, arg_lifetime);
+        }
+      }
+    }
+
+    for (const auto &[arg, arg_num_indiretions] : current_type_call_info.info) {
+      const auto &arg_points_to = PointsTo.GetExprDecls(arg);
+      for (const auto &decl : arg_points_to) {
+        char id = PointsTo.GetExprLifetime(arg);
+        Lifetime arg_lifetime =
+            id != NOTSET ? Lifetime(id, arg_num_indiretions)
+                         : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
+        if (arg_lifetime < lhs_lifetime) {
+          factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
+                  arg_lifetime);
+        }
+      }
+    }
+    lhs_num_indirections--;
   }
 }
 
@@ -444,51 +489,23 @@ void LifetimesCheckerVisitor::CompareAndCheck(
   if (expr == nullptr) return;
   if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
     auto &call_info = PointsTo.GetCallExprInfo(call_expr);
-    while (lhs_num_indirections > 0) {
-      Lifetime &lhs_lifetime =
-          is_return ? State.GetReturnLifetime(lhs_num_indirections)
-                    : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
-      if (lhs_lifetime.IsNotSet()) {
-        lhs_num_indirections--;
-        continue;
-      }
-      auto &current_type_call_info = call_info[lhs_num_indirections];
-      if (current_type_call_info.is_local) {
-        if (is_return) {
-          S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
-              << std::string(rhs_num_indirections, '*')
-              << expr->getSourceRange();
-        } else {
-          Lifetime arg_lifetime(LOCAL);
-          if (Lifetime(LOCAL) < lhs_lifetime) {
-            factory(lhs_var_decl, call_expr->getCalleeDecl(), op, expr, stmt,
-                    lhs_lifetime, arg_lifetime);
-          }
-        }
-      }
-
-      for (const auto &[arg, arg_num_indiretions] :
-           current_type_call_info.info) {
-        const auto &arg_points_to = PointsTo.GetExprDecls(arg);
-        for (const auto &decl : arg_points_to) {
-          char id = PointsTo.GetExprLifetime(arg);
-          Lifetime arg_lifetime =
-              id != NOTSET
-                  ? Lifetime(id, arg_num_indiretions)
-                  : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
-          if (arg_lifetime < lhs_lifetime) {
-            factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
-                    arg_lifetime);
-          }
-        }
-      }
-      lhs_num_indirections--;
-    }
-  } else if (clang::isa<clang::MemberExpr>(expr)) {
+    CallExprChecker(lhs_var_decl, lhs_num_indirections, expr,
+                    rhs_num_indirections, stmt, op, is_return, call_info,
+                    factory);
+  } else if (const auto *member_expr =
+                 clang::dyn_cast<clang::MemberExpr>(expr)) {
     auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
-    for (const auto *rhs_decl : rhs_points_to) {
-      DeclChecker(lhs_var_decl, lhs_num_indirections, expr, rhs_decl,
-                  rhs_num_indirections, stmt, op, is_return, factory);
+    if (rhs_points_to.size() == 1) {
+      for (const auto *rhs_decl : rhs_points_to) {
+        DeclChecker(lhs_var_decl, lhs_num_indirections, expr, rhs_decl,
+                    rhs_num_indirections, stmt, op, is_return, factory);
+      }
+    } else if (PointsTo.HasCallExprInfo(member_expr)) {
+      CallExprChecker(lhs_var_decl, lhs_num_indirections, expr,
+                      rhs_num_indirections, stmt, op, is_return,
+                      PointsTo.GetCallExprInfo(member_expr), factory);
+    } else {
+      assert(true && "Should not reach here");
     }
   } else if (const auto *rhs_decl_ref_expr =
                  clang::dyn_cast<clang::DeclRefExpr>(expr)) {
@@ -629,11 +646,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
               Lifetime &second_lifetime =
                   State.GetLifetime(second_decl, num_indirections);
               if (first_lifetime != second_lifetime) {
-                CallExprChecker(call, direct_callee, first_decl, second_decl,
-                                first_lifetime, second_lifetime,
-                                first_num_indirections, second_num_indirections,
-                                num_indirections,
-                                diag::warn_func_params_lifetimes_equal);
+                ParamsCallExprChecker(call, direct_callee, first_decl,
+                                      second_decl, first_lifetime,
+                                      second_lifetime, first_num_indirections,
+                                      second_num_indirections, num_indirections,
+                                      diag::warn_func_params_lifetimes_equal);
                 return std::nullopt;
               }
             }
@@ -678,11 +695,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                   num_indirections +
                   (Lifetime::GetNumIndirections(second_decl->getType()) -
                    Lifetime::GetNumIndirections(second_expr->getType()));
-              CallExprChecker(call, direct_callee, first_decl, second_decl,
-                              first_lifetime, second_lifetime,
-                              first_num_indirections, second_num_indirections,
-                              num_indirections,
-                              diag::warn_func_params_lifetimes_shorter);
+              ParamsCallExprChecker(call, direct_callee, first_decl,
+                                    second_decl, first_lifetime,
+                                    second_lifetime, first_num_indirections,
+                                    second_num_indirections, num_indirections,
+                                    diag::warn_func_params_lifetimes_shorter);
             }
           }
         }
