@@ -238,16 +238,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     auto &func_info = all_func_info[direct_callee];
 
     // * process args
-    unsigned int arg_idx = 0;
-    for (auto &[param, lifetimes] : func_info.GetParamsLifetimes()) {
-      const auto *arg = call->getArg(arg_idx++)->IgnoreParens();
+    for (unsigned int arg_idx = 0; arg_idx < func_info.GetNumParams(); arg_idx++) {
+      const auto *arg = call->getArg(arg_idx)->IgnoreParens();
       Visit(const_cast<clang::Expr *>(arg));
       const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
 
       unsigned int num_indirections =
-          Lifetime::GetNumIndirections(param->getType());
+          Lifetime::GetNumIndirections(arg->getType());
       while (--num_indirections > 0) {
-        Lifetime &param_lifetime = lifetimes.GetLifetime(num_indirections);
+        Lifetime &param_lifetime = func_info.GetParamLifetime(arg_idx, num_indirections);
         if (param_lifetime.IsLocal()) {
           TransferDeadLifetime(arg, call, num_indirections, PointsTo, State);
           for (const auto &expr : arg_points_to) {

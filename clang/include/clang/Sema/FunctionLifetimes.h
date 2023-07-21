@@ -88,6 +88,13 @@ class FunctionLifetimes {
     return it->second;
   }
 
+  ObjectLifetimes &GetParamLifetime(unsigned int i) {
+    const auto *param = Params[i];
+    auto it = ParamsLifetimes.find(param);
+    assert(it != ParamsLifetimes.end());
+    return it->second;
+  }
+
   Lifetime &GetParamLifetime(const clang::ParmVarDecl *param,
                              clang::QualType type) {
     type = type.getCanonicalType();
@@ -104,6 +111,13 @@ class FunctionLifetimes {
 
     ObjectLifetimes object_lifetimes = it->second;
     return object_lifetimes.GetLifetimeOrLocal(num_indirections);
+  }
+
+  Lifetime &GetParamLifetime(unsigned int i, unsigned int num_indirections) {
+    const auto *param = Params[i];
+    auto it = ParamsLifetimes.find(param);
+    assert(it != ParamsLifetimes.end());
+    return it->second.GetLifetimeOrLocal(num_indirections);
   }
 
   ObjectLifetimes &GetReturnLifetime() { return ReturnLifetime; }
