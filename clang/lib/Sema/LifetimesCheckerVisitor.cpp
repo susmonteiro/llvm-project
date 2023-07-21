@@ -269,7 +269,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
           Lifetime rhs_lifetime =
               id != NOTSET ? Lifetime(id, rhs_type)
                            : State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
-          unsigned int i = LOCAL - 1;
+          unsigned int i = DEAD - 1;
           unsigned int lhs_possible_lifetimes_size =
               lhs_lifetime.GetPossibleLifetimes().size();
           while (++i < lhs_possible_lifetimes_size) {

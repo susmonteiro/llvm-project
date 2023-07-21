@@ -33,7 +33,7 @@ Lifetime::Lifetime(char id, unsigned int num_indirections) {
 }
 
 void Lifetime::InitializeId(char id) {
-  if (id == NOTSET || id == LOCAL || id == STATIC) {
+  if (id == NOTSET || id == LOCAL || id == STATIC || id == DEAD) {
     Id = id;
   } else if (id >= 'a' && id <= 'z') {
     Id = CharToId(id);
@@ -44,7 +44,7 @@ void Lifetime::InitializeId(char id) {
   }
 }
 
-bool Lifetime::IsSet() const { return Id >= LOCAL; }
+bool Lifetime::IsSet() const { return Id >= DEAD; }
 bool Lifetime::IsNotSet() const { return Id == NOTSET; }
 bool Lifetime::IsStatic() const { return Id == STATIC; }
 bool Lifetime::ContainsStatic() const {
@@ -57,8 +57,17 @@ bool Lifetime::ContainsLocal() const {
   return (unsigned int)LOCAL < PossibleLifetimes.size() &&
          !PossibleLifetimes[LOCAL].empty();
 }
+
+bool Lifetime::IsDead() const { return Id == DEAD; }
+bool Lifetime::ContainsDead() const {
+  return (unsigned int)DEAD < PossibleLifetimes.size() &&
+         !PossibleLifetimes[DEAD].empty();
+}
+
+
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
+void Lifetime::SetDead() { Id = DEAD; }
 
 bool Lifetime::IsNull() const { return Id == NULL_LIFETIME; }
 
@@ -100,6 +109,9 @@ std::string Lifetime::GetLifetimeName(char id) {
     case LOCAL:
       return "$local";
       break;
+    case DEAD:
+      return "$dead";
+      break;
     case NULL_LIFETIME:
       return "NULL";
       break;
@@ -133,7 +145,7 @@ std::string Lifetime::DebugString() const {
 }
 
 bool Lifetime::EmptyPossibleLifetimes() const {
-  unsigned idx = LOCAL;
+  unsigned idx = DEAD;
   unsigned size = PossibleLifetimes.size();
   while (++idx < size && PossibleLifetimes[idx].empty()) {
   }
@@ -143,6 +155,11 @@ bool Lifetime::EmptyPossibleLifetimes() const {
 void Lifetime::ProcessPossibleLifetimes() {
   // should only reach this if lifetime is not set
   assert(IsNotSet());
+  if (ContainsDead()) {
+    SetDead();
+    return;
+  }
+
   if (ContainsLocal()) {
     // lifetime $local is the shortest possible
     SetLocal();
@@ -214,11 +231,19 @@ bool Lifetime::operator==(const Lifetime &Other) const {
 }
 
 bool Lifetime::operator!=(const Lifetime &Other) const {
+  if (IsDead() && Other.IsDead()) {
+    // TODO check if stmts are the same
+  }
   return !operator==(Other);
 }
 
 bool Lifetime::operator<(const Lifetime &Other) const {
   // $static outlives all lifetimes and all lifetimes outlive $local
+  if (IsDead() && Other.IsDead()) {
+    // TODO check stmts
+  } else if (IsDead() || Other.IsDead()) {
+    return IsDead();
+  }
   if (IsStatic() || Other.IsLocal()) return false;
   if (IsLocal() || Other.IsStatic()) return true;
 

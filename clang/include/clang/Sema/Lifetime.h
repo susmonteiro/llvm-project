@@ -20,9 +20,10 @@ constexpr char NOTSET = 0;
 constexpr char INVALID_ID_TOMBSTONE = 1;
 constexpr char INVALID_EMPTY = 2;
 constexpr char NULL_LIFETIME = 3;
-constexpr char LOCAL = 4;
-constexpr char STATIC = 5;
-constexpr char OFFSET = 6;
+constexpr char DEAD = 4;
+constexpr char LOCAL = 5;
+constexpr char STATIC = 6;
+constexpr char OFFSET = 7;
 
 // the lifetime of a variable can be $static, $local or $c, where c is a char
 class Lifetime {
@@ -52,6 +53,10 @@ class Lifetime {
   bool IsLocal() const;
   bool ContainsLocal() const;
 
+  // Returns whether this lifetime is a dead lifetime.
+  bool IsDead() const;
+  bool ContainsDead() const;
+
   // Returns whether this lifetime is null
   bool IsNull() const;
 
@@ -60,6 +65,9 @@ class Lifetime {
 
   // Sets the Id to $local
   void SetLocal();
+
+  // Sets the Id to $dead
+  void SetDead();
 
   static char CharToId(char id) { return id < OFFSET ? id : id - 'a' + OFFSET; }
   static char IdToChar(char id) { return id < OFFSET ? id : id + 'a' - OFFSET; }

@@ -194,6 +194,29 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   return std::nullopt;
 }
 
+void TransferDeadLifetime(const Expr *arg, const Stmt *loc,
+                          unsigned int num_indirections, PointsToMap &PointsTo,
+                          LifetimeAnnotationsAnalysis &state) {
+  if (arg == nullptr) return;
+  const clang::VarDecl *arg_decl;
+  if (clang::isa<clang::MemberExpr>(arg)) {
+    auto &points_to = PointsTo.GetExprDecls(arg);
+    // TODO delete this
+    assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
+    arg_decl = *points_to.begin();
+  } else if (const auto *arg_decl_ref_expr =
+                 dyn_cast<clang::DeclRefExpr>(arg)) {
+    if (!(arg_decl = dyn_cast<clang::VarDecl>(arg_decl_ref_expr->getDecl()))) {
+      return;
+    }
+  } else {
+    return;
+  }
+  Lifetime &arg_lifetime = state.GetLifetime(arg_decl, num_indirections);
+  arg_lifetime.SetDead();
+  arg_lifetime.InsertPossibleLifetimes(DEAD, loc);
+}
+
 std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     const clang::CallExpr *call) {
   if (debugEnabled) debugLifetimes("[VisitCallExpr]");
@@ -214,6 +237,26 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     auto &func_info = all_func_info[direct_callee];
 
+    // * process args
+    unsigned int arg_idx = 0;
+    for (auto &[param, lifetimes] : func_info.GetParamsLifetimes()) {
+      const auto *arg = call->getArg(arg_idx++)->IgnoreParens();
+      Visit(const_cast<clang::Expr *>(arg));
+      const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
+
+      unsigned int num_indirections =
+          Lifetime::GetNumIndirections(param->getType());
+      while (--num_indirections > 0) {
+        Lifetime &param_lifetime = lifetimes.GetLifetime(num_indirections);
+        if (param_lifetime.IsLocal()) {
+          TransferDeadLifetime(arg, call, num_indirections, PointsTo, State);
+          for (const auto &expr : arg_points_to) {
+            TransferDeadLifetime(expr, call, num_indirections, PointsTo, State);
+          }
+        }
+      }
+    }
+
     if (!func_type->isPointerType() && !func_type->isReferenceType()) {
       // debugWarn("Return type is not pointer type");
       unsigned int i = -1;
@@ -225,6 +268,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
           continue;
         }
         const Expr *arg = call->getArg(i)->IgnoreParens();
+        // TODO remove this
         Visit(const_cast<clang::Expr *>(arg));
         clang::QualType found_type = PointsTo.GetExprType(arg);
         if (!found_type.isNull()) {
@@ -258,6 +302,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
             continue;
           }
           const Expr *arg = call->getArg(i)->IgnoreParens();
+          // TODO remove this
           Visit(const_cast<clang::Expr *>(arg));
           ObjectLifetimes &param_ol = func_info.GetParamLifetime(param);
           for (Lifetime &param_lifetime : param_ol.GetLifetimes()) {

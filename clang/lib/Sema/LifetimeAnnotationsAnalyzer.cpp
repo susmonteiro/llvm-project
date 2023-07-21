@@ -140,6 +140,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
       unsigned int rhs_num_indirections = rhs_info.num_indirections;
       stmts.insert(rhs_info);
 
+      // This should be correct -> don't want to propagate $dead
       if (rhs_info.extra_lifetime >= LOCAL) {
         Lifetime::InsertPossibleLifetimes(rhs_info.extra_lifetime,
                                           rhs_info.stmt, possible_lifetimes);
@@ -150,8 +151,10 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
         if (var_decl == current_var) continue;
         Lifetime &rhs_lifetime =
             State.GetLifetime(var_decl, rhs_num_indirections);
-
-        if (rhs_lifetime.IsNotSet()) {
+        
+        if (rhs_lifetime.IsDead()) {
+          continue;
+        } else if (rhs_lifetime.IsNotSet()) {
           auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
           for (unsigned int i = 0; i < rhs_possible_lifetimes.size(); i++) {
             if (!rhs_possible_lifetimes[i].empty()) {
