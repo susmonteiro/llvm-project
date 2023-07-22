@@ -11833,6 +11833,10 @@ def warn_func_return_unknown_lifetime : Warning<
   "at least one parameter must be annotated with '%0'">;
 def warn_cannot_return_local : Warning<
   "cannot return data with lifetime '%0$local'">;
+def warn_read_dead : Warning<
+  "cannot read data with lifetime '%0$dead'">;
+def note_param_lifetime_local : Note<
+  "parameter was declared with lifetime '%0'">;
 def note_lifetime_of : Note<
   "lifetime is '%0'">;
 def note_lifetime_declared_here : Note<

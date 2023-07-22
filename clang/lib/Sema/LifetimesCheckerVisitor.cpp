@@ -436,6 +436,25 @@ void LifetimesCheckerVisitor::DeclChecker(
             << GenerateLifetimeName(rhs_lifetime)
             << rhs_var_decl->getSourceRange();
       }
+    } else if (rhs_lifetime.IsDead()) {
+      S.Diag(expr->getExprLoc(), diag::warn_read_dead)
+          << std::string(rhs_lifetime.GetNumIndirections(), '*')
+          << expr->getSourceRange();
+      const auto &maybe_stmts = rhs_lifetime.GetStmts(DEAD);
+      if (maybe_stmts.has_value()) {
+        const auto &stmts = maybe_stmts.value();
+        for (const auto &stmt : stmts) {
+          if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(stmt)) {
+            const auto *call_decl = call_expr->getCalleeDecl();
+            S.Diag(call_expr->getBeginLoc(), diag::note_lifetime_declared_here)
+                << GenerateLifetimeName(DEAD, rhs_lifetime.GetNumIndirections())
+                << call_expr->getSourceRange();
+            S.Diag(call_decl->getBeginLoc(), diag::note_param_lifetime_local)
+                << GenerateLifetimeName(LOCAL, rhs_lifetime.GetNumIndirections())
+                << call_decl->getSourceRange();
+          }
+        }
+      }
     } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
       factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
               rhs_lifetime);
@@ -466,6 +485,25 @@ void LifetimesCheckerVisitor::DeclChecker(
         S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here)
             << GenerateLifetimeName(rhs_lifetime)
             << rhs_var_decl->getSourceRange();
+      }
+    } else if (rhs_lifetime.IsDead()) {
+      S.Diag(expr->getExprLoc(), diag::warn_read_dead)
+          << std::string(rhs_lifetime.GetNumIndirections(), '*')
+          << expr->getSourceRange();
+      const auto &maybe_stmts = rhs_lifetime.GetStmts(DEAD);
+      if (maybe_stmts.has_value()) {
+        const auto &stmts = maybe_stmts.value();
+        for (const auto &stmt : stmts) {
+          if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(stmt)) {
+            const auto *call_decl = call_expr->getCalleeDecl();
+            S.Diag(call_expr->getBeginLoc(), diag::note_lifetime_declared_here)
+                << GenerateLifetimeName(DEAD, rhs_lifetime.GetNumIndirections())
+                << call_expr->getSourceRange();
+            S.Diag(call_decl->getBeginLoc(), diag::note_param_lifetime_local)
+                << GenerateLifetimeName(DEAD, rhs_lifetime.GetNumIndirections())
+                << call_decl->getSourceRange();
+          }
+        }
       }
     } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
       factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
