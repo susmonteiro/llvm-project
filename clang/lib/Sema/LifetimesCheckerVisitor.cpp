@@ -273,7 +273,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
           unsigned int lhs_possible_lifetimes_size =
               lhs_lifetime.GetPossibleLifetimes().size();
           while (++i < lhs_possible_lifetimes_size) {
-            if (lhs_lifetime.GetPossibleLifetime(i)->empty()) continue;
+            if (lhs_lifetime.GetPossibleLifetime(i).empty()) continue;
             Lifetime specific_lifetime(Lifetime::IdToChar(i));
             unsigned int lhs_num_indirections =
                 lhs_lifetime.GetNumIndirections();
@@ -371,10 +371,6 @@ void LifetimesCheckerVisitor::CallExprChecker(
     Lifetime &lhs_lifetime =
         is_return ? State.GetReturnLifetime(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
-    if (lhs_lifetime.IsNotSet()) {
-      lhs_num_indirections--;
-      continue;
-    }
     auto &current_type_call_info = call_info[lhs_num_indirections];
     if (current_type_call_info.is_local) {
       if (is_return) {
@@ -382,7 +378,7 @@ void LifetimesCheckerVisitor::CallExprChecker(
             << std::string(rhs_num_indirections, '*') << expr->getSourceRange();
       } else {
         Lifetime arg_lifetime(LOCAL);
-        if (Lifetime(LOCAL) < lhs_lifetime) {
+        if (arg_lifetime < lhs_lifetime) {
           factory(lhs_var_decl,
                   current_type_call_info.call_expr->getCalleeDecl(), op, expr,
                   stmt, lhs_lifetime, arg_lifetime);
@@ -436,25 +432,6 @@ void LifetimesCheckerVisitor::DeclChecker(
             << GenerateLifetimeName(rhs_lifetime)
             << rhs_var_decl->getSourceRange();
       }
-    } else if (rhs_lifetime.IsDead()) {
-      S.Diag(expr->getExprLoc(), diag::warn_read_dead)
-          << std::string(rhs_lifetime.GetNumIndirections(), '*')
-          << expr->getSourceRange();
-      const auto &maybe_stmts = rhs_lifetime.GetStmts(DEAD);
-      if (maybe_stmts.has_value()) {
-        const auto &stmts = maybe_stmts.value();
-        for (const auto &stmt : stmts) {
-          if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(stmt)) {
-            const auto *call_decl = call_expr->getCalleeDecl();
-            S.Diag(call_expr->getBeginLoc(), diag::note_lifetime_declared_here)
-                << GenerateLifetimeName(DEAD, rhs_lifetime.GetNumIndirections())
-                << call_expr->getSourceRange();
-            S.Diag(call_decl->getBeginLoc(), diag::note_param_lifetime_local)
-                << GenerateLifetimeName(LOCAL, rhs_lifetime.GetNumIndirections())
-                << call_decl->getSourceRange();
-          }
-        }
-      }
     } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
       factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
               rhs_lifetime);
@@ -485,25 +462,6 @@ void LifetimesCheckerVisitor::DeclChecker(
         S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here)
             << GenerateLifetimeName(rhs_lifetime)
             << rhs_var_decl->getSourceRange();
-      }
-    } else if (rhs_lifetime.IsDead()) {
-      S.Diag(expr->getExprLoc(), diag::warn_read_dead)
-          << std::string(rhs_lifetime.GetNumIndirections(), '*')
-          << expr->getSourceRange();
-      const auto &maybe_stmts = rhs_lifetime.GetStmts(DEAD);
-      if (maybe_stmts.has_value()) {
-        const auto &stmts = maybe_stmts.value();
-        for (const auto &stmt : stmts) {
-          if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(stmt)) {
-            const auto *call_decl = call_expr->getCalleeDecl();
-            S.Diag(call_expr->getBeginLoc(), diag::note_lifetime_declared_here)
-                << GenerateLifetimeName(DEAD, rhs_lifetime.GetNumIndirections())
-                << call_expr->getSourceRange();
-            S.Diag(call_decl->getBeginLoc(), diag::note_param_lifetime_local)
-                << GenerateLifetimeName(DEAD, rhs_lifetime.GetNumIndirections())
-                << call_decl->getSourceRange();
-          }
-        }
       }
     } else if (lhs_lifetime.IsSet() && rhs_lifetime < lhs_lifetime) {
       factory(lhs_var_decl, rhs_var_decl, op, expr, stmt, lhs_lifetime,
@@ -603,6 +561,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   const auto &rhs = op->getRHS()->IgnoreParens();
+  Visit(rhs);
 
   VerifyBinAssign(lhs, rhs, lhs, op, lhs_points_to);
   for (const auto &expr : lhs_points_to) {
@@ -624,6 +583,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     const auto &params_info_vec = func_info.GetParamsInfo();
 
     unsigned int num_args = call->getNumArgs();
+    for (unsigned int idx = 0; idx < num_args; idx++) {
+      Visit(const_cast<clang::Expr *>(call->getArg(idx)));
+    }
 
     llvm::SmallVector<ParamInfo> params_set;
     params_set.resize(num_args);
@@ -793,6 +755,55 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
   return std::nullopt;
 }
 
+std::optional<std::string> LifetimesCheckerVisitor::VisitDeclRefExpr(
+    const clang::DeclRefExpr *decl_ref) {
+  if (debugEnabled) debugLifetimes("[VisitDeclRefExpr]");
+
+  auto *decl = decl_ref->getDecl();
+  if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
+    ObjectLifetimes &lifetimes = State.GetObjectLifetimes(var_decl);
+    for (auto &lifetime : lifetimes.GetLifetimes()) {
+      if (lifetime.IsDead()) {
+        const auto &maybe_stmts = lifetime.GetStmts(DEAD);
+        if (maybe_stmts.has_value()) {
+          const auto &stmts = maybe_stmts.value();
+          const auto *stmt = *stmts.begin();
+          if (stmts.size() == 1) {
+            if (const auto *call_expr =
+                    clang::dyn_cast<clang::CallExpr>(stmt)) {
+              if (PointsTo.HasCallExprPointsTo(call_expr, decl_ref)) {
+                continue;
+              }
+            }
+          }
+          S.Diag(decl_ref->getExprLoc(), diag::warn_read_dead)
+              << std::string(lifetime.GetNumIndirections(), '*')
+              << decl_ref->getSourceRange();
+
+          for (const auto &stmt : stmts) {
+            if (const auto *call_expr =
+                    clang::dyn_cast<clang::CallExpr>(stmt)) {
+              if (PointsTo.HasCallExprPointsTo(call_expr, decl_ref)) {
+                continue;
+              }
+              const auto *call_decl = call_expr->getCalleeDecl();
+              S.Diag(call_expr->getBeginLoc(),
+                     diag::note_lifetime_declared_here)
+                  << GenerateLifetimeName(DEAD, lifetime.GetNumIndirections())
+                  << call_expr->getSourceRange();
+              S.Diag(call_decl->getBeginLoc(), diag::note_param_lifetime_local)
+                  << GenerateLifetimeName(LOCAL, lifetime.GetNumIndirections())
+                  << call_decl->getSourceRange();
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return std::nullopt;
+}
+
 std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
     const clang::DeclStmt *decl_stmt) {
   if (debugEnabled) debugLifetimes("[VisitDeclStmt]");
@@ -813,6 +824,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
         return std::nullopt;
 
       const auto *init = var_decl->getInit()->IgnoreParens();
+      Visit(const_cast<clang::Expr *>(init));
       const auto &init_points_to = PointsTo.GetExprPointsTo(init);
 
       // TODO remove this
@@ -840,6 +852,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
 std::optional<std::string> LifetimesCheckerVisitor::VisitExpr(
     const clang::Expr *expr) {
   if (debugEnabled) debugLifetimes("[VisitExpr]");
+  for (const auto &child : expr->children()) {
+    if (child == nullptr) continue;
+    Visit(const_cast<clang::Stmt *>(child));
+  }
   return std::nullopt;
 }
 

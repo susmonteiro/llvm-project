@@ -100,23 +100,26 @@ class Lifetime {
   static std::string GetLifetimeName(char id);
   std::string GetLifetimeName() const { return GetLifetimeName(Id); }
 
-  static StmtDenseSet *GetAndResizePossibleLifetime(
+  StmtDenseSet GetPossibleLifetime(char id) const { return PossibleLifetimes[id]; }
+
+  static StmtDenseSet &GetPossibleLifetime(
       char id, LifetimesVector &possible_lifetimes) {
-    ResizePossibleLifetimes(id, possible_lifetimes);
-    return &possible_lifetimes[id];
+    return possible_lifetimes[id];
   }
 
-  StmtDenseSet *GetPossibleLifetime(char id) {
-    return GetPossibleLifetime(id, PossibleLifetimes);
+  StmtDenseSet &GetAndResizePossibleLifetime(char id) {
+    if ((unsigned int)id >= PossibleLifetimes.size()) {
+      PossibleLifetimes.resize(id + 1);
+    }
+    return PossibleLifetimes[id];
   }
 
-  static StmtDenseSet *GetPossibleLifetime(
+  static StmtDenseSet &GetAndResizePossibleLifetime(
       char id, LifetimesVector &possible_lifetimes) {
-    return &possible_lifetimes[id];
-  }
-
-  StmtDenseSet *GetAndResizePossibleLifetime(char id) {
-    return GetPossibleLifetime(id, PossibleLifetimes);
+    if ((unsigned int)id >= possible_lifetimes.size()) {
+      possible_lifetimes.resize(id + 1);
+    }
+    return possible_lifetimes[id];
   }
 
   const LifetimesVector &GetPossibleLifetimes() const {
@@ -127,16 +130,9 @@ class Lifetime {
 
   std::optional<StmtDenseSet> GetStmts(char id);
 
-  static void ResizePossibleLifetimes(char id,
-                                      LifetimesVector &possible_lifetimes) {
-    if ((unsigned int)id >= possible_lifetimes.size())
-      possible_lifetimes.resize(id + 1);
-  }
-
   static void InsertPossibleLifetimes(char id, const clang::Stmt *stmt,
                                       LifetimesVector &possible_lifetimes) {
-    Lifetime::GetAndResizePossibleLifetime(id, possible_lifetimes)
-        ->insert(stmt);
+    Lifetime::GetAndResizePossibleLifetime(id, possible_lifetimes).insert(stmt);
   }
 
   void InsertPossibleLifetimes(char id, const clang::Stmt *stmt) {
@@ -147,9 +143,9 @@ class Lifetime {
     if (possible_lifetimes.size() > PossibleLifetimes.size())
       PossibleLifetimes.resize(possible_lifetimes.size());
     for (unsigned int i = 0; i < possible_lifetimes.size(); i++) {
-      GetPossibleLifetime(i)->insert(
-          GetPossibleLifetime(i, possible_lifetimes)->begin(),
-          GetPossibleLifetime(i, possible_lifetimes)->end());
+      PossibleLifetimes[i].insert(
+          GetPossibleLifetime(i, possible_lifetimes).begin(),
+          GetPossibleLifetime(i, possible_lifetimes).end());
     }
   }
 
@@ -157,9 +153,7 @@ class Lifetime {
     PossibleLifetimes = possible_lifetimes;
   }
 
-  void RemoveFromPossibleLifetimes(char id) {
-    GetPossibleLifetime(id)->clear();
-  }
+  void RemoveFromPossibleLifetimes(char id) { PossibleLifetimes[id].clear(); }
 
   bool ContainsShortestLifetime(unsigned int id) const {
     return is_in_shortest(ShortestLifetimes, id);

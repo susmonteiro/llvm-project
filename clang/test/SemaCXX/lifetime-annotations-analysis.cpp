@@ -856,3 +856,27 @@ int **return_local4() {
   return p; // expected-warning {{cannot return data with lifetime '**$local'}} \
             // expected-note@-1 {{declared with lifetime '**$local' here}}
 }
+
+int *$a dead1(int *$a x, int **y);
+void dead2(int *$a *$b x);
+
+int *$a dead_lifetimes(int *$a x, int *$b *$a y) {
+    int *p = dead1(x, y); 
+    int **q = y;  // expected-warning {{cannot read data with lifetime '*$dead'}} \
+                  // expected-note@-1 {{declared with lifetime '*$dead' here}} \
+                  // expected-note@-5 {{parameter was declared with lifetime '*$local'}}
+    dead2(y);     // expected-warning {{cannot read data with lifetime '*$dead'}} \
+                  // expected-note@-4 {{declared with lifetime '*$dead' here}} \
+                  // expected-note@-8 {{parameter was declared with lifetime '*$local'}}
+    return *q;
+}
+
+void dead4(int **x);
+void dead5(int *$a x, int *$b *$a y) {
+    int *p = dead1(x, y); // expected-warning {{cannot read data with lifetime '*$dead'}} \
+                  // expected-note@+3 {{declared with lifetime '*$dead' here}} \
+                  // expected-note@-2 {{parameter was declared with lifetime '*$local'}}
+    dead4(y);     // expected-warning {{cannot read data with lifetime '*$dead'}} \
+                  // expected-note@-3 {{declared with lifetime '*$dead' here}} \
+                  // expected-note@-19 {{parameter was declared with lifetime '*$local'}}
+}

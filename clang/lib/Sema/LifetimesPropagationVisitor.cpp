@@ -241,6 +241,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     for (unsigned int arg_idx = 0; arg_idx < func_info.GetNumParams(); arg_idx++) {
       const auto *arg = call->getArg(arg_idx)->IgnoreParens();
       Visit(const_cast<clang::Expr *>(arg));
+      PointsTo.InsertCallExprPointsTo(call, arg);
       const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
 
       unsigned int num_indirections =
@@ -267,8 +268,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
           continue;
         }
         const Expr *arg = call->getArg(i)->IgnoreParens();
-        // TODO remove this
-        Visit(const_cast<clang::Expr *>(arg));
         clang::QualType found_type = PointsTo.GetExprType(arg);
         if (!found_type.isNull()) {
           PointsTo.InsertExprType(arg, found_type);
@@ -301,8 +300,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
             continue;
           }
           const Expr *arg = call->getArg(i)->IgnoreParens();
-          // TODO remove this
-          Visit(const_cast<clang::Expr *>(arg));
           ObjectLifetimes &param_ol = func_info.GetParamLifetime(param);
           for (Lifetime &param_lifetime : param_ol.GetLifetimes()) {
             // TODO == or contains?

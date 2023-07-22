@@ -64,7 +64,6 @@ bool Lifetime::ContainsDead() const {
          !PossibleLifetimes[DEAD].empty();
 }
 
-
 void Lifetime::SetStatic() { Id = STATIC; }
 void Lifetime::SetLocal() { Id = LOCAL; }
 void Lifetime::SetDead() { Id = DEAD; }
@@ -232,7 +231,9 @@ bool Lifetime::operator==(const Lifetime &Other) const {
 
 bool Lifetime::operator!=(const Lifetime &Other) const {
   if (IsDead() && Other.IsDead()) {
-    // TODO check if stmts are the same
+    // TODO delete this
+    assert(true && "Should not reach this");
+    return GetPossibleLifetime(DEAD) == Other.GetPossibleLifetime(DEAD);
   }
   return !operator==(Other);
 }
@@ -240,7 +241,17 @@ bool Lifetime::operator!=(const Lifetime &Other) const {
 bool Lifetime::operator<(const Lifetime &Other) const {
   // $static outlives all lifetimes and all lifetimes outlive $local
   if (IsDead() && Other.IsDead()) {
-    // TODO check stmts
+    // TODO delete this
+    const auto &this_possible_lifetime = GetPossibleLifetime(DEAD);
+    const auto &other_possible_lifetime = Other.GetPossibleLifetime(DEAD);
+    if (this_possible_lifetime.size() < other_possible_lifetime.size()) {
+      return false;
+    }
+    for (const auto *stmt : this_possible_lifetime) {
+      if (other_possible_lifetime.find(stmt) == other_possible_lifetime.end())
+        return true;
+    }
+    return false;
   } else if (IsDead() || Other.IsDead()) {
     return IsDead();
   }
