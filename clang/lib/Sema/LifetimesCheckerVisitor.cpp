@@ -578,7 +578,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
-    // debugInfo(direct_callee->getNameAsString());
+    debugInfo(direct_callee->getNameAsString());
     auto it = FuncInfo.find(direct_callee);
     // TODO remove this assert
     assert(it != FuncInfo.end());

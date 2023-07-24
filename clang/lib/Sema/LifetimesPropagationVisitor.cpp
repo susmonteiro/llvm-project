@@ -182,7 +182,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
 
   Visit(rhs);
   PointsTo.InsertExprPointsTo(op, rhs);
-  PointsTo.InsertExprDecl(op, rhs);
+  // PointsTo.InsertExprDecl(op, rhs);
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
 
@@ -325,7 +325,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
   switch (cast->getCastKind()) {
     case clang::CK_LValueToRValue: {
       // TODO
-      // debugLight("> Case LValueToRValue");
+      debugLight("> Case LValueToRValue");
       // if (cast->getType()->isPointerType()) {
       // Converting from a glvalue to a prvalue means that we need to
       // perform a dereferencing operation because the objects associated
@@ -361,7 +361,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     }
     case clang::CK_NullToPointer: {
       // TODO
-      // debugLight("> Case NullToPointer");
+      debugLight("> Case NullToPointer");
 
       // PointsTo.SetExprObjectSet(cast, {});
       // break;
@@ -374,23 +374,23 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
       // CXXMemberCallExpr that is a subexpression of this CastExpr. The
       // CK_UserDefinedConversion is just used to mark the fact that this is a
       // user-defined conversion; it's therefore a no-op for our purposes.
-    case clang::CK_NoOp: {
-      // TODO
-      // debugLight("> Case No-ops");
+      {
+        // TODO
+        debugLight("> Case FunctionToPointerDecay");
 
-      // clang::QualType type = cast->getType().getCanonicalType();
-      // if (type->isPointerType() || cast->isGLValue()) {
-      //   PointsTo.SetExprObjectSet(
-      //       cast, PointsTo.GetExprObjectSet(cast->getSubExpr()));
-      // }
-      break;
-    }
+        // clang::QualType type = cast->getType().getCanonicalType();
+        // if (type->isPointerType() || cast->isGLValue()) {
+        //   PointsTo.SetExprObjectSet(
+        //       cast, PointsTo.GetExprObjectSet(cast->getSubExpr()));
+        // }
+        break;
+      }
     case clang::CK_DerivedToBase:
     case clang::CK_UncheckedDerivedToBase:
     case clang::CK_BaseToDerived:
     case clang::CK_Dynamic: {
       // TODO
-      // debugLight("> Case SubExpressions");
+      debugLight("> Case SubExpressions");
 
       // These need to be mapped to what the subexpr points to.
       // (Simple cases just work okay with this; may need to be revisited when
@@ -405,10 +405,12 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     case clang::CK_LValueBitCast:
     case clang::CK_IntegralCast:
     case clang::CK_ArrayToPointerDecay:
-    case clang::CK_IntegralToPointer: {
-      // We don't support analyzing functions that perform a reinterpret_cast.
+    case clang::CK_IntegralToPointer:
+    case clang::CK_NoOp:
+    case clang::CK_ToVoid:
+    case clang::CK_IntegralToFloating: {
+      debugLight("> Case Reinterpret cast");
 
-      // TODO
       for (const auto *child : cast->children()) {
         Visit(const_cast<clang::Stmt *>(child));
         if (!cast->getType()->isPointerType() &&
@@ -426,18 +428,12 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
           }
         }
       }
-      // debugLight("> Case Reinterpret cast");
 
-      // diag_reporter_(
-      //     Func->getBeginLoc(),
-      //     "cannot infer lifetimes because function uses a type-unsafe
-      //     cast", clang::DiagnosticIDs::Warning);
-      // diag_reporter_(cast->getBeginLoc(), "type-unsafe cast occurs here",
-      //                clang::DiagnosticIDs::Note);
-      // return "type-unsafe cast prevents analysis";
       break;
     }
     default: {
+      debugLight("> Case Unknown cast");
+      cast->dump();
       if (cast->isGLValue() ||
           cast->getType().getCanonicalType()->isPointerType()) {
         llvm::errs() << "Unknown cast type:\n";
@@ -481,6 +477,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclRefExpr(
 
   PointsTo.InsertExprPointsTo(decl_ref, nullptr);
   if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
+    State.CreateVariableIfNotFound(var_decl);
     PointsTo.InsertExprDecl(decl_ref, var_decl);
   }
   return std::nullopt;
@@ -496,7 +493,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
 
       ObjectLifetimes objectLifetimes;
       if (var_decl->isStaticLocal()) {
-        unsigned int num_indirections = Lifetime::GetNumIndirections(lhs_type);
+        unsigned int num_indirections = Lifetime::GetNumIndirections(lhs_type) + 1;
         while (num_indirections > 0) {
           objectLifetimes.InsertPointeeObject(
               Lifetime(STATIC, num_indirections--));
@@ -544,10 +541,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
 
   const clang::Expr *base = member_expr->getBase();
   Visit(const_cast<clang::Expr *>(base));
+  // debugLifetimes("After visit");
   // TODO check if this works from struct->struct->field
   // TODO
   auto &points_to = PointsTo.GetExprDecls(base);
-  if (points_to.size() > 1) debugWarn("More than one decl in MemberExpr");
+  if (points_to.size() > 1) {
+    assert(true && "More than one decl in MemberExpr");
+  }
 
   // TODO delete this
   bool has_func_call = false;
@@ -580,13 +580,16 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitReturnStmt(
   if (debugEnabled) debugLifetimes("[VisitReturnStmt]");
 
   const auto *return_value = return_stmt->getRetValue();
-  clang::QualType return_type = Func->getReturnType().IgnoreParens();
-  if (return_value == nullptr || !return_type->isPointerType() ||
-      return_type->isReferenceType()) {
+  if (return_value == nullptr) {
     return std::nullopt;
   }
 
   Visit(const_cast<clang::Expr *>(return_value));
+  clang::QualType return_type = Func->getReturnType().IgnoreParens();
+  if (!return_type->isPointerType() || return_type->isReferenceType()) {
+    return std::nullopt;
+  }
+
   if (clang::isa<clang::CastExpr>(return_value)) {
     for (const auto &child : return_value->children()) {
       if (child == nullptr) continue;
@@ -623,7 +626,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
   }
 
   for (const auto *decl : PointsTo.GetExprDecls(op)) {
-    if (decl->isStaticLocal()) {
+    if (decl->isStaticLocal() || decl->isDefinedOutsideFunctionOrMethod()) {
       PointsTo.InsertExprLifetime(op, STATIC);
       return std::nullopt;
     }
