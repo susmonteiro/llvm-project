@@ -62,6 +62,7 @@ class LifetimeAnnotationsAnalysis {
                                unsigned int num_indirections);
   Lifetime &GetReturnLifetime(clang::QualType &type);
   Lifetime &GetReturnLifetime(unsigned int num_indirections);
+  Lifetime &GetReturnLifetimeOrLocal(unsigned int num_indirections);
 
   bool IsLifetimeNotset(const clang::VarDecl *var_decl, clang::QualType &type);
   bool IsLifetimeNotset(const clang::VarDecl *var_decl,

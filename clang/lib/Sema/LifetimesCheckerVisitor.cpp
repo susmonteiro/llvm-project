@@ -369,7 +369,7 @@ void LifetimesCheckerVisitor::CallExprChecker(
     clang::TypeToSet &call_info, PrintNotesFactory factory) const {
   while (lhs_num_indirections > 0) {
     Lifetime &lhs_lifetime =
-        is_return ? State.GetReturnLifetime(lhs_num_indirections)
+        is_return ? State.GetReturnLifetimeOrLocal(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
     auto &current_type_call_info = call_info[lhs_num_indirections];
     if (current_type_call_info.is_local) {
@@ -414,7 +414,7 @@ void LifetimesCheckerVisitor::DeclChecker(
   char id = PointsTo.GetExprLifetime(expr);
   if (id != NOTSET) {
     Lifetime &lhs_lifetime =
-        is_return ? State.GetReturnLifetime(lhs_num_indirections)
+        is_return ? State.GetReturnLifetimeOrLocal(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
     Lifetime rhs_lifetime = Lifetime(id, rhs_num_indirections);
     if (is_return && rhs_lifetime.IsLocal()) {
@@ -444,7 +444,7 @@ void LifetimesCheckerVisitor::DeclChecker(
 
   while (lhs_num_indirections > 0 && rhs_num_indirections > 0) {
     Lifetime &lhs_lifetime =
-        is_return ? State.GetReturnLifetime(lhs_num_indirections)
+        is_return ? State.GetReturnLifetimeOrLocal(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
     Lifetime rhs_lifetime =
         State.GetLifetimeOrLocal(rhs_var_decl, rhs_num_indirections);
@@ -586,7 +586,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     auto &func_info = it->second;
     const auto &params_info_vec = func_info.GetParamsInfo();
 
-    unsigned int num_args = call->getNumArgs();
+    unsigned int num_args = func_info.GetNumParams();
     for (unsigned int idx = 0; idx < num_args; idx++) {
       Visit(const_cast<clang::Expr *>(call->getArg(idx)));
     }

@@ -240,7 +240,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     // * process args
 
-    for (unsigned int arg_idx = 0; arg_idx < call->getNumArgs(); arg_idx++) {
+    for (unsigned int arg_idx = 0; arg_idx < func_info.GetNumParams(); arg_idx++) {
       const auto *arg = call->getArg(arg_idx);
       Visit(const_cast<clang::Expr *>(arg));
       PointsTo.InsertCallExprPointsTo(call, arg);

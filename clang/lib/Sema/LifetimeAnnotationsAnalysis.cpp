@@ -83,6 +83,16 @@ Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetime(
   return ReturnLifetime.GetLifetime(num_indirections);
 }
 
+Lifetime &LifetimeAnnotationsAnalysis::GetReturnLifetimeOrLocal(
+    unsigned int num_indirections) {
+  Lifetime &return_lifetime = ReturnLifetime.GetLifetime(num_indirections);
+  if (return_lifetime.IsNotSet()) {
+    // no annotation, so return $local
+    return_lifetime = Lifetime(LOCAL, num_indirections);
+  }
+  return return_lifetime;
+}
+
 bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
     const clang::VarDecl *var_decl, clang::QualType &type) {
   return IsLifetimeNotset(var_decl, Lifetime::GetNumIndirections(type));
