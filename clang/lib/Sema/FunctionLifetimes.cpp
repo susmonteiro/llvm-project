@@ -213,9 +213,6 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
     clang::QualType qualtype, clang::TypeLoc type_loc,
     LifetimeFactory lifetime_factory) {
   assert(!qualtype.isNull());
-  if (type_loc) {
-    assert(SameType(type_loc.getType(), qualtype));
-  }
 
   qualtype = qualtype.IgnoreParens();
   qualtype = StripAttributes(qualtype);
