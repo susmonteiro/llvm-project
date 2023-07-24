@@ -11841,5 +11841,7 @@ def note_lifetime_of : Note<
   "lifetime is '%0'">;
 def note_lifetime_declared_here : Note<
   "declared with lifetime '%0' here">;
+def note_return_value_not_annotated : Note<
+  "the return value has no lifetime annotation">;
 
 } // end of sema component.

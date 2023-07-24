@@ -225,6 +225,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
+    // debugInfo(direct_callee->getNameAsString());
     PointsTo.InsertExprPointsTo(call, nullptr);
 
     clang::QualType func_type = direct_callee->getReturnType().IgnoreParens();
@@ -238,16 +239,17 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     auto &func_info = all_func_info[direct_callee];
 
     // * process args
-    for (unsigned int arg_idx = 0; arg_idx < func_info.GetNumParams(); arg_idx++) {
-      const auto *arg = call->getArg(arg_idx)->IgnoreParens();
+
+    for (unsigned int arg_idx = 0; arg_idx < call->getNumArgs(); arg_idx++) {
+      const auto *arg = call->getArg(arg_idx);
       Visit(const_cast<clang::Expr *>(arg));
       PointsTo.InsertCallExprPointsTo(call, arg);
       const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
 
-      unsigned int num_indirections =
-          Lifetime::GetNumIndirections(arg->getType());
+      int num_indirections = Lifetime::GetNumIndirections(arg->getType());
       while (--num_indirections > 0) {
-        Lifetime &param_lifetime = func_info.GetParamLifetime(arg_idx, num_indirections);
+        Lifetime &param_lifetime =
+            func_info.GetParamLifetime(arg_idx, num_indirections);
         if (param_lifetime.IsLocal()) {
           TransferDeadLifetime(arg, call, num_indirections, PointsTo, State);
           for (const auto &expr : arg_points_to) {
@@ -401,6 +403,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     }
     case clang::CK_BitCast:
     case clang::CK_LValueBitCast:
+    case clang::CK_IntegralCast:
     case clang::CK_IntegralToPointer: {
       // We don't support analyzing functions that perform a reinterpret_cast.
 
