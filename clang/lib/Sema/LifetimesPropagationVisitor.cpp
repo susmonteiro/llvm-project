@@ -240,7 +240,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     // * process args
 
-    for (unsigned int arg_idx = 0; arg_idx < func_info.GetNumParams(); arg_idx++) {
+    for (unsigned int arg_idx = 0; arg_idx < func_info.GetNumParams();
+         arg_idx++) {
       const auto *arg = call->getArg(arg_idx);
       Visit(const_cast<clang::Expr *>(arg));
       PointsTo.InsertCallExprPointsTo(call, arg);
@@ -368,7 +369,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     // These casts are just no-ops from a Object point of view.
     case clang::CK_FunctionToPointerDecay:
     case clang::CK_BuiltinFnToFnPtr:
-    case clang::CK_ArrayToPointerDecay:
     case clang::CK_UserDefinedConversion:
       // Note on CK_UserDefinedConversion: The actual conversion happens in a
       // CXXMemberCallExpr that is a subexpression of this CastExpr. The
@@ -404,6 +404,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     case clang::CK_BitCast:
     case clang::CK_LValueBitCast:
     case clang::CK_IntegralCast:
+    case clang::CK_ArrayToPointerDecay:
     case clang::CK_IntegralToPointer: {
       // We don't support analyzing functions that perform a reinterpret_cast.
 
