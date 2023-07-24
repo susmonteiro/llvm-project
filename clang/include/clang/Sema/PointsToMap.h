@@ -105,8 +105,10 @@ class PointsToMap {
     return CallExprToInfo[expr];
   }
 
-  bool HasCallExprPointsTo(const clang::CallExpr* parent, const clang::Expr* child) {
-    return CallExprPointsTo[parent].find(child) != CallExprPointsTo[parent].end();
+  bool HasCallExprPointsTo(const clang::CallExpr* parent,
+                           const clang::Expr* child) {
+    return CallExprPointsTo[parent].find(child) !=
+           CallExprPointsTo[parent].end();
   }
 
   bool HasExprDecl(const clang::Expr* expr, const clang::VarDecl* decl) {
@@ -128,11 +130,13 @@ class PointsToMap {
     ExprPointsTo[parent].insert(child_points_to.begin(), child_points_to.end());
   }
 
-  void InsertCallExprPointsTo(const clang::CallExpr* parent, const clang::Expr* child) {
+  void InsertCallExprPointsTo(const clang::CallExpr* parent,
+                              const clang::Expr* child) {
     CallExprPointsTo[parent].insert(child);
     const auto child_points_to = ExprPointsTo[child];
     // propagate points-to
-    CallExprPointsTo[parent].insert(child_points_to.begin(), child_points_to.end());
+    CallExprPointsTo[parent].insert(child_points_to.begin(),
+                                    child_points_to.end());
   }
 
   void InsertExprDecl(const clang::Expr* expr, const clang::VarDecl* decl) {
@@ -160,8 +164,13 @@ class PointsToMap {
     }
   }
 
-  void InsertCallExprInfo(const clang::Expr* parent, const clang::Expr* child) {
-    CallExprToInfo[parent] = CallExprToInfo[child];
+  bool InsertCallExprInfo(const clang::Expr* parent, const clang::Expr* child) {
+    auto it = CallExprToInfo.find(parent);
+    if (it != CallExprToInfo.end()) {
+      it->second = CallExprToInfo[child];
+      return true;
+    }
+    return false;
   }
 
  private:
