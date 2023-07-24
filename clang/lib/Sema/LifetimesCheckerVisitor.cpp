@@ -254,6 +254,8 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
       lhs_type =
           lhs_type.isNull() ? deref_op->getType().getCanonicalType() : lhs_type;
       Lifetime &lhs_lifetime = State.GetLifetime(lhs_var_decl, lhs_type);
+      if (lhs_lifetime.IsDead()) continue;
+
       for (const auto &expr : rhs_points_to) {
         if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) continue;
         const auto *rhs_decl_ref_expr =
@@ -269,7 +271,8 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
           Lifetime rhs_lifetime =
               id != NOTSET ? Lifetime(id, rhs_type)
                            : State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
-          unsigned int i = DEAD - 1;
+          if (rhs_lifetime.IsDead()) continue;
+          unsigned int i = LOCAL - 1;
           unsigned int lhs_possible_lifetimes_size =
               lhs_lifetime.GetPossibleLifetimes().size();
           while (++i < lhs_possible_lifetimes_size) {
@@ -376,8 +379,10 @@ void LifetimesCheckerVisitor::CallExprChecker(
       if (is_return) {
         S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
             << std::string(rhs_num_indirections, '*') << expr->getSourceRange();
-        const auto *func_decl = current_type_call_info.call_expr->getDirectCallee();
-        S.Diag(func_decl->getLocation(), diag::note_return_value_not_annotated) << func_decl->getSourceRange();
+        const auto *func_decl =
+            current_type_call_info.call_expr->getDirectCallee();
+        S.Diag(func_decl->getLocation(), diag::note_return_value_not_annotated)
+            << func_decl->getSourceRange();
       } else {
         Lifetime arg_lifetime(LOCAL);
         if (arg_lifetime < lhs_lifetime) {
