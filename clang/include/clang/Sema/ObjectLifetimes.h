@@ -17,6 +17,13 @@ class ObjectLifetimes {
     InsertPointeeObject(Lifetime(LOCAL, 0));
     InsertPointeeObject(lifetime);
   }
+  ObjectLifetimes(bool is_static, unsigned int num_indirections)
+      : IsStatic(is_static) {
+    assert(is_static);
+    while (num_indirections > 0) {
+      InsertPointeeObject(Lifetime(STATIC, --num_indirections));
+    }
+  }
 
   Lifetime& GetLifetime(unsigned int num_indirections, char id) {
     if (num_indirections >= PointeeObjects.size()) {
@@ -72,7 +79,12 @@ class ObjectLifetimes {
     if (num_indirections >= PointeeObjects.size()) {
       PointeeObjects.resize(num_indirections + 1);
     }
-    PointeeObjects[num_indirections] = lifetime;
+    if (IsStatic) {
+      PointeeObjects[num_indirections] = Lifetime(STATIC, num_indirections);
+
+    } else {
+      PointeeObjects[num_indirections] = lifetime;
+    }
     return PointeeObjects[num_indirections];
   }
 
@@ -81,7 +93,11 @@ class ObjectLifetimes {
     if (num_indirections >= PointeeObjects.size()) {
       PointeeObjects.resize(num_indirections + 1);
     }
-    PointeeObjects[num_indirections] = Lifetime(NOTSET, type);
+    if (IsStatic) {
+      PointeeObjects[num_indirections] = Lifetime(STATIC, num_indirections);
+    } else {
+      PointeeObjects[num_indirections] = Lifetime(NOTSET, type);
+    }
     return PointeeObjects[num_indirections];
   }
 
@@ -95,6 +111,7 @@ class ObjectLifetimes {
 
  private:
   llvm::SmallVector<Lifetime> PointeeObjects;
+  bool IsStatic = false;
 };
 }  // namespace clang
 

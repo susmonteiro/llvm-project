@@ -72,7 +72,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
                 const clang::Stmt *stmt, clang::Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
     assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr && op != nullptr);
-    assert(lhs_lifetime.IsSet());
+    assert(lhs_lifetime.IsSet() && "BinAssignFactory");
     if (rhs_lifetime.IsNotSet()) {
       unsigned int possible_lifetimes_size =
           rhs_lifetime.GetPossibleLifetimes().size();
@@ -106,7 +106,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
                 const clang::Stmt *stmt, Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
     assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr);
-    assert(lhs_lifetime.IsSet());
+    assert(lhs_lifetime.IsSet() && "DeclStmtFactory");
     if (rhs_lifetime.IsNotSet()) {
       unsigned int init_possible_lifetimes_size =
           rhs_lifetime.GetPossibleLifetimes().size();
@@ -370,10 +370,12 @@ void LifetimesCheckerVisitor::CallExprChecker(
     const clang::Expr *expr, unsigned int rhs_num_indirections,
     const clang::Stmt *stmt, const clang::BinaryOperator *op, bool is_return,
     clang::TypeToSet &call_info, PrintNotesFactory factory) const {
+  debugInfo("CallExprChecker");
   while (lhs_num_indirections > 0) {
     Lifetime &lhs_lifetime =
         is_return ? State.GetReturnLifetimeOrLocal(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
+    debugLifetimes("LHS lifetime", lhs_lifetime.DebugString());
     auto &current_type_call_info = call_info[lhs_num_indirections];
     if (current_type_call_info.is_local) {
       if (is_return) {
@@ -385,7 +387,7 @@ void LifetimesCheckerVisitor::CallExprChecker(
             << func_decl->getSourceRange();
       } else {
         Lifetime arg_lifetime(LOCAL);
-        if (arg_lifetime < lhs_lifetime) {
+        if (lhs_lifetime.IsSet() && arg_lifetime < lhs_lifetime) {
           factory(lhs_var_decl,
                   current_type_call_info.call_expr->getCalleeDecl(), op, expr,
                   stmt, lhs_lifetime, arg_lifetime);
@@ -393,19 +395,24 @@ void LifetimesCheckerVisitor::CallExprChecker(
       }
     }
 
-    for (const auto &[arg, arg_num_indiretions] : current_type_call_info.info) {
-      const auto &arg_points_to = PointsTo.GetExprDecls(arg);
-      for (const auto &decl : arg_points_to) {
-        char id = PointsTo.GetExprLifetime(arg);
-        Lifetime arg_lifetime =
-            id != NOTSET ? Lifetime(id, arg_num_indiretions)
-                         : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
-        if (arg_lifetime < lhs_lifetime) {
-          factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
-                  arg_lifetime);
+    if (lhs_lifetime.IsSet()) {
+      for (const auto &[arg, arg_num_indiretions] :
+           current_type_call_info.info) {
+        const auto &arg_points_to = PointsTo.GetExprDecls(arg);
+        for (const auto &decl : arg_points_to) {
+          char id = PointsTo.GetExprLifetime(arg);
+          Lifetime arg_lifetime =
+              id != NOTSET
+                  ? Lifetime(id, arg_num_indiretions)
+                  : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
+          if (arg_lifetime < lhs_lifetime) {
+            factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
+                    arg_lifetime);
+          }
         }
       }
     }
+
     lhs_num_indirections--;
   }
 }
@@ -416,6 +423,7 @@ void LifetimesCheckerVisitor::DeclChecker(
     unsigned int rhs_num_indirections, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
+  debugInfo("DeclChecker");
   char id = PointsTo.GetExprLifetime(expr);
   if (id != NOTSET) {
     Lifetime &lhs_lifetime =
@@ -485,6 +493,7 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     unsigned int rhs_num_indirections, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
+  debugInfo("CompareAndCheck");
   // debugLifetimes("LHS num_indirections", lhs_num_indirections);
   // debugLifetimes("RHS num_indirections", rhs_num_indirections);
   assert(lhs_num_indirections == rhs_num_indirections);
@@ -508,7 +517,8 @@ void LifetimesCheckerVisitor::CompareAndCheck(
                       rhs_num_indirections, stmt, op, is_return,
                       PointsTo.GetCallExprInfo(member_expr), factory);
     } else {
-      assert(true && "Should not reach here");
+      // TODO uncomment assert
+      assert(false && "Should not reach here");
     }
   } else if (const auto *rhs_decl_ref_expr =
                  clang::dyn_cast<clang::DeclRefExpr>(expr)) {
@@ -601,11 +611,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
     unsigned int num_indirections = params_info_vec.size();
 
-    while (num_indirections-- > 0) {
+    while (num_indirections-- > 1) {
+      debugLifetimes("Num indirections", num_indirections);
       llvm::SmallVector<llvm::SmallVector<ParamInfo>> param_lifetimes;
 
       // get lifetimes for the current indirection level
       for (const auto &param_info : params_set) {
+        debugLifetimes("Inside first loop");
         if (param_info.param == nullptr) continue;
         // TODO delete this (3 lines)
         assert(!param_info.type.isNull());
@@ -617,6 +629,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         assert(num_indirections == param_info.current_num_indirections);
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, num_indirections);
+        debugLifetimes("Param", param_info.param->getNameAsString());
+        debugLifetimes("Param lifetime", param_lifetime.DebugString());
         char lifetime_id = param_lifetime.GetId();
         if ((unsigned int)lifetime_id >= param_lifetimes.size()) {
           param_lifetimes.resize(lifetime_id + 1);
@@ -625,7 +639,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of higher indirections
+      debugLifetimes("Size of param_lifetimes", param_lifetimes.size());
       for (const auto &params : param_lifetimes) {
+        debugLifetimes("Size of params", params.size());
         if (params.size() < 2) continue;
 
         // param_lifetimes have ParamInfo sorted
@@ -715,6 +731,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // insert params for the next indirection level
+
       for (const auto &param_info : params_info_vec[num_indirections]) {
         assert(param_info.index < params_set.size());
         params_set[param_info.index] = param_info;
@@ -722,6 +739,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
       // check static params
       for (const auto &param_info : params_set) {
+        debugLifetimes("Checking static params");
         if (param_info.param == nullptr) continue;
         // TODO delete this
         assert(!param_info.type.isNull());

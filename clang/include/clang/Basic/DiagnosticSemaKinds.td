@@ -11822,7 +11822,6 @@ def warn_decl_lifetimes_differ : Warning<
   "initialization requires that '%1' outlives '%0'">;
 def warn_arg_lifetimes_differ : Warning<
   "argument requires that '%1' outlives '%0'">;
-  // here
 def warn_func_params_lifetimes_equal : Warning<
   "when calling function %0, the lifetimes of %1 and %2 should be the same">;
 def warn_func_params_lifetimes_shorter : Warning<
@@ -11835,6 +11834,7 @@ def warn_cannot_return_local : Warning<
   "cannot return data with lifetime '%0$local'">;
 def warn_read_dead : Warning<
   "cannot read data with lifetime '%0$dead'">;
+
 def note_param_lifetime_local : Note<
   "parameter was declared with lifetime '%0'">;
 def note_lifetime_of : Note<

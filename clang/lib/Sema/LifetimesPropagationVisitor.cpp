@@ -47,6 +47,29 @@ void TransferFuncCall(const clang::VarDecl *lhs,
   TransferFuncCall(lhs, lhs_type, func_type, call_info, loc, PointsTo, state);
 }
 
+void TransferDeadLifetime(const Expr *arg, const Stmt *loc,
+                          unsigned int num_indirections, PointsToMap &PointsTo,
+                          LifetimeAnnotationsAnalysis &state) {
+  if (arg == nullptr) return;
+  const clang::VarDecl *arg_decl;
+  if (clang::isa<clang::MemberExpr>(arg)) {
+    auto &points_to = PointsTo.GetExprDecls(arg);
+    // TODO delete this
+    assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
+    arg_decl = *points_to.begin();
+  } else if (const auto *arg_decl_ref_expr =
+                 dyn_cast<clang::DeclRefExpr>(arg)) {
+    if (!(arg_decl = dyn_cast<clang::VarDecl>(arg_decl_ref_expr->getDecl()))) {
+      return;
+    }
+  } else {
+    return;
+  }
+  Lifetime &arg_lifetime = state.GetLifetime(arg_decl, num_indirections);
+  arg_lifetime.SetDead();
+  arg_lifetime.InsertPossibleLifetimes(DEAD, loc);
+}
+
 void TransferMemberExpr(const clang::VarDecl *lhs,
                         const clang::MemberExpr *member_expr,
                         clang::QualType lhs_type, clang::QualType rhs_type,
@@ -62,7 +85,8 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
     auto &call_info = PointsTo.GetCallExprInfo(member_expr);
     TransferFuncCall(lhs, lhs_type, rhs_type, call_info, loc, PointsTo, state);
   } else {
-    assert(true && "Should not reach here");
+    // TODO uncomment assert
+    assert(false && "Should not reach here");
   }
 }
 
@@ -196,29 +220,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   }
 
   return std::nullopt;
-}
-
-void TransferDeadLifetime(const Expr *arg, const Stmt *loc,
-                          unsigned int num_indirections, PointsToMap &PointsTo,
-                          LifetimeAnnotationsAnalysis &state) {
-  if (arg == nullptr) return;
-  const clang::VarDecl *arg_decl;
-  if (clang::isa<clang::MemberExpr>(arg)) {
-    auto &points_to = PointsTo.GetExprDecls(arg);
-    // TODO delete this
-    assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
-    arg_decl = *points_to.begin();
-  } else if (const auto *arg_decl_ref_expr =
-                 dyn_cast<clang::DeclRefExpr>(arg)) {
-    if (!(arg_decl = dyn_cast<clang::VarDecl>(arg_decl_ref_expr->getDecl()))) {
-      return;
-    }
-  } else {
-    return;
-  }
-  Lifetime &arg_lifetime = state.GetLifetime(arg_decl, num_indirections);
-  arg_lifetime.SetDead();
-  arg_lifetime.InsertPossibleLifetimes(DEAD, loc);
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
@@ -439,11 +440,11 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
     }
     default: {
       debugLight("> Case Unknown cast");
-      cast->dump();
+      // cast->dump();
       if (cast->isGLValue() ||
           cast->getType().getCanonicalType()->isPointerType()) {
         llvm::errs() << "Unknown cast type:\n";
-        cast->dump();
+        // cast->dump();
         // No-noop casts of pointer types are not handled yet.
         llvm::report_fatal_error("unknown cast type encountered");
       }
@@ -499,14 +500,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
     if (const auto *var_decl = clang::dyn_cast<clang::VarDecl>(decl)) {
       clang::QualType lhs_type = var_decl->getType().getCanonicalType();
 
-      ObjectLifetimes objectLifetimes;
       if (var_decl->isStaticLocal()) {
-        unsigned int num_indirections =
-            Lifetime::GetNumIndirections(lhs_type) + 1;
-        while (num_indirections > 0) {
-          objectLifetimes.InsertPointeeObject(
-              Lifetime(STATIC, num_indirections--));
-        }
+        ObjectLifetimes objectLifetimes(
+            true, Lifetime::GetNumIndirections(lhs_type) + 2);
         State.CreateVariable(var_decl, objectLifetimes);
         return std::nullopt;
       }
@@ -515,7 +511,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         continue;
       }
 
-      objectLifetimes =
+      ObjectLifetimes objectLifetimes =
           State.GetVarDeclLifetime(var_decl, State.GetLifetimeFactory());
       State.CreateVariable(var_decl, objectLifetimes);
 
@@ -557,13 +553,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   auto &points_to = PointsTo.GetExprDecls(base);
   if (points_to.size() > 1) {
     assert(true && "More than one decl in MemberExpr");
+    assert(false && "More than one decl in MemberExpr");
   }
 
-  // TODO delete this
+  // TODO change this
   bool has_func_call = PointsTo.InsertCallExprInfo(member_expr, base);
+  // PointsTo.InsertCallExprInfo(member_expr, base);
 
-  // TODO uncomment this
-  // assert(points_to.size() == 1 || has_func_call);
+  // TODO uncomment assert
+  assert(points_to.size() == 1 || has_func_call);
 
   if (points_to.size() < 1) return std::nullopt;
   PointsTo.InsertExprDecl(member_expr, base);

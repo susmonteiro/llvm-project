@@ -113,29 +113,26 @@ bool LifetimeAnnotationsAnalysis::IsLifetimeNotset(
 
 void LifetimeAnnotationsAnalysis::CreateVariableIfNotFound(
     const clang::VarDecl *var_decl) {
-
   auto it = VariableLifetimes.find(var_decl);
   if (it == VariableLifetimes.end()) {
-    ObjectLifetimes ol;
-    if (var_decl->isStaticLocal() || var_decl->isDefinedOutsideFunctionOrMethod()) {
+    if (var_decl->isStaticLocal() ||
+        var_decl->isDefinedOutsideFunctionOrMethod()) {
       // TODO delete
       // debugLifetimes("Var decl is static", var_decl->getNameAsString());
       // var_decl->dump();
       // debugLifetimes("Var decl type", var_decl->getType().getAsString());
-      unsigned int num_indirections =
-          Lifetime::GetNumIndirections(var_decl->getType()) + 1;
       // debugLifetimes("Num indirections", num_indirections);
-      while (num_indirections > 0) {
-        ol.InsertPointeeObject(Lifetime(STATIC, num_indirections--));
-      }
+      ObjectLifetimes ol(true, Lifetime::GetNumIndirections(var_decl->getType()) + 2);
+      CreateVariable(var_decl, ol);
     } else {
       // TODO delete
       // debugLifetimes("Var decl is NOT static", var_decl->getNameAsString());
-      ol = GetVarDeclLifetime(var_decl, Factory);
+      ObjectLifetimes ol = GetVarDeclLifetime(var_decl, Factory);
+      CreateVariable(var_decl, ol);
     }
     // debugLifetimes("Created variable with lifetimes", ol.DebugString());
-    CreateVariable(var_decl, ol);
   }
+  debugLifetimes(DebugString());
 }
 
 void LifetimeAnnotationsAnalysis::CreateDependencySimple(
