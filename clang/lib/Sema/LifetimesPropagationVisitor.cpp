@@ -177,7 +177,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
   Visit(const_cast<clang::Expr *>(base));
   PointsTo.InsertExprPointsTo(expr, base);
   PointsTo.InsertExprDecl(expr, base);
+  debugLifetimes("Before insert call expr info (ArraySubscriptExpr)");
   PointsTo.InsertCallExprInfo(expr, base);
+  debugLifetimes("After insert call expr info (ArraySubscriptExpr)");
+
   clang::QualType found_type = PointsTo.GetExprType(base);
   if (!found_type.isNull()) {
     PointsTo.InsertExprType(expr, found_type);
@@ -206,11 +209,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   PointsTo.InsertExprPointsTo(op, lhs);
   PointsTo.InsertExprDecl(op, lhs);
   // TODO check if this is needed
+  debugLifetimes("Before insert call expr info (BinAssign lhs)");
   PointsTo.InsertCallExprInfo(op, lhs);
+  debugLifetimes("After insert call expr info (BinAssign lhs)");
 
   Visit(rhs);
   PointsTo.InsertExprPointsTo(op, rhs);
+  debugLifetimes("Before insert call expr info (BinAssign rhs)");
   PointsTo.InsertCallExprInfo(op, rhs);
+  debugLifetimes("After insert call expr info (BinAssign rhs)");
 
   const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
 
@@ -250,6 +257,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       const auto *arg = call->getArg(arg_idx);
       Visit(const_cast<clang::Expr *>(arg));
       PointsTo.InsertCallExprPointsTo(call, arg);
+
       const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
 
       int num_indirections = Lifetime::GetNumIndirections(arg->getType());
@@ -285,7 +293,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     }
 
     ObjectLifetimes return_ol = func_info.GetReturnLifetime();
+    debugInfo("Inserting call into CallExprInfo");
     auto &call_info = PointsTo.GetCallExprInfo(call);
+    debugLifetimes("Has call_info?", PointsTo.HasCallExprInfo(call));
     unsigned int func_num_indirections =
         Lifetime::GetNumIndirections(func_type);
     while (func_num_indirections > 0) {
@@ -356,7 +366,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
           PointsTo.InsertExprPointsTo(cast, child_expr);
           PointsTo.InsertExprDecl(cast, child_expr);
+          debugLifetimes("Before insert call expr info (DeclRef)");
           PointsTo.InsertCallExprInfo(cast, child_expr);
+          debugLifetimes("After insert call expr info (DeclRef)");
           clang::QualType found_type = PointsTo.GetExprType(child_expr);
           if (!found_type.isNull()) {
             PointsTo.InsertExprType(cast, found_type);
@@ -426,7 +438,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
         if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
           PointsTo.InsertExprPointsTo(cast, child_expr);
           PointsTo.InsertExprDecl(cast, child_expr);
+          debugLifetimes("Before insert call expr info (CastExpr)");
           PointsTo.InsertCallExprInfo(cast, child_expr);
+          debugLifetimes("After insert call expr info (CastExpr)");
+
           clang::QualType found_type = PointsTo.GetExprType(child_expr);
           if (!found_type.isNull()) {
             PointsTo.InsertExprType(cast, found_type);
@@ -463,8 +478,12 @@ LifetimesPropagationVisitor::VisitConditionalOperator(
   Visit(const_cast<clang::Expr *>(false_expr));
   PointsTo.InsertExprPointsTo(op, true_expr);
   PointsTo.InsertExprPointsTo(op, false_expr);
+  debugLifetimes("Before insert call expr info (ConditionalOperator true)");
   PointsTo.InsertCallExprInfo(op, true_expr);
+  debugLifetimes("After insert call expr info (ConditionalOperator true)");
+  debugLifetimes("Before insert call expr info (ConditionalOperator false)");
   PointsTo.InsertCallExprInfo(op, false_expr);
+  debugLifetimes("After insert call expr info (ConditionalOperator false)");
   PointsTo.InsertExprDecl(op, true_expr);
   PointsTo.InsertExprDecl(op, false_expr);
   return std::nullopt;
@@ -535,7 +554,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitExpr(
     if (const auto *child_expr = clang::dyn_cast<clang::Expr>(child)) {
       PointsTo.InsertExprPointsTo(expr, child_expr);
       PointsTo.InsertExprDecl(expr, child_expr);
+      debugLifetimes("Before insert call expr info (Expr)");
       PointsTo.InsertCallExprInfo(expr, child_expr);
+      debugLifetimes("After insert call expr info (Expr)");
     }
   }
   return std::nullopt;
@@ -552,12 +573,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   // TODO
   auto &points_to = PointsTo.GetExprDecls(base);
   if (points_to.size() > 1) {
-    assert(true && "More than one decl in MemberExpr");
     assert(false && "More than one decl in MemberExpr");
   }
 
   // TODO change this
+  debugLifetimes("Member - has call info?", PointsTo.HasCallExprInfo(base));
+  debugLifetimes("Before insert call expr info (MemberExpr)");
   bool has_func_call = PointsTo.InsertCallExprInfo(member_expr, base);
+  debugLifetimes("After insert call expr info (MemberExpr)");
   // PointsTo.InsertCallExprInfo(member_expr, base);
 
   // TODO uncomment assert
@@ -618,7 +641,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     if (const auto *child_expr = dyn_cast<clang::Expr>(child)) {
       PointsTo.InsertExprPointsTo(op, child_expr);
       PointsTo.InsertExprDecl(op, child_expr);
+      debugLifetimes("Before insert call expr info (UnaryAddrOf)");
       PointsTo.InsertCallExprInfo(op, child_expr);
+      debugLifetimes("After insert call expr info (UnaryAddrOf)");
     }
   }
 
@@ -648,7 +673,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryOperator(
     if (auto *child_expr = dyn_cast<clang::Expr>(child)) {
       PointsTo.InsertExprPointsTo(op, child_expr);
       PointsTo.InsertExprDecl(op, child_expr);
+      debugLifetimes("Before insert call expr info (UnaryOperator)");
       PointsTo.InsertCallExprInfo(op, child_expr);
+      debugLifetimes("After insert call expr info (UnaryOperator)");
     }
   }
   return std::nullopt;

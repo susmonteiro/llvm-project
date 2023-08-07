@@ -165,11 +165,19 @@ class PointsToMap {
   }
 
   bool InsertCallExprInfo(const clang::Expr* parent, const clang::Expr* child) {
-    auto it = CallExprToInfo.find(parent);
-    if (it != CallExprToInfo.end()) {
-      it->second = CallExprToInfo[child];
+    if (CallExprToInfo.find(parent) != CallExprToInfo.end()) {
+      debugLifetimes("InsertCallExprInfo", "FOUND PARENT!");
       return true;
     }
+
+    auto it = CallExprToInfo.find(child);
+    if (it != CallExprToInfo.end()) {
+      debugLifetimes("InsertCallExprInfo", "FOUND CHILD!");
+      CallExprToInfo[parent] = it->second;
+      return true;
+    }
+    debugLifetimes("InsertCallExprInfo", "NOT FOUND...");
+
     return false;
   }
 
