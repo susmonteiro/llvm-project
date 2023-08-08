@@ -653,6 +653,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
         Lifetime &first_lifetime =
             State.GetLifetime(first_decl, num_indirections);
+        if (first_lifetime.IsDead()) continue;
 
         int first_num_indirections =
             first_param_info->original_num_indirections - num_indirections +
@@ -670,6 +671,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                    Lifetime::GetNumIndirections(second_expr->getType()));
               Lifetime &second_lifetime =
                   State.GetLifetime(second_decl, num_indirections);
+              if (second_lifetime.IsDead()) continue;
               if (first_lifetime != second_lifetime) {
                 ParamsCallExprChecker(call, direct_callee, first_decl,
                                       second_decl, first_lifetime,
