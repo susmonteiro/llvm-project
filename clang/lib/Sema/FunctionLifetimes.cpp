@@ -382,13 +382,13 @@ void FunctionLifetimes::ProcessParams() {
   for (const auto& param : Params) {
     clang::QualType type = param->getType().getCanonicalType();
     unsigned int num_indirections = Lifetime::GetNumIndirections(type);
-    if (num_indirections > 0) {
-      if (num_indirections >= ParamsInfo.size()) {
-        ParamsInfo.resize(num_indirections + 1);
-      }
-      ParamsInfo[num_indirections].emplace_back(
-          ParamInfo{type, param, idx, num_indirections, num_indirections});
+
+    if (num_indirections >= ParamsInfo.size()) {
+      ParamsInfo.resize(num_indirections + 1);
     }
+
+    ParamsInfo[num_indirections].emplace_back(
+        ParamInfo{type, param, idx, num_indirections, num_indirections});
     idx++;
   }
 }

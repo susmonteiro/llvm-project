@@ -132,7 +132,7 @@ void LifetimeAnnotationsAnalysis::CreateVariableIfNotFound(
     }
     // debugLifetimes("Created variable with lifetimes", ol.DebugString());
   }
-  debugLifetimes(DebugString());
+  // debugLifetimes(DebugString());
 }
 
 void LifetimeAnnotationsAnalysis::CreateDependencySimple(
