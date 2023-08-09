@@ -251,6 +251,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     auto &func_info = all_func_info[direct_callee];
 
     // * process args
+    // debugLight("Processing dead args...");
     unsigned int param_idx = 0;
     for (unsigned int arg_idx = 0; arg_idx < direct_callee->getNumParams();
          arg_idx++) {
@@ -280,15 +281,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     if (!func_type->isPointerType() && !func_type->isReferenceType()) {
       // debugWarn("Return type is not pointer type");
-      unsigned int i = -1;
-      while (++i < func_info.GetNumParams()) {
-        const clang::ParmVarDecl *param = func_info.GetParam(i);
-        if (!param->getType()->isPointerType() &&
-            !param->getType()->isReferenceType()) {
-          // debugWarn("Param type is not pointer type");
+      for (unsigned int arg_idx = 0; arg_idx < direct_callee->getNumParams();
+           arg_idx++) {
+        const Expr *arg = call->getArg(arg_idx)->IgnoreParens();
+        clang::QualType arg_type = arg->getType();
+        if (!arg_type->isPointerType() && !arg_type->isReferenceType()) {
           continue;
         }
-        const Expr *arg = call->getArg(i)->IgnoreParens();
         clang::QualType found_type = PointsTo.GetExprType(arg);
         if (!found_type.isNull()) {
           PointsTo.InsertExprType(arg, found_type);
@@ -304,8 +303,11 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
     unsigned int func_num_indirections =
         Lifetime::GetNumIndirections(func_type);
     while (func_num_indirections > 0) {
+      // debugLifetimes("Func num indirections", func_num_indirections);
       Lifetime &return_lifetime = return_ol.GetLifetime(func_type);
       assert(!return_lifetime.IsNull());
+      // debugLifetimes("Func lifetime", return_lifetime.DebugString());
+
       auto &current_type_call_info = call_info[func_num_indirections];
       current_type_call_info.call_expr = call;
 
@@ -314,23 +316,26 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       } else if (return_lifetime.IsStatic()) {
         current_type_call_info.is_static = true;
       } else {
-        unsigned int i = -1;
-        while (++i < func_info.GetNumParams()) {
-          const clang::ParmVarDecl *param = func_info.GetParam(i);
-          if (!param->getType()->isPointerType() &&
-              !param->getType()->isReferenceType()) {
-            // debugWarn("Param type is not pointer type");
+        unsigned int param_idx = 0;
+        for (unsigned int arg_idx = 0; arg_idx < direct_callee->getNumParams();
+             arg_idx++) {
+          const Expr *arg = call->getArg(arg_idx)->IgnoreParens();
+          clang::QualType arg_type = arg->getType();
+          if (!arg_type->isPointerType() && !arg_type->isReferenceType()) {
             continue;
           }
-          const Expr *arg = call->getArg(i)->IgnoreParens();
+
+          const clang::ParmVarDecl *param = func_info.GetParam(param_idx);
           ObjectLifetimes &param_ol = func_info.GetParamLifetime(param);
           for (Lifetime &param_lifetime : param_ol.GetLifetimes()) {
             // TODO == or contains?
             if (param_lifetime == return_lifetime) {
+              // debugLifetimes("Param lifetime", param_lifetime.DebugString());
               current_type_call_info.info.insert(
-                  {arg, Lifetime::GetNumIndirections(arg->getType())});
+                  {arg, param_lifetime.GetNumIndirections()});
             }
           }
+          param_idx++;
         }
       }
       func_num_indirections--;

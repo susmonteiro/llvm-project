@@ -376,8 +376,14 @@ void LifetimesCheckerVisitor::CallExprChecker(
         is_return ? State.GetReturnLifetimeOrLocal(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
     debugLifetimes("LHS lifetime", lhs_lifetime.DebugString());
+    if (lhs_lifetime.IsDead()) {
+      lhs_num_indirections--;
+      continue;
+    }
+
     auto &current_type_call_info = call_info[lhs_num_indirections];
     if (current_type_call_info.is_local) {
+      // debugLight("FuncCall is local");
       if (is_return) {
         S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
             << std::string(rhs_num_indirections, '*') << expr->getSourceRange();
@@ -401,11 +407,15 @@ void LifetimesCheckerVisitor::CallExprChecker(
         const auto &arg_points_to = PointsTo.GetExprDecls(arg);
         for (const auto &decl : arg_points_to) {
           char id = PointsTo.GetExprLifetime(arg);
+          // debugLifetimes("DECL", decl->getNameAsString());
+          // debugLifetimes("ARG ID", id);
+          // debugLifetimes("ARG NUM INDIRECTIONS", arg_num_indiretions);
           Lifetime arg_lifetime =
-              id != NOTSET
+              id != NOTSET && arg_num_indiretions == Lifetime::GetNumIndirections(arg->getType())
                   ? Lifetime(id, arg_num_indiretions)
                   : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
-          if (arg_lifetime < lhs_lifetime) {
+          // debugLifetimes("ARG LIFETIME", arg_lifetime.DebugString());
+          if (arg_lifetime < lhs_lifetime && !arg_lifetime.IsDead()) {
             factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
                     arg_lifetime);
           }
