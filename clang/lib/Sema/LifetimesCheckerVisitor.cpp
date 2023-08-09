@@ -184,7 +184,9 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
   if (expr == nullptr) return;
 
   if (clang::isa<clang::MemberExpr>(expr)) {
+    // debugInfo("<Member Expr>");
     auto &points_to = PointsTo.GetExprDecls(expr);
+    // debugLifetimes("Points to", points_to.size());
     // TODO delete this
     assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
     const auto *lhs_var_decl = *points_to.begin();
@@ -516,10 +518,11 @@ void LifetimesCheckerVisitor::CompareAndCheck(
                     factory);
   } else if (const auto *member_expr =
                  clang::dyn_cast<clang::MemberExpr>(expr)) {
-    auto &rhs_points_to = PointsTo.GetExprDecls(rhs);
-    if (rhs_points_to.size() == 1) {
-      for (const auto *rhs_decl : rhs_points_to) {
-        DeclChecker(lhs_var_decl, lhs_num_indirections, expr, rhs_decl,
+    // debugInfo("<Member Expr>");
+    auto &member_expr_points_to = PointsTo.GetExprDecls(member_expr);
+    if (member_expr_points_to.size() == 1) {
+      for (const auto *decl : member_expr_points_to) {
+        DeclChecker(lhs_var_decl, lhs_num_indirections, expr, decl,
                     rhs_num_indirections, stmt, op, is_return, factory);
       }
     } else if (PointsTo.HasCallExprInfo(member_expr)) {
@@ -527,6 +530,13 @@ void LifetimesCheckerVisitor::CompareAndCheck(
                       rhs_num_indirections, stmt, op, is_return,
                       PointsTo.GetCallExprInfo(member_expr), factory);
     } else {
+      // expr->dump();
+      // member_expr->dump();
+      // rhs->dump();
+      // debugLifetimes("Size of member_expr_points_to", member_expr_points_to.size());
+      // for (const auto *decl : member_expr_points_to) {
+      //   debugLifetimes("RHS decl", decl->getNameAsString());
+      // }
       // TODO uncomment assert
       assert(false && "Should not reach here");
     }

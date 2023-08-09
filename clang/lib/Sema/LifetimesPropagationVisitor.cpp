@@ -77,6 +77,7 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
                         LifetimeAnnotationsAnalysis &state) {
   debugInfo("TransferMemberExpr");
   auto &rhs_points_to = PointsTo.GetExprDecls(member_expr);
+  // debugLifetimes("rhs_points_to.size()", rhs_points_to.size());
   if (rhs_points_to.size() == 1) {
     for (const auto *rhs_decl : rhs_points_to) {
       state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
@@ -488,6 +489,10 @@ LifetimesPropagationVisitor::VisitConditionalOperator(
   Visit(const_cast<clang::Expr *>(false_expr));
   PointsTo.InsertExprPointsTo(op, true_expr);
   PointsTo.InsertExprPointsTo(op, false_expr);
+
+  // debugLifetimes("Size of points to of op",
+  //                PointsTo.GetExprPointsTo(op).size());
+
   // debugLifetimes("Before insert call expr info (ConditionalOperator true)");
   PointsTo.InsertCallExprInfo(op, true_expr);
   // debugLifetimes("After insert call expr info (ConditionalOperator true)");
@@ -496,6 +501,10 @@ LifetimesPropagationVisitor::VisitConditionalOperator(
   // debugLifetimes("After insert call expr info (ConditionalOperator false)");
   PointsTo.InsertExprDecl(op, true_expr);
   PointsTo.InsertExprDecl(op, false_expr);
+  // debugLifetimes("Size of expr decls of op", PointsTo.GetExprDecls(op).size());
+  // debugLifetimes("Size of expr decls of true", PointsTo.GetExprDecls(true_expr).size());
+  // debugLifetimes("Size of expr decls of false", PointsTo.GetExprDecls(false_expr).size());
+
   return std::nullopt;
 }
 
@@ -601,6 +610,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
 
   // TODO delete this
   PointsTo.InsertExprType(member_expr, base->getType());
+  // debugLifetimes("Size of points to [member expr]",
+  //                PointsTo.GetExprDecls(member_expr).size());
   return std::nullopt;
 }
 
