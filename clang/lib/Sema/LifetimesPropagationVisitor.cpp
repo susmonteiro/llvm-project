@@ -667,9 +667,9 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
       // debugLifetimes("After insert call expr info (UnaryAddrOf)");
     }
   }
-
+  
   for (const auto *decl : PointsTo.GetExprDecls(op)) {
-    if (decl->isStaticLocal() || decl->isDefinedOutsideFunctionOrMethod()) {
+    if (decl->isStaticLocal() || decl->isDefinedOutsideFunctionOrMethod() || State.GetObjectLifetimes(decl).HasLifetimeStatic()) {
       PointsTo.InsertExprLifetime(op, STATIC);
       return std::nullopt;
     }

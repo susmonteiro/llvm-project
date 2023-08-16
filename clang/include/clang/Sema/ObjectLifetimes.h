@@ -67,6 +67,14 @@ class ObjectLifetimes {
     return false;
   }
 
+  bool HasLifetimeStatic() {
+    for (Lifetime& lifetime : PointeeObjects) {
+      if (lifetime.IsStatic() && lifetime.GetNumIndirections() != 0)
+        return true;
+    }
+    return false;
+  }
+
   bool HasLifetime(char id) {
     for (Lifetime& lifetime : PointeeObjects) {
       if (lifetime.GetId() == id) return true;

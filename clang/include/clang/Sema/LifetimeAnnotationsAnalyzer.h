@@ -55,7 +55,8 @@ class LifetimeAnnotationsAnalyzer {
     for (const auto &info : var_stmt) {
       for (const auto &rhs_var : stmt_var[info.stmt]) {
         if (var == rhs_var) continue;
-        res += "(" + std::string(info.num_indirections, '*') + ")" + rhs_var->getNameAsString() + ' ';
+        res += "(" + std::string(info.num_indirections, '*') + ")" +
+               rhs_var->getNameAsString() + ' ';
       }
     }
     res += '\n';
