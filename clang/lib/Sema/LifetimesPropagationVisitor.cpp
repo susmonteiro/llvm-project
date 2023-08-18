@@ -267,7 +267,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
 
       int num_indirections = Lifetime::GetNumIndirections(arg->getType());
+      const auto *param = direct_callee->getParamDecl(param_idx);
+      clang::QualType param_type = param->getType()->getPointeeType();
+      
       while (--num_indirections > 0) {
+        if (param_type.isConstQualified()) {
+          continue;
+        }
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_idx, num_indirections);
         if (param_lifetime.IsLocal()) {
@@ -276,6 +282,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
             TransferDeadLifetime(expr, call, num_indirections, PointsTo, State);
           }
         }
+        param_type->getPointeeType();
       }
       param_idx++;
     }
