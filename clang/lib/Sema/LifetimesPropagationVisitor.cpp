@@ -501,9 +501,10 @@ LifetimesPropagationVisitor::VisitConditionalOperator(
   // debugLifetimes("After insert call expr info (ConditionalOperator false)");
   PointsTo.InsertExprDecl(op, true_expr);
   PointsTo.InsertExprDecl(op, false_expr);
-  // debugLifetimes("Size of expr decls of op", PointsTo.GetExprDecls(op).size());
-  // debugLifetimes("Size of expr decls of true", PointsTo.GetExprDecls(true_expr).size());
-  // debugLifetimes("Size of expr decls of false", PointsTo.GetExprDecls(false_expr).size());
+  // debugLifetimes("Size of expr decls of op",
+  // PointsTo.GetExprDecls(op).size()); debugLifetimes("Size of expr decls of
+  // true", PointsTo.GetExprDecls(true_expr).size()); debugLifetimes("Size of
+  // expr decls of false", PointsTo.GetExprDecls(false_expr).size());
 
   return std::nullopt;
 }
@@ -657,7 +658,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     const clang::UnaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitUnaryAddrOfOperator]");
 
-  bool isArraySubs = false;
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
     if (const auto *child_expr = dyn_cast<clang::Expr>(child)) {
@@ -667,6 +667,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
       PointsTo.InsertCallExprInfo(op, child_expr);
       // debugLifetimes("After insert call expr info (UnaryAddrOf)");
       if (clang::isa<clang::ArraySubscriptExpr>(child_expr)) {
+        return std::nullopt;
+      }
+    }
+  }
+
+  for (const auto *child : PointsTo.GetExprPointsTo(op)) {
+    if (child != nullptr && clang::isa<clang::ArraySubscriptExpr>(child)) {
+      clang::QualType child_type = child->getType();
+      if (child_type->isPointerType() || child_type->isReferenceType()) {
         return std::nullopt;
       }
     }
