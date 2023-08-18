@@ -251,7 +251,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
 
     auto &func_info = all_func_info[direct_callee];
 
-    // * process args
+    // * process dead args
     // debugLight("Processing dead args...");
     unsigned int param_idx = 0;
     for (unsigned int arg_idx = 0; arg_idx < direct_callee->getNumParams();
@@ -267,11 +267,24 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       const auto &arg_points_to = PointsTo.GetExprPointsTo(arg);
 
       int num_indirections = Lifetime::GetNumIndirections(arg->getType());
-      const auto *param = direct_callee->getParamDecl(param_idx);
+      if (num_indirections < 2) {
+        param_idx++;
+        continue;
+      }
+      // TODO remove asserts
+      assert(param_idx <= direct_callee->getNumParams());
+      const auto *param = func_info.GetParam(param_idx);
+      assert(param != nullptr);
       clang::QualType param_type = param->getType()->getPointeeType();
-      
+      // if (param_type.isNull()) {
+      //   param->dump();
+      //   debugLifetimes("Num indirections", num_indirections);
+      // }
+      assert(!param_type.isNull());
+      assert(num_indirections == Lifetime::GetNumIndirections(param_type) + 1);
       while (--num_indirections > 0) {
         if (param_type.isConstQualified()) {
+          param_type->getPointeeType();
           continue;
         }
         Lifetime &param_lifetime =
