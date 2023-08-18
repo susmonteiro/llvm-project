@@ -657,6 +657,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
     const clang::UnaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitUnaryAddrOfOperator]");
 
+  bool isArraySubs = false;
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
     if (const auto *child_expr = dyn_cast<clang::Expr>(child)) {
@@ -665,11 +666,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
       // debugLifetimes("Before insert call expr info (UnaryAddrOf)");
       PointsTo.InsertCallExprInfo(op, child_expr);
       // debugLifetimes("After insert call expr info (UnaryAddrOf)");
+      if (clang::isa<clang::ArraySubscriptExpr>(child_expr)) {
+        return std::nullopt;
+      }
     }
   }
-  
+
   for (const auto *decl : PointsTo.GetExprDecls(op)) {
-    if (decl->isStaticLocal() || decl->isDefinedOutsideFunctionOrMethod() || State.GetObjectLifetimes(decl).HasLifetimeStatic()) {
+    if (decl->isStaticLocal() || decl->isDefinedOutsideFunctionOrMethod() ||
+        State.GetObjectLifetimes(decl).HasLifetimeStatic()) {
       PointsTo.InsertExprLifetime(op, STATIC);
       return std::nullopt;
     }

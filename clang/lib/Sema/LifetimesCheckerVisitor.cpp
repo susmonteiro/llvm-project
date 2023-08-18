@@ -953,7 +953,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitStmt(
 
 std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryOperator(
     const clang::UnaryOperator *op) {
-  if (debugEnabled) debugLifetimes("[VisitUnaryAddrOf]");
+  if (debugEnabled) debugLifetimes("[VisitUnaryOperator]");
   for (const auto &child : op->children()) {
     Visit(const_cast<clang::Stmt *>(child));
   }
