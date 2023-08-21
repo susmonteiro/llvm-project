@@ -97,6 +97,7 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("TransferRHS", lhs->getNameAsString());
   clang::QualType rhs_type = PointsTo.GetExprType(rhs);
+  debugLifetimes("Type of rhs", rhs_type.getAsString());
   rhs_type = rhs_type.isNull() ? base_type : rhs_type;
 
   char maybe_lifetime = PointsTo.GetExprLifetime(rhs);
@@ -108,6 +109,7 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
     TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
   } else if (const auto *member_expr =
                  clang::dyn_cast<clang::MemberExpr>(rhs)) {
+    debugLifetimes("TransferMemberExpr");
     TransferMemberExpr(lhs, member_expr, lhs_type, rhs_type, loc, PointsTo,
                        state);
   }
@@ -577,6 +579,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
+        // debugLifetimes("Type of init", init->getType().getAsString());
         TransferRHS(var_decl, init, lhs_type, lhs_type, decl_stmt, PointsTo,
                     State);
       }
@@ -630,7 +633,7 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   PointsTo.InsertExprDecl(member_expr, base);
 
   // TODO delete this
-  PointsTo.InsertExprType(member_expr, base->getType());
+  // PointsTo.InsertExprType(member_expr, base->getType());
   // debugLifetimes("Size of points to [member expr]",
   //                PointsTo.GetExprDecls(member_expr).size());
   return std::nullopt;
