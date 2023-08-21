@@ -413,7 +413,8 @@ void LifetimesCheckerVisitor::CallExprChecker(
           // debugLifetimes("ARG ID", id);
           // debugLifetimes("ARG NUM INDIRECTIONS", arg_num_indiretions);
           Lifetime arg_lifetime =
-              id != NOTSET && arg_num_indiretions == Lifetime::GetNumIndirections(arg->getType())
+              id != NOTSET && arg_num_indiretions ==
+                                  Lifetime::GetNumIndirections(arg->getType())
                   ? Lifetime(id, arg_num_indiretions)
                   : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
           // debugLifetimes("ARG LIFETIME", arg_lifetime.DebugString());
@@ -533,8 +534,9 @@ void LifetimesCheckerVisitor::CompareAndCheck(
       // expr->dump();
       // member_expr->dump();
       // rhs->dump();
-      // debugLifetimes("Size of member_expr_points_to", member_expr_points_to.size());
-      // for (const auto *decl : member_expr_points_to) {
+      // debugLifetimes("Size of member_expr_points_to",
+      // member_expr_points_to.size()); for (const auto *decl :
+      // member_expr_points_to) {
       //   debugLifetimes("RHS decl", decl->getNameAsString());
       // }
       // TODO uncomment assert
@@ -673,6 +675,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
         Lifetime &first_lifetime =
             State.GetLifetime(first_decl, num_indirections);
+        if (first_lifetime.EmptyPossibleLifetimes() &&
+            first_lifetime.IsNotSet())
+          continue;
         if (first_lifetime.IsDead()) continue;
 
         int first_num_indirections =
@@ -691,6 +696,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                    Lifetime::GetNumIndirections(second_expr->getType()));
               Lifetime &second_lifetime =
                   State.GetLifetime(second_decl, num_indirections);
+              if (second_lifetime.EmptyPossibleLifetimes() &&
+                  second_lifetime.IsNotSet())
+                continue;
               if (second_lifetime.IsDead()) continue;
               if (first_lifetime != second_lifetime) {
                 ParamsCallExprChecker(call, direct_callee, first_decl,
@@ -724,6 +732,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
           Lifetime &first_lifetime =
               State.GetLifetimeOrLocal(first_decl, num_indirections);
+          if (first_lifetime.EmptyPossibleLifetimes() &&
+              first_lifetime.IsNotSet())
+            continue;
 
           int first_num_indirections =
               first_param_info.original_num_indirections - num_indirections +
@@ -736,6 +747,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             if (second_decl == nullptr) continue;
             Lifetime &second_lifetime =
                 State.GetLifetimeOrLocal(second_decl, num_indirections);
+            if (second_lifetime.EmptyPossibleLifetimes() &&
+                second_lifetime.IsNotSet())
+              continue;
             if (first_lifetime < second_lifetime) {
               int second_num_indirections =
                   second_param_info.original_num_indirections -
