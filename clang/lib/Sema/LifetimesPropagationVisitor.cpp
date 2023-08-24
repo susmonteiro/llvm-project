@@ -75,7 +75,7 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
                         clang::QualType lhs_type, clang::QualType rhs_type,
                         const clang::Stmt *loc, PointsToMap &PointsTo,
                         LifetimeAnnotationsAnalysis &state) {
-  debugInfo("TransferMemberExpr");
+  // debugInfo("TransferMemberExpr");
   auto &rhs_points_to = PointsTo.GetExprDecls(member_expr);
   // debugLifetimes("rhs_points_to.size()", rhs_points_to.size());
   if (rhs_points_to.size() == 1) {
@@ -109,7 +109,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
     TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
   } else if (const auto *member_expr =
                  clang::dyn_cast<clang::MemberExpr>(rhs)) {
-    debugLifetimes("TransferMemberExpr");
     TransferMemberExpr(lhs, member_expr, lhs_type, rhs_type, loc, PointsTo,
                        state);
   }
@@ -632,10 +631,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitMemberExpr(
   if (points_to.size() < 1) return std::nullopt;
   PointsTo.InsertExprDecl(member_expr, base);
 
-  // TODO delete this
-  // PointsTo.InsertExprType(member_expr, base->getType());
-  // debugLifetimes("Size of points to [member expr]",
-  //                PointsTo.GetExprDecls(member_expr).size());
   return std::nullopt;
 }
 
