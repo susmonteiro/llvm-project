@@ -378,8 +378,9 @@ LifetimeFactory FunctionLifetimeFactory::VarLifetimeFactory() const {
 FunctionLifetimes::FunctionLifetimes() : FuncId(INVALID) {}
 
 void FunctionLifetimes::ProcessParams() {
-  unsigned int idx = 0;
-  for (const auto& param : Params) {
+  unsigned int ptr_idx = 0;
+  unsigned int glb_idx = 0;
+  for (const auto& param : AllParams) {
     clang::QualType type = param->getType().getCanonicalType();
     unsigned int num_indirections = Lifetime::GetNumIndirections(type);
 
@@ -388,8 +389,11 @@ void FunctionLifetimes::ProcessParams() {
     }
 
     ParamsInfo[num_indirections].emplace_back(
-        ParamInfo{type, param, idx, num_indirections, num_indirections});
-    idx++;
+        ParamInfo{type, param, ptr_idx, glb_idx, num_indirections, num_indirections});
+    glb_idx++;
+    if (type->isPointerType() || type->isReferenceType()) {
+      ptr_idx++;
+    }
   }
 }
 
@@ -469,27 +473,26 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
     if (type_loc) {
       const clang::ParmVarDecl* param = func_type_loc.getParam(i);
       if (!param->getType()->isPointerType() &&
-          !param->getType()->isReferenceType())
+          !param->getType()->isReferenceType()) {
+        ret.InsertParamLifetime(param);
         continue;
+      }
       if (param && param->getTypeSourceInfo()) {
         param_type_loc = param->getTypeSourceInfo()->getTypeLoc();
       }
 
+      clang::QualType param_type = type->getParamType(i);
       ObjectLifetimes tmpObjectLifetimes;
 
-      // TODO check if this covers everything that should have a lifetime
-      clang::TypeLoc pointee_type_loc;
-      if (param_type_loc) {
-        pointee_type_loc = PointeeTypeLoc(type_loc);
-        // Note: We can't assert that `pointee_type_loc` is non-null here. If
-        // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
-        // the pointee type because the pointee type never got spelled out at
-        // the location of the original `TypeLoc`.
+      if (param->isFunctionPointerType()) {
+        tmpObjectLifetimes =
+            ObjectLifetimes(true, Lifetime::GetNumIndirections(param_type) + 1);
+        ret.InsertParamLifetime(param, tmpObjectLifetimes);
+        continue;
       }
 
       if (llvm::Error err =
-              lifetime_factory
-                  .CreateParamLifetimes(type->getParamType(i), param_type_loc)
+              lifetime_factory.CreateParamLifetimes(param_type, param_type_loc)
                   .moveInto(tmpObjectLifetimes)) {
         return std::move(err);
       }

@@ -644,10 +644,10 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         // TODO delete this (3 lines)
         assert(!param_info.type.isNull());
         clang::QualType param_type = param_info.type->getPointeeType();
-        params_set[param_info.index].type = param_type;
+        params_set[param_info.ptr_idx].type = param_type;
         // TODO check if current_num_indirections is needed
         // TODO maybe use just num_indirections
-        params_set[param_info.index].current_num_indirections--;
+        params_set[param_info.ptr_idx].current_num_indirections--;
         assert(num_indirections == param_info.current_num_indirections);
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, num_indirections);
@@ -669,7 +669,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         // param_lifetimes have ParamInfo sorted
         auto it = params.begin();
         const ParamInfo *first_param_info = it;
-        const auto *first_expr = call->getArg(first_param_info->index);
+        const auto *first_expr = call->getArg(first_param_info->glb_idx);
         const auto *first_decl = GetDeclFromArg(first_expr);
         if (first_decl == nullptr) continue;
 
@@ -686,8 +686,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
              Lifetime::GetNumIndirections(first_expr->getType()));
 
         while (++it != params.end()) {
-          if (it->index != first_param_info->index) {
-            const auto *second_expr = call->getArg(it->index);
+          if (it->ptr_idx != first_param_info->ptr_idx) {
+            const auto *second_expr = call->getArg(it->glb_idx);
             const auto *second_decl = GetDeclFromArg(second_expr);
             if (second_decl != nullptr) {
               int second_num_indirections =
@@ -726,7 +726,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           }
 
           const auto &filtered_params = param_lifetimes[param_lifetime_id];
-          const auto *first_expr = call->getArg(first_param_info.index);
+          const auto *first_expr = call->getArg(first_param_info.glb_idx);
           const auto *first_decl = GetDeclFromArg(first_expr);
           if (first_decl == nullptr) continue;
 
@@ -742,7 +742,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                Lifetime::GetNumIndirections(first_expr->getType()));
 
           for (const auto &second_param_info : filtered_params) {
-            const auto *second_expr = call->getArg(second_param_info.index);
+            const auto *second_expr = call->getArg(second_param_info.glb_idx);
             const auto *second_decl = GetDeclFromArg(second_expr);
             if (second_decl == nullptr) continue;
             Lifetime &second_lifetime =
@@ -769,8 +769,8 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       // insert params for the next indirection level
 
       for (const auto &param_info : params_info_vec[num_indirections]) {
-        assert(param_info.index < params_set.size());
-        params_set[param_info.index] = param_info;
+        assert(param_info.ptr_idx < params_set.size());
+        params_set[param_info.ptr_idx] = param_info;
       }
 
       // check static params
@@ -783,7 +783,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, num_indirections);
         if (param_lifetime.IsStatic()) {
-          const auto *arg_expr = call->getArg(param_info.index);
+          const auto *arg_expr = call->getArg(param_info.glb_idx);
           const auto *arg_decl = GetDeclFromArg(arg_expr);
           if (arg_decl == nullptr) continue;
           Lifetime &arg_lifetime =

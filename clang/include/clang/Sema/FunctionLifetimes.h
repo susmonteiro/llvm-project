@@ -15,7 +15,8 @@ struct ParamInfo {
   // TODO remove type from struct
   clang::QualType type;
   const clang::ParmVarDecl *param;
-  unsigned int index;
+  unsigned int ptr_idx;  // includes only pointers/references
+  unsigned int glb_idx;  // includes all args
   unsigned int original_num_indirections;
   unsigned int current_num_indirections;
 };
@@ -105,7 +106,8 @@ class FunctionLifetimes {
     return object_lifetimes.GetLifetimeOrLocal(type);
   }
 
-  Lifetime &GetParamLifetime(const clang::ParmVarDecl *param, unsigned int num_indirections) {
+  Lifetime &GetParamLifetime(const clang::ParmVarDecl *param,
+                             unsigned int num_indirections) {
     auto it = ParamsLifetimes.find(param);
     assert(it != ParamsLifetimes.end());
 
@@ -130,8 +132,13 @@ class FunctionLifetimes {
     return return_ol.HasLifetimeLocal();
   }
 
+  void InsertParamLifetime(const clang::ParmVarDecl *param) {
+    AllParams.emplace_back(param);
+  }
+
   void InsertParamLifetime(const clang::ParmVarDecl *param,
                            ObjectLifetimes &objectsLifetimes) {
+    AllParams.emplace_back(param);
     Params.emplace_back(param);
     ParamsLifetimes[param] = objectsLifetimes;
   }
@@ -149,6 +156,7 @@ class FunctionLifetimes {
 
  private:
   // stores param lifetimes in order
+  std::vector<const clang::ParmVarDecl *> AllParams;
   std::vector<const clang::ParmVarDecl *> Params;
   ParamsInfoVector ParamsInfo;
   ParamsLifetimesMap ParamsLifetimes;
