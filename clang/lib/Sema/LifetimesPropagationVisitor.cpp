@@ -2,13 +2,12 @@
 
 namespace clang {
 
-void TransferFuncCall(const clang::VarDecl *lhs, clang::QualType lhs_type,
-                      clang::QualType func_type, clang::TypeToSet &call_info,
-                      const clang::Stmt *loc, PointsToMap &PointsTo,
+void TransferFuncCall(const clang::VarDecl *lhs,
+                      unsigned int lhs_num_indirections,
+                      unsigned int func_num_indirections,
+                      clang::TypeToSet &call_info, const clang::Stmt *loc,
+                      PointsToMap &PointsTo,
                       LifetimeAnnotationsAnalysis &state) {
-  unsigned int lhs_num_indirections = Lifetime::GetNumIndirections(lhs_type);
-  unsigned int func_num_indirections = Lifetime::GetNumIndirections(func_type);
-
   while (lhs_num_indirections > 0 && func_num_indirections > 0) {
     if (state.IsLifetimeNotset(lhs, lhs_num_indirections)) {
       auto &current_type_call_info = call_info[func_num_indirections];
@@ -39,12 +38,13 @@ void TransferFuncCall(const clang::VarDecl *lhs, clang::QualType lhs_type,
 
 void TransferFuncCall(const clang::VarDecl *lhs,
                       const clang::CallExpr *call_expr,
-                      clang::QualType lhs_type, const clang::Stmt *loc,
+                      unsigned int lhs_num_indirections, const clang::Stmt *loc,
                       PointsToMap &PointsTo,
                       LifetimeAnnotationsAnalysis &state) {
   auto &call_info = PointsTo.GetCallExprInfo(call_expr);
-  clang::QualType func_type = call_expr->getType().getCanonicalType();
-  TransferFuncCall(lhs, lhs_type, func_type, call_info, loc, PointsTo, state);
+  unsigned int func_num_indirections = Lifetime::GetNumIndirections(call_expr->getType().getCanonicalType());
+  TransferFuncCall(lhs, lhs_num_indirections, func_num_indirections, call_info, loc,
+                   PointsTo, state);
 }
 
 void TransferDeadLifetime(const Expr *arg, const Stmt *loc,
@@ -52,11 +52,16 @@ void TransferDeadLifetime(const Expr *arg, const Stmt *loc,
                           LifetimeAnnotationsAnalysis &state) {
   if (arg == nullptr) return;
   const clang::VarDecl *arg_decl;
+  // Lifetime arg_lifetime;
   if (clang::isa<clang::MemberExpr>(arg)) {
     auto &points_to = PointsTo.GetExprDecls(arg);
     // TODO delete this
     assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
     arg_decl = *points_to.begin();
+    // member expr -> always first level of indirection   
+    // arg_lifetime = state.GetLifetime(arg_decl, 1);
+    // TODO change this
+    // arg_lifetime = state.GetLifetime(arg_decl, num_indirections);
   } else if (const auto *arg_decl_ref_expr =
                  dyn_cast<clang::DeclRefExpr>(arg)) {
     if (!(arg_decl = dyn_cast<clang::VarDecl>(arg_decl_ref_expr->getDecl()))) {
@@ -72,7 +77,8 @@ void TransferDeadLifetime(const Expr *arg, const Stmt *loc,
 
 void TransferMemberExpr(const clang::VarDecl *lhs,
                         const clang::MemberExpr *member_expr,
-                        clang::QualType lhs_type, clang::QualType rhs_type,
+                        unsigned int lhs_num_indirections,
+                        unsigned int rhs_num_indirections,
                         const clang::Stmt *loc, PointsToMap &PointsTo,
                         LifetimeAnnotationsAnalysis &state) {
   // debugInfo("TransferMemberExpr");
@@ -80,11 +86,13 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
   // debugLifetimes("rhs_points_to.size()", rhs_points_to.size());
   if (rhs_points_to.size() == 1) {
     for (const auto *rhs_decl : rhs_points_to) {
-      state.CreateDependency(lhs, lhs_type, rhs_decl, rhs_type, loc);
+      state.CreateDependency(lhs, lhs_num_indirections, rhs_decl,
+                             rhs_num_indirections, loc);
     }
   } else if (PointsTo.HasCallExprInfo(member_expr)) {
     auto &call_info = PointsTo.GetCallExprInfo(member_expr);
-    TransferFuncCall(lhs, lhs_type, rhs_type, call_info, loc, PointsTo, state);
+    TransferFuncCall(lhs, lhs_num_indirections, rhs_num_indirections, call_info,
+                     loc, PointsTo, state);
   } else {
     // TODO uncomment assert
     assert(false && "Should not reach here");
@@ -92,25 +100,28 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
 }
 
 void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
-                 clang::QualType lhs_type, clang::QualType base_type,
-                 const clang::Stmt *loc, PointsToMap &PointsTo,
-                 LifetimeAnnotationsAnalysis &state) {
+                 unsigned int lhs_num_indirections,
+                 unsigned int base_num_indirections, const clang::Stmt *loc,
+                 PointsToMap &PointsTo, LifetimeAnnotationsAnalysis &state) {
   // debugLifetimes("TransferRHS", lhs->getNameAsString());
   clang::QualType rhs_type = PointsTo.GetExprType(rhs);
   debugLifetimes("Type of rhs", rhs_type.getAsString());
-  rhs_type = rhs_type.isNull() ? base_type : rhs_type;
+  unsigned int rhs_num_indirections =
+      rhs_type.isNull() ? base_num_indirections
+                        : Lifetime::GetNumIndirections(rhs_type);
 
   char maybe_lifetime = PointsTo.GetExprLifetime(rhs);
   if (maybe_lifetime != NOTSET) {
-    state.CreateLifetimeDependency(lhs, lhs_type, loc, rhs_type,
-                                   maybe_lifetime);
+    state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
+                                   rhs_num_indirections, maybe_lifetime);
     state.CreateStmtLifetime(loc, LOCAL);
   } else if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
-    TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
+    TransferFuncCall(lhs, call_expr, lhs_num_indirections, loc, PointsTo,
+                     state);
   } else if (const auto *member_expr =
                  clang::dyn_cast<clang::MemberExpr>(rhs)) {
-    TransferMemberExpr(lhs, member_expr, lhs_type, rhs_type, loc, PointsTo,
-                       state);
+    TransferMemberExpr(lhs, member_expr, lhs_num_indirections,
+                       rhs_num_indirections, loc, PointsTo, state);
   }
 
   const auto &points_to_expr = PointsTo.GetExprPointsTo(rhs);
@@ -118,16 +129,17 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
     if (expr != nullptr) {
       char maybe_lifetime = PointsTo.GetExprLifetime(expr);
       if (maybe_lifetime != NOTSET) {
-        state.CreateLifetimeDependency(lhs, lhs_type, loc, rhs_type,
-                                       maybe_lifetime);
+        state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
+                                       rhs_num_indirections, maybe_lifetime);
         state.CreateStmtLifetime(loc, LOCAL);
       } else if (const auto *call_expr =
                      clang::dyn_cast<clang::CallExpr>(expr)) {
-        TransferFuncCall(lhs, call_expr, lhs_type, loc, PointsTo, state);
+        TransferFuncCall(lhs, call_expr, lhs_num_indirections, loc, PointsTo,
+                         state);
       } else if (const auto *member_expr =
                      clang::dyn_cast<clang::MemberExpr>(expr)) {
-        TransferMemberExpr(lhs, member_expr, lhs_type, rhs_type, loc, PointsTo,
-                           state);
+        TransferMemberExpr(lhs, member_expr, lhs_num_indirections,
+                           rhs_num_indirections, loc, PointsTo, state);
       }
     }
   }
@@ -140,7 +152,8 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
 
   for (const auto &decl : points_to_decl) {
     // TODO most recent decl
-    state.CreateDependency(lhs, lhs_type, decl, rhs_type, loc);
+    state.CreateDependency(lhs, lhs_num_indirections, decl,
+                           rhs_num_indirections, loc);
   }
 }
 
@@ -166,9 +179,11 @@ void LifetimesPropagationVisitor::PropagateBinAssign(
   } else {
     return;
   }
-  // TODO maybe don't use types
-  clang::QualType base_type = lhs->getType().getCanonicalType();
-  TransferRHS(lhs_decl, rhs, base_type, base_type, op, PointsTo, State);
+
+  unsigned int base_num_indirections =
+      Lifetime::GetNumIndirections(lhs->getType().getCanonicalType());
+  TransferRHS(lhs_decl, rhs, base_num_indirections, base_num_indirections, op,
+              PointsTo, State);
 }
 
 std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
@@ -587,9 +602,11 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
       if (var_decl->hasInit() && !var_decl->getType()->isRecordType()) {
         const clang::Expr *init = var_decl->getInit()->IgnoreParens();
         Visit(const_cast<clang::Expr *>(init));
+        unsigned int lhs_num_indirections =
+            Lifetime::GetNumIndirections(lhs_type);
         // debugLifetimes("Type of init", init->getType().getAsString());
-        TransferRHS(var_decl, init, lhs_type, lhs_type, decl_stmt, PointsTo,
-                    State);
+        TransferRHS(var_decl, init, lhs_num_indirections, lhs_num_indirections,
+                    decl_stmt, PointsTo, State);
       }
     }
   }
