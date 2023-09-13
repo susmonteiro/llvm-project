@@ -83,12 +83,13 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
   // debugLifetimes("rhs_points_to.size()", rhs_points_to.size());
   if (rhs_points_to.size() == 1) {
     for (const auto *rhs_decl : rhs_points_to) {
-      state.CreateDependency(lhs, lhs_num_indirections, rhs_decl, rhs_num_indirections, loc);
+      state.CreateDependency(lhs, lhs_num_indirections, rhs_decl,
+                             rhs_num_indirections, loc);
     }
   } else if (PointsTo.HasCallExprInfo(member_expr)) {
     auto &call_info = PointsTo.GetCallExprInfo(member_expr);
-    TransferFuncCall(lhs, lhs_num_indirections, rhs_num_indirections, call_info, loc, PointsTo,
-                     state);
+    TransferFuncCall(lhs, lhs_num_indirections, rhs_num_indirections, call_info,
+                     loc, PointsTo, state);
   } else {
     // TODO uncomment assert
     assert(false && "Should not reach here");
@@ -710,10 +711,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
       if (clang::isa<clang::ArraySubscriptExpr>(child_expr)) {
         return std::nullopt;
       }
-      // TODO s->x
-      // if (clang::isa<clang::MemberExpr>(child_expr)) {
-      //   debugImportant("It is memberexpr!!");
-      // }
+
+      if (const auto &member_expr =
+              clang::dyn_cast<clang::MemberExpr>(child_expr)) {
+        if (member_expr->isArrow()) {
+          return std::nullopt;
+        }
+      }
     }
   }
 
