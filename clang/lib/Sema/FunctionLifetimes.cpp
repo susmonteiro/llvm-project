@@ -388,8 +388,8 @@ void FunctionLifetimes::ProcessParams() {
       ParamsInfo.resize(num_indirections + 1);
     }
 
-    ParamsInfo[num_indirections].emplace_back(
-        ParamInfo{type, param, ptr_idx, glb_idx, num_indirections, num_indirections});
+    ParamsInfo[num_indirections].emplace_back(ParamInfo{
+        type, param, ptr_idx, glb_idx, num_indirections, num_indirections});
     glb_idx++;
     if (type->isPointerType() || type->isReferenceType()) {
       ptr_idx++;
@@ -502,6 +502,11 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
   }
 
   clang::QualType return_type = type->getReturnType();
+  if (return_type->isFunctionPointerType()) {
+    ret.ReturnLifetime =
+        ObjectLifetimes(true, Lifetime::GetNumIndirections(return_type) + 1);
+    return ret;
+  }
   clang::QualType return_pointee = PointeeType(return_type);
 
   if (!return_pointee.isNull()) {
