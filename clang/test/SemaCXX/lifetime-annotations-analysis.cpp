@@ -880,3 +880,21 @@ void dead5(int *$a x, int *$b *$a y) {
                   // expected-note@-3 {{declared with lifetime '*$dead' here}} \
                   // expected-note@-19 {{parameter was declared with lifetime '*$local'}}
 }
+
+struct S {
+        int *p;
+        int num;
+};
+
+struct SS {
+        struct S s;
+};
+
+
+int *$a f(struct SS *$a ss) {
+        return ss->s.p;
+}
+
+int *$a f(struct S *$a s) {
+        return &s->num;
+}
