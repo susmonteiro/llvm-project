@@ -567,6 +567,15 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitDeclStmt(
         return std::nullopt;
       }
 
+      if (var_decl->isFunctionPointerType()) {
+        // debug
+        debugWarn("Function pointer");
+        ObjectLifetimes objectLifetimes(
+            true, Lifetime::GetNumIndirections(lhs_type) + 1);
+        State.CreateVariable(var_decl, objectLifetimes);
+        return std::nullopt;
+      }
+
       if (!lhs_type->isPointerType() && !lhs_type->isReferenceType()) {
         continue;
       }
@@ -687,6 +696,10 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitUnaryAddrOf(
       if (clang::isa<clang::ArraySubscriptExpr>(child_expr)) {
         return std::nullopt;
       }
+      // TODO s->x
+      // if (clang::isa<clang::MemberExpr>(child_expr)) {
+      //   debugImportant("It is memberexpr!!");
+      // }
     }
   }
 
