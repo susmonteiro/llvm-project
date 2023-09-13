@@ -183,6 +183,7 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
     const llvm::SmallSet<const clang::Expr *, 2U> &lhs_points_to) const {
   if (expr == nullptr) return;
 
+  // expr refers to lhs
   if (clang::isa<clang::MemberExpr>(expr)) {
     // debugInfo("<Member Expr>");
     auto &points_to = PointsTo.GetExprDecls(expr);
@@ -191,8 +192,7 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
     assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
     const auto *lhs_var_decl = *points_to.begin();
 
-    unsigned int lhs_num_indirections =
-        Lifetime::GetNumIndirections(lhs->getType());
+    unsigned int lhs_num_indirections = 1;
     unsigned int rhs_num_indirections =
         Lifetime::GetNumIndirections(rhs->getType());
 
@@ -509,8 +509,6 @@ void LifetimesCheckerVisitor::CompareAndCheck(
   debugInfo("CompareAndCheck");
   // debugLifetimes("LHS num_indirections", lhs_num_indirections);
   // debugLifetimes("RHS num_indirections", rhs_num_indirections);
-  assert(lhs_num_indirections == rhs_num_indirections);
-  // TODO if this is always true, only need to receive one num_indirections
   if (expr == nullptr) return;
   if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
     auto &call_info = PointsTo.GetCallExprInfo(call_expr);
@@ -520,6 +518,7 @@ void LifetimesCheckerVisitor::CompareAndCheck(
   } else if (const auto *member_expr =
                  clang::dyn_cast<clang::MemberExpr>(expr)) {
     // debugInfo("<Member Expr>");
+    rhs_num_indirections = 1;
     auto &member_expr_points_to = PointsTo.GetExprDecls(member_expr);
     if (member_expr_points_to.size() == 1) {
       for (const auto *decl : member_expr_points_to) {
