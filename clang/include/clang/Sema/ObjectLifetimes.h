@@ -33,6 +33,8 @@ class ObjectLifetimes {
     if (lifetime.IsNull()) {
       if (num_indirections == 0 && id == NOTSET) {
         return InsertPointeeObject(Lifetime(LOCAL, num_indirections));
+      } else if (GetLifetime(num_indirections - 1).IsStatic()) {
+        return InsertPointeeObject(Lifetime(STATIC, num_indirections));
       } else {
         return InsertPointeeObject(Lifetime(id, num_indirections));
       }
