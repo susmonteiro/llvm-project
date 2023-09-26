@@ -60,7 +60,6 @@ class LifetimesCheckerVisitor
   std::optional<std::string> VisitReturnStmt(
       const clang::ReturnStmt *return_stmt);
   std::optional<std::string> VisitStmt(const clang::Stmt *stmt);
-  std::optional<std::string> VisitUnaryOperator(const clang::UnaryOperator *op);
 
   const clang::VarDecl *GetDeclFromArg(const clang::Expr *arg) const;
 

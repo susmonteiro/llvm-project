@@ -964,13 +964,4 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitStmt(
   return std::nullopt;
 }
 
-std::optional<std::string> LifetimesCheckerVisitor::VisitUnaryOperator(
-    const clang::UnaryOperator *op) {
-  if (debugEnabled) debugLifetimes("[VisitUnaryOperator]");
-  for (const auto &child : op->children()) {
-    Visit(const_cast<clang::Stmt *>(child));
-  }
-  return std::nullopt;
-}
-
 }  // namespace clang
