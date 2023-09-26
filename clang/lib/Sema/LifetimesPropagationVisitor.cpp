@@ -14,12 +14,9 @@ void TransferFuncCall(const clang::VarDecl *lhs,
       if (current_type_call_info.is_local) {
         state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
                                        func_num_indirections, LOCAL);
-        state.CreateStmtLifetime(loc, LOCAL);
       } else if (current_type_call_info.is_static) {
         state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
                                        func_num_indirections, STATIC);
-        // TODO delete stmt lifetimes
-        state.CreateStmtLifetime(loc, STATIC);
       } else {
         for (const auto &[arg, arg_num_indirections] :
              current_type_call_info.info) {
@@ -111,7 +108,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
   if (maybe_lifetime != NOTSET) {
     state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
                                    rhs_num_indirections, maybe_lifetime);
-    state.CreateStmtLifetime(loc, LOCAL);
   } else if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(rhs)) {
     TransferFuncCall(lhs, call_expr, lhs_num_indirections, loc, PointsTo,
                      state);
@@ -128,7 +124,6 @@ void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
       if (maybe_lifetime != NOTSET) {
         state.CreateLifetimeDependency(lhs, lhs_num_indirections, loc,
                                        rhs_num_indirections, maybe_lifetime);
-        state.CreateStmtLifetime(loc, LOCAL);
       } else if (const auto *call_expr =
                      clang::dyn_cast<clang::CallExpr>(expr)) {
         TransferFuncCall(lhs, call_expr, lhs_num_indirections, loc, PointsTo,

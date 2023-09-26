@@ -210,10 +210,6 @@ StmtVarDependenciesMap &LifetimeAnnotationsAnalysis::GetStmtDependencies() {
   return StmtDependencies;
 }
 
-char LifetimeAnnotationsAnalysis::GetStmtLifetime(const clang::Stmt *stmt) {
-  return StmtLifetimes[stmt];
-}
-
 void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
     const clang::VarDecl *from, clang::QualType from_type,
     const clang::Stmt *to, clang::QualType to_type, char lifetime) {
@@ -245,11 +241,6 @@ void LifetimeAnnotationsAnalysis::CreateLifetimeDependency(
 void LifetimeAnnotationsAnalysis::CreateStmtDependency(
     const clang::Stmt *from, const clang::VarDecl *to) {
   StmtDependencies[from].insert(to);
-}
-
-void LifetimeAnnotationsAnalysis::CreateStmtLifetime(const clang::Stmt *from,
-                                                     char id) {
-  StmtLifetimes[from] = id;
 }
 
 llvm::DenseMap<LHSTypeStruct, llvm::DenseSet<LHSTypeStruct>>

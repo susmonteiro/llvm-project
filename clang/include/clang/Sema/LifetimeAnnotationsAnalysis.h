@@ -104,7 +104,6 @@ class LifetimeAnnotationsAnalysis {
 
   VarStmtDependenciesMap &GetLifetimeDependencies();
   StmtVarDependenciesMap &GetStmtDependencies();
-  char GetStmtLifetime(const clang::Stmt *stmt);
 
   void CreateLifetimeDependency(const clang::VarDecl *from,
                                 clang::QualType from_type,
@@ -127,8 +126,6 @@ class LifetimeAnnotationsAnalysis {
                                 unsigned int to_num_indirections);
 
   void CreateStmtDependency(const clang::Stmt *from, const clang::VarDecl *to);
-
-  void CreateStmtLifetime(const clang::Stmt *from, char id);
 
   void CreateDependencySimple(const clang::VarDecl *from,
                               clang::QualType from_type,
@@ -171,7 +168,6 @@ class LifetimeAnnotationsAnalysis {
   VariableLifetimesVector VariableLifetimes;
   VarStmtDependenciesMap LifetimeDependencies;
   StmtVarDependenciesMap StmtDependencies;
-  LifetimesMap StmtLifetimes;
   PointsToMap PointsTo;
   ObjectLifetimes ReturnLifetime;
   FunctionLifetimeFactory Factory;
