@@ -211,16 +211,13 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   const auto &lhs = op->getLHS()->IgnoreParens();
   const auto &rhs = op->getRHS()->IgnoreParens();
 
-  // Because of how we handle reference-like structs, a member access to a
-  // non-reference-like field in a struct might still produce lifetimes. We
-  // don't want to change points-to sets in those cases.
+  Visit(lhs);
+  Visit(rhs);
+  
   if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
-    Visit(lhs);
-    Visit(rhs);
     return std::nullopt;
   }
 
-  Visit(lhs);
   PointsTo.InsertExprPointsTo(op, lhs);
   PointsTo.InsertExprDecl(op, lhs);
   // TODO check if this is needed
@@ -228,7 +225,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   PointsTo.InsertCallExprInfo(op, lhs);
   // debugLifetimes("After insert call expr info (BinAssign lhs)");
 
-  Visit(rhs);
   PointsTo.InsertExprPointsTo(op, rhs);
   // debugLifetimes("Before insert call expr info (BinAssign rhs)");
   PointsTo.InsertCallExprInfo(op, rhs);
