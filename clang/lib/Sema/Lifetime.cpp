@@ -48,20 +48,20 @@ bool Lifetime::IsSet() const { return Id >= DEAD; }
 bool Lifetime::IsNotSet() const { return Id == NOTSET; }
 bool Lifetime::IsStatic() const { return Id == STATIC; }
 bool Lifetime::ContainsStatic() const {
-  return (unsigned int)STATIC < PossibleLifetimes.size() &&
-         !PossibleLifetimes[STATIC].empty();
+  return (unsigned int)STATIC < Dependencies.size() &&
+         !Dependencies[STATIC].empty();
 }
 
 bool Lifetime::IsLocal() const { return Id == LOCAL; }
 bool Lifetime::ContainsLocal() const {
-  return (unsigned int)LOCAL < PossibleLifetimes.size() &&
-         !PossibleLifetimes[LOCAL].empty();
+  return (unsigned int)LOCAL < Dependencies.size() &&
+         !Dependencies[LOCAL].empty();
 }
 
 bool Lifetime::IsDead() const { return Id == DEAD; }
 bool Lifetime::ContainsDead() const {
-  return (unsigned int)DEAD < PossibleLifetimes.size() &&
-         !PossibleLifetimes[DEAD].empty();
+  return (unsigned int)DEAD < Dependencies.size() &&
+         !Dependencies[DEAD].empty();
 }
 
 void Lifetime::SetStatic() { Id = STATIC; }
@@ -133,7 +133,7 @@ std::string Lifetime::DebugString() const {
 
   if (IsNotSet()) {
     res += "Shortest Lifetimes of this variable: { ";
-    for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
+    for (unsigned int i = 0; i < Dependencies.size(); i++) {
       if (ContainsShortestLifetime(i)) {
         res += GetLifetimeName(i) + ' ';
       }
@@ -143,15 +143,15 @@ std::string Lifetime::DebugString() const {
   return res + '\n';
 }
 
-bool Lifetime::EmptyPossibleLifetimes() const {
+bool Lifetime::EmptyDependencies() const {
   unsigned idx = DEAD;
-  unsigned size = PossibleLifetimes.size();
-  while (++idx < size && PossibleLifetimes[idx].empty()) {
+  unsigned size = Dependencies.size();
+  while (++idx < size && Dependencies[idx].empty()) {
   }
   return idx >= size;
 }
 
-void Lifetime::ProcessPossibleLifetimes() {
+void Lifetime::ProcessDependencies() {
   // should only reach this if lifetime is not set
   assert(IsNotSet());
   if (ContainsDead()) {
@@ -166,12 +166,12 @@ void Lifetime::ProcessPossibleLifetimes() {
   }
 
   char unique_id = NOTSET;
-  for (unsigned int i = 0; i < PossibleLifetimes.size(); i++) {
-    if (!PossibleLifetimes[i].empty()) {
+  for (unsigned int i = 0; i < Dependencies.size(); i++) {
+    if (!Dependencies[i].empty()) {
       if (unique_id != NOTSET) {
         // set all possible lifetimes as shortest
-        for (unsigned int j = OFFSET; j < PossibleLifetimes.size(); j++) {
-          if (!PossibleLifetimes[j].empty() && j != STATIC) {
+        for (unsigned int j = OFFSET; j < Dependencies.size(); j++) {
+          if (!Dependencies[j].empty() && j != STATIC) {
             shortest_insert(ShortestLifetimes, j);
           }
         }
@@ -184,36 +184,36 @@ void Lifetime::ProcessPossibleLifetimes() {
   SetId(unique_id);
 
   // in all other cases, the Id of the lifetime remains NOTSET
-  // - if PossibleLifetimes is empty, the lifetime of this variable is
+  // - if Dependencies is empty, the lifetime of this variable is
   // undefined
-  // - if PossibleLifetimes contains multiple lifetimes, then the
+  // - if Dependencies contains multiple lifetimes, then the
   // lifetime is the shortest among them since we cannot know which lifetimes
   // outlives which, then all of them are considered the shortest
 }
 
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
   assert(id != NOTSET);
-  return (unsigned int)id >= PossibleLifetimes.size() ||
-                 PossibleLifetimes[id].empty()
+  return (unsigned int)id >= Dependencies.size() ||
+                 Dependencies[id].empty()
              ? std::nullopt
-             : std::optional(PossibleLifetimes[id]);
+             : std::optional(Dependencies[id]);
 }
 
 bool Lifetime::operator==(const Lifetime &Other) const {
   if (IsNull() || Other.IsNull()) return false;
   
   if (Id != Other.GetId()) {
-    return (Id == NOTSET && EmptyPossibleLifetimes()) ||
-           (Other.GetId() == NOTSET && Other.EmptyPossibleLifetimes());
+    return (Id == NOTSET && EmptyDependencies()) ||
+           (Other.GetId() == NOTSET && Other.EmptyDependencies());
   }
 
   if (IsSet()) return true;
 
   unsigned int min_size =
-      std::min(PossibleLifetimes.size(), Other.GetPossibleLifetimes().size());
+      std::min(Dependencies.size(), Other.GetDependencies().size());
   const Lifetime &larger_lifetime =
-      PossibleLifetimes.size() > min_size ? *this : Other;
-  unsigned int max_size = larger_lifetime.GetPossibleLifetimes().size();
+      Dependencies.size() > min_size ? *this : Other;
+  unsigned int max_size = larger_lifetime.GetDependencies().size();
   unsigned int i = -1;
 
   while (++i < min_size) {
@@ -242,13 +242,13 @@ bool Lifetime::operator<(const Lifetime &Other) const {
   // $static outlives all lifetimes and all lifetimes outlive $local
   if (IsDead() && Other.IsDead()) {
     // TODO delete this
-    const auto &this_possible_lifetime = GetPossibleLifetime(DEAD);
-    const auto &other_possible_lifetime = Other.GetPossibleLifetime(DEAD);
-    if (this_possible_lifetime.size() < other_possible_lifetime.size()) {
+    const auto &this_dependencies = GetPossibleLifetime(DEAD);
+    const auto &other_dependencies = Other.GetPossibleLifetime(DEAD);
+    if (this_dependencies.size() < other_dependencies.size()) {
       return false;
     }
-    for (const auto *stmt : this_possible_lifetime) {
-      if (other_possible_lifetime.find(stmt) == other_possible_lifetime.end())
+    for (const auto *stmt : this_dependencies) {
+      if (other_dependencies.find(stmt) == other_dependencies.end())
         return true;
     }
     return false;
@@ -258,29 +258,29 @@ bool Lifetime::operator<(const Lifetime &Other) const {
   if (IsStatic() || Other.IsLocal()) return false;
   if (IsLocal() || Other.IsStatic()) return true;
 
-  const auto &other_possible_lifetimes = Other.GetPossibleLifetimes();
+  const auto &other_dependenciess = Other.GetDependencies();
 
   if (IsSet() && Other.IsSet()) {
     return Id != Other.GetId();
   } else if (IsSet()) {
-    return (unsigned int)Id >= other_possible_lifetimes.size() ||
-           other_possible_lifetimes[Id].empty();
+    return (unsigned int)Id >= other_dependenciess.size() ||
+           other_dependenciess[Id].empty();
   } else if (Other.IsSet()) {
     return true;
   }
 
   // if both this and other are not set
   unsigned int min_size =
-      std::min(PossibleLifetimes.size(), other_possible_lifetimes.size());
+      std::min(Dependencies.size(), other_dependenciess.size());
   unsigned int i = -1;
   while (++i < min_size) {
     if (ContainsShortestLifetime(i) && !Other.ContainsShortestLifetime(i))
       return true;
   }
 
-  if (PossibleLifetimes.size() > other_possible_lifetimes.size()) {
+  if (Dependencies.size() > other_dependenciess.size()) {
     i--;
-    while (++i < PossibleLifetimes.size()) {
+    while (++i < Dependencies.size()) {
       if (ContainsShortestLifetime(i)) return true;
     }
   }

@@ -69,7 +69,7 @@ void TransferDeadLifetime(const Expr *arg, const Stmt *loc,
   }
   Lifetime &arg_lifetime = state.GetLifetime(arg_decl, num_indirections);
   arg_lifetime.SetDead();
-  arg_lifetime.InsertPossibleLifetimes(DEAD, loc);
+  arg_lifetime.InsertDependencies(DEAD, loc);
 }
 
 void TransferMemberExpr(const clang::VarDecl *lhs,

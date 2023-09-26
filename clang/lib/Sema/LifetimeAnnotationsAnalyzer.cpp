@@ -142,7 +142,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
 
       // This should be correct -> don't want to propagate $dead
       if (rhs_info.extra_lifetime >= LOCAL) {
-        Lifetime::InsertPossibleLifetimes(rhs_info.extra_lifetime,
+        Lifetime::InsertDependencies(rhs_info.extra_lifetime,
                                           rhs_info.stmt, possible_lifetimes);
       }
 
@@ -155,16 +155,16 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
         if (rhs_lifetime.IsDead()) {
           continue;
         } else if (rhs_lifetime.IsNotSet()) {
-          auto &rhs_possible_lifetimes = rhs_lifetime.GetPossibleLifetimes();
+          auto &rhs_possible_lifetimes = rhs_lifetime.GetDependencies();
           for (unsigned int i = 0; i < rhs_possible_lifetimes.size(); i++) {
             if (!rhs_possible_lifetimes[i].empty()) {
-              Lifetime::InsertPossibleLifetimes(i, rhs_info.stmt,
+              Lifetime::InsertDependencies(i, rhs_info.stmt,
                                                 possible_lifetimes);
             }
           }
         } else {
           char vardecl_lifetime_id = rhs_lifetime.GetId();
-          Lifetime::InsertPossibleLifetimes(vardecl_lifetime_id, rhs_info.stmt,
+          Lifetime::InsertDependencies(vardecl_lifetime_id, rhs_info.stmt,
                                             possible_lifetimes);
         }
       }

@@ -75,7 +75,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
     assert(lhs_lifetime.IsSet() && "BinAssignFactory");
     if (rhs_lifetime.IsNotSet()) {
       unsigned int possible_lifetimes_size =
-          rhs_lifetime.GetPossibleLifetimes().size();
+          rhs_lifetime.GetDependencies().size();
       unsigned int num_indirections = rhs_lifetime.GetNumIndirections();
       for (unsigned int i = OFFSET; i < possible_lifetimes_size; i++) {
         if (!rhs_lifetime.ContainsShortestLifetime(i) ||
@@ -109,7 +109,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
     assert(lhs_lifetime.IsSet() && "DeclStmtFactory");
     if (rhs_lifetime.IsNotSet()) {
       unsigned int init_possible_lifetimes_size =
-          rhs_lifetime.GetPossibleLifetimes().size();
+          rhs_lifetime.GetDependencies().size();
       unsigned int num_indirections = rhs_lifetime.GetNumIndirections();
       for (unsigned int i = 0; i < init_possible_lifetimes_size; i++) {
         if (!rhs_lifetime.ContainsShortestLifetime(i) ||
@@ -143,7 +143,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
     assert(return_lifetime.IsSet());
     if (var_lifetime.IsNotSet()) {
       unsigned int var_possible_lifetimes_size =
-          var_lifetime.GetPossibleLifetimes().size();
+          var_lifetime.GetDependencies().size();
       unsigned int num_indirections = var_lifetime.GetNumIndirections();
       for (unsigned int i = 0; i < var_possible_lifetimes_size; i++) {
         if (!var_lifetime.ContainsShortestLifetime(i) ||
@@ -276,7 +276,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
           if (rhs_lifetime.IsDead()) continue;
           unsigned int i = LOCAL - 1;
           unsigned int lhs_possible_lifetimes_size =
-              lhs_lifetime.GetPossibleLifetimes().size();
+              lhs_lifetime.GetDependencies().size();
           while (++i < lhs_possible_lifetimes_size) {
             if (lhs_lifetime.GetPossibleLifetime(i).empty()) continue;
             Lifetime specific_lifetime(Lifetime::IdToChar(i));
@@ -285,7 +285,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
             if (rhs_lifetime < specific_lifetime) {
               if (rhs_lifetime.IsNotSet()) {
                 unsigned int possible_lifetimes_size =
-                    rhs_lifetime.GetPossibleLifetimes().size();
+                    rhs_lifetime.GetDependencies().size();
                 const auto &stmts = lhs_lifetime.GetStmts(i);
                 unsigned int rhs_num_indirections =
                     rhs_lifetime.GetNumIndirections();
@@ -329,8 +329,8 @@ void LifetimesCheckerVisitor::ParamsCallExprChecker(
       << direct_callee << GenerateArgName(first_arg, first_num_indirections)
       << GenerateArgName(second_arg, second_num_indirections)
       << call->getSourceRange();
-  unsigned int first_arg_size = first_lifetime.GetPossibleLifetimes().size();
-  unsigned int second_arg_size = second_lifetime.GetPossibleLifetimes().size();
+  unsigned int first_arg_size = first_lifetime.GetDependencies().size();
+  unsigned int second_arg_size = second_lifetime.GetDependencies().size();
   if (first_lifetime.IsNotSet() && second_lifetime.IsNotSet()) {
     unsigned int max_size = std::max(first_arg_size, second_arg_size);
     for (unsigned int i = 0; i < max_size; i++) {
@@ -674,7 +674,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
         Lifetime &first_lifetime =
             State.GetLifetime(first_decl, num_indirections);
-        if (first_lifetime.EmptyPossibleLifetimes() &&
+        if (first_lifetime.EmptyDependencies() &&
             first_lifetime.IsNotSet())
           continue;
         if (first_lifetime.IsDead()) continue;
@@ -695,7 +695,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                    Lifetime::GetNumIndirections(second_expr->getType()));
               Lifetime &second_lifetime =
                   State.GetLifetime(second_decl, num_indirections);
-              if (second_lifetime.EmptyPossibleLifetimes() &&
+              if (second_lifetime.EmptyDependencies() &&
                   second_lifetime.IsNotSet())
                 continue;
               if (second_lifetime.IsDead()) continue;
@@ -731,7 +731,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
           Lifetime &first_lifetime =
               State.GetLifetimeOrLocal(first_decl, num_indirections);
-          if (first_lifetime.EmptyPossibleLifetimes() &&
+          if (first_lifetime.EmptyDependencies() &&
               first_lifetime.IsNotSet())
             continue;
 
@@ -746,7 +746,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
             if (second_decl == nullptr) continue;
             Lifetime &second_lifetime =
                 State.GetLifetimeOrLocal(second_decl, num_indirections);
-            if (second_lifetime.EmptyPossibleLifetimes() &&
+            if (second_lifetime.EmptyDependencies() &&
                 second_lifetime.IsNotSet())
               continue;
             if (first_lifetime < second_lifetime) {
@@ -790,7 +790,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
           if (!arg_lifetime.IsStatic()) {
             if (arg_lifetime.IsNotSet()) {
               unsigned int arg_possible_lifetimes_size =
-                  arg_lifetime.GetPossibleLifetimes().size();
+                  arg_lifetime.GetDependencies().size();
               for (unsigned int i = 0; i < arg_possible_lifetimes_size; i++) {
                 if (!arg_lifetime.ContainsShortestLifetime(i)) continue;
                 S.Diag(arg_expr->getExprLoc(), diag::warn_arg_lifetimes_differ)

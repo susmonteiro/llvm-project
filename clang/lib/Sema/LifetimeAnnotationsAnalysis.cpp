@@ -286,7 +286,7 @@ void LifetimeAnnotationsAnalysis::ProcessPossibleLifetimes() {
     for (auto &objectLifetime : lifetimes) {
       Lifetime &lifetime = objectLifetime;
       if (lifetime.IsNotSet()) {
-        lifetime.ProcessPossibleLifetimes();
+        lifetime.ProcessDependencies();
       }
     }
   }

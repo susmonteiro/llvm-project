@@ -91,8 +91,8 @@ class Lifetime {
     SetNumIndirections(type);
   }
 
-  bool EmptyPossibleLifetimes() const;
-  void ProcessPossibleLifetimes();
+  bool EmptyDependencies() const;
+  void ProcessDependencies();
 
   std::string DebugString() const;
 
@@ -100,60 +100,60 @@ class Lifetime {
   static std::string GetLifetimeName(char id);
   std::string GetLifetimeName() const { return GetLifetimeName(Id); }
 
-  StmtDenseSet GetPossibleLifetime(char id) const { return PossibleLifetimes[id]; }
+  StmtDenseSet GetPossibleLifetime(char id) const { return Dependencies[id]; }
 
   static StmtDenseSet &GetPossibleLifetime(
-      char id, LifetimesVector &possible_lifetimes) {
-    return possible_lifetimes[id];
+      char id, LifetimesVector &dependencies) {
+    return dependencies[id];
   }
 
   StmtDenseSet &GetAndResizePossibleLifetime(char id) {
-    if ((unsigned int)id >= PossibleLifetimes.size()) {
-      PossibleLifetimes.resize(id + 1);
+    if ((unsigned int)id >= Dependencies.size()) {
+      Dependencies.resize(id + 1);
     }
-    return PossibleLifetimes[id];
+    return Dependencies[id];
   }
 
   static StmtDenseSet &GetAndResizePossibleLifetime(
-      char id, LifetimesVector &possible_lifetimes) {
-    if ((unsigned int)id >= possible_lifetimes.size()) {
-      possible_lifetimes.resize(id + 1);
+      char id, LifetimesVector &dependencies) {
+    if ((unsigned int)id >= dependencies.size()) {
+      dependencies.resize(id + 1);
     }
-    return possible_lifetimes[id];
+    return dependencies[id];
   }
 
-  const LifetimesVector &GetPossibleLifetimes() const {
-    return PossibleLifetimes;
+  const LifetimesVector &GetDependencies() const {
+    return Dependencies;
   }
 
   int GetShortestLifetimes() const { return ShortestLifetimes; }
 
   std::optional<StmtDenseSet> GetStmts(char id);
 
-  static void InsertPossibleLifetimes(char id, const clang::Stmt *stmt,
-                                      LifetimesVector &possible_lifetimes) {
-    Lifetime::GetAndResizePossibleLifetime(id, possible_lifetimes).insert(stmt);
+  static void InsertDependencies(char id, const clang::Stmt *stmt,
+                                      LifetimesVector &dependencies) {
+    Lifetime::GetAndResizePossibleLifetime(id, dependencies).insert(stmt);
   }
 
-  void InsertPossibleLifetimes(char id, const clang::Stmt *stmt) {
-    InsertPossibleLifetimes(id, stmt, PossibleLifetimes);
+  void InsertDependencies(char id, const clang::Stmt *stmt) {
+    InsertDependencies(id, stmt, Dependencies);
   }
 
-  void InsertPossibleLifetimes(LifetimesVector possible_lifetimes) {
-    if (possible_lifetimes.size() > PossibleLifetimes.size())
-      PossibleLifetimes.resize(possible_lifetimes.size());
-    for (unsigned int i = 0; i < possible_lifetimes.size(); i++) {
-      PossibleLifetimes[i].insert(
-          GetPossibleLifetime(i, possible_lifetimes).begin(),
-          GetPossibleLifetime(i, possible_lifetimes).end());
+  void InsertDependencies(LifetimesVector dependencies) {
+    if (dependencies.size() > Dependencies.size())
+      Dependencies.resize(dependencies.size());
+    for (unsigned int i = 0; i < dependencies.size(); i++) {
+      Dependencies[i].insert(
+          GetPossibleLifetime(i, dependencies).begin(),
+          GetPossibleLifetime(i, dependencies).end());
     }
   }
 
-  void SetPossibleLifetimes(LifetimesVector possible_lifetimes) {
-    PossibleLifetimes = possible_lifetimes;
+  void SetDependencies(LifetimesVector dependencies) {
+    Dependencies = dependencies;
   }
 
-  void RemoveFromPossibleLifetimes(char id) { PossibleLifetimes[id].clear(); }
+  void RemoveFromDependencies(char id) { Dependencies[id].clear(); }
 
   bool ContainsShortestLifetime(unsigned int id) const {
     return is_in_shortest(ShortestLifetimes, id);
@@ -169,7 +169,7 @@ class Lifetime {
 
   friend class llvm::DenseMapInfo<Lifetime, void>;
 
-  LifetimesVector PossibleLifetimes;
+  LifetimesVector Dependencies;
   clang::QualType LifetimeType;
   unsigned int NumIndirections = 0;
   int ShortestLifetimes = 0;

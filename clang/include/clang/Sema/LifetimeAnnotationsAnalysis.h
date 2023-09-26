@@ -74,19 +74,19 @@ class LifetimeAnnotationsAnalysis {
 
   const LifetimesVector &GetPossibleLifetimes(const clang::VarDecl *var_decl,
                                               clang::QualType type) {
-    return GetLifetime(var_decl, type).GetPossibleLifetimes();
+    return GetLifetime(var_decl, type).GetDependencies();
   }
 
   const LifetimesVector &GetPossibleLifetimes(const clang::VarDecl *var_decl,
                                               unsigned int num_indirections) {
-    return GetLifetime(var_decl, num_indirections).GetPossibleLifetimes();
+    return GetLifetime(var_decl, num_indirections).GetDependencies();
   }
 
   void PropagatePossibleLifetimes(const clang::VarDecl *target,
                                   const LifetimesVector &possible_lifetimes,
                                   unsigned int num_indirections) {
     GetLifetime(target, num_indirections)
-        .InsertPossibleLifetimes(possible_lifetimes);
+        .InsertDependencies(possible_lifetimes);
   }
 
   void CreateVariable(const clang::VarDecl *var_decl, clang::QualType type) {
