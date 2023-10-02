@@ -589,18 +589,16 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
   assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS()->IgnoreParens();
-
   clang::QualType lhs_type = lhs->getType().getCanonicalType();
-
   if (!lhs_type->isPointerType() && !lhs_type->isReferenceType()) {
     // debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
 
-  const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   const auto &rhs = op->getRHS()->IgnoreParens();
   Visit(rhs);
 
+  const auto &lhs_points_to = PointsTo.GetExprPointsTo(lhs);
   VerifyBinAssign(lhs, rhs, lhs, op, lhs_points_to);
   for (const auto &expr : lhs_points_to) {
     VerifyBinAssign(lhs, rhs, expr, op, lhs_points_to);

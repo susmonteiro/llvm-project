@@ -76,13 +76,13 @@ void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(
 
   // step 2
   debugInfo("\n====== START STEP 2 - " + func_name + " ======\n");
-  LifetimeAnnotationsAnalyzer::PropagateLifetimes();
+  PropagateLifetimes();
   debugInfo("\n====== FINISH STEP 2 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 
   // step 3
   debugInfo("\n====== START STEP 3 - " + func_name + " ======\n");
-  LifetimeAnnotationsAnalyzer::CheckLifetimes(func);
+  CheckLifetimes(func);
   debugInfo("\n====== FINISH STEP 3 - " + func_name + " ======\n");
   debugLifetimes(State.DebugString());
 }
