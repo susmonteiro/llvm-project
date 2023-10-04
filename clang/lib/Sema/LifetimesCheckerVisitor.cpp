@@ -483,10 +483,12 @@ void LifetimesCheckerVisitor::DeclChecker(
       const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
       if (maybe_stmts.has_value()) {
         const auto &stmts = maybe_stmts.value();
+        int num_notes = MAX_NUM_NOTES;
         for (const auto &stmt : stmts) {
           S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
               << GenerateLifetimeName(LOCAL, rhs_lifetime.GetNumIndirections())
               << stmt->getSourceRange();
+          if (--num_notes < 0) break;
         }
       } else {
         S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here)
@@ -514,10 +516,12 @@ void LifetimesCheckerVisitor::DeclChecker(
       const auto &maybe_stmts = rhs_lifetime.GetStmts(LOCAL);
       if (maybe_stmts.has_value()) {
         const auto &stmts = maybe_stmts.value();
+        int num_notes = MAX_NUM_NOTES;
         for (const auto &stmt : stmts) {
           S.Diag(stmt->getBeginLoc(), diag::note_lifetime_declared_here)
               << GenerateLifetimeName(LOCAL, rhs_lifetime.GetNumIndirections())
               << stmt->getSourceRange();
+          if (--num_notes < 0) break;
         }
       } else {
         S.Diag(rhs_var_decl->getBeginLoc(), diag::note_lifetime_declared_here)
@@ -898,6 +902,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclRefExpr(
               << std::string(lifetime.GetNumIndirections(), '*')
               << decl_ref->getSourceRange();
 
+          int num_notes = MAX_NUM_NOTES;
           for (const auto &stmt : stmts) {
             if (const auto *call_expr =
                     clang::dyn_cast<clang::CallExpr>(stmt)) {
@@ -912,6 +917,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclRefExpr(
               S.Diag(call_decl->getBeginLoc(), diag::note_param_lifetime_local)
                   << GenerateLifetimeName(LOCAL, lifetime.GetNumIndirections())
                   << call_decl->getSourceRange();
+              if ((num_notes -= 2) < 0) return std::nullopt;
             }
           }
         }
