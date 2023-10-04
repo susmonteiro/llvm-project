@@ -635,6 +635,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       llvm::SmallVector<llvm::SmallVector<ParamInfo>> param_lifetimes;
 
       // get lifetimes for the current indirection level
+      debugInfo("1) Params for current indirection level");
       for (const auto &param_info : params_set) {
         debugLifetimes("Inside first loop");
         if (param_info.param == nullptr) continue;
@@ -642,10 +643,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
         assert(!param_info.type.isNull());
         clang::QualType param_type = param_info.type->getPointeeType();
         params_set[param_info.ptr_idx].type = param_type;
-        // TODO check if current_num_indirections is needed
-        // TODO maybe use just num_indirections
-        params_set[param_info.ptr_idx].current_num_indirections--;
-        assert(num_indirections == param_info.current_num_indirections);
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, num_indirections);
         debugLifetimes("Param", param_info.param->getNameAsString());
@@ -658,6 +655,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of higher indirections
+      debugInfo("2) Check params for HIGHER indirection level");
       debugLifetimes("Size of param_lifetimes", param_lifetimes.size());
       for (const auto &params : param_lifetimes) {
         debugLifetimes("Size of params", params.size());
@@ -672,8 +670,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
         Lifetime &first_lifetime =
             State.GetLifetime(first_decl, num_indirections);
-        if (first_lifetime.EmptyDependencies() &&
-            first_lifetime.IsNotSet())
+        if (first_lifetime.EmptyDependencies() && first_lifetime.IsNotSet())
           continue;
         if (first_lifetime.IsDead()) continue;
 
@@ -698,11 +695,28 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                 continue;
               if (second_lifetime.IsDead()) continue;
               if (first_lifetime != second_lifetime) {
-                ParamsCallExprChecker(call, direct_callee, first_decl,
-                                      second_decl, first_lifetime,
-                                      second_lifetime, first_num_indirections,
-                                      second_num_indirections, num_indirections,
-                                      diag::warn_func_params_lifetimes_equal);
+                if (first_param_info->type.isConstQualified() &&
+                    it->type.isConstQualified()) {
+                  continue;
+                } else if (first_param_info->type.isConstQualified()) {
+                  ParamsCallExprChecker(
+                      call, direct_callee, first_decl, second_decl,
+                      first_lifetime, second_lifetime, first_num_indirections,
+                      second_num_indirections, num_indirections,
+                      diag::warn_func_params_lifetimes_shorter);
+                } else if (it->type.isConstQualified()) {
+                  ParamsCallExprChecker(
+                      call, direct_callee, second_decl, first_decl,
+                      second_lifetime, first_lifetime, second_num_indirections,
+                      first_num_indirections, num_indirections,
+                      diag::warn_func_params_lifetimes_shorter);
+                } else {
+                  ParamsCallExprChecker(
+                      call, direct_callee, first_decl, second_decl,
+                      first_lifetime, second_lifetime, first_num_indirections,
+                      second_num_indirections, num_indirections,
+                      diag::warn_func_params_lifetimes_equal);
+                }
                 return std::nullopt;
               }
             }
@@ -711,9 +725,9 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of current indirection level
+      debugInfo("3) Check params for CURRENT indirection level");
       if (!param_lifetimes.empty()) {
         for (const auto &first_param_info : params_info_vec[num_indirections]) {
-          assert(num_indirections == first_param_info.current_num_indirections);
           Lifetime &param_lifetime = func_info.GetParamLifetime(
               first_param_info.param, num_indirections);
           char param_lifetime_id = param_lifetime.GetId();
@@ -729,8 +743,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
           Lifetime &first_lifetime =
               State.GetLifetimeOrLocal(first_decl, num_indirections);
-          if (first_lifetime.EmptyDependencies() &&
-              first_lifetime.IsNotSet())
+          if (first_lifetime.EmptyDependencies() && first_lifetime.IsNotSet())
             continue;
 
           int first_num_indirections =
@@ -739,6 +752,11 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
                Lifetime::GetNumIndirections(first_expr->getType()));
 
           for (const auto &second_param_info : filtered_params) {
+            // skip const params
+            if (second_param_info.type.isConstQualified()) {
+              continue;
+            }
+
             const auto *second_expr = call->getArg(second_param_info.glb_idx);
             const auto *second_decl = GetDeclFromArg(second_expr);
             if (second_decl == nullptr) continue;
@@ -764,19 +782,19 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // insert params for the next indirection level
-
+      debugInfo("4) Insert params for NEXT indirection level");
       for (const auto &param_info : params_info_vec[num_indirections]) {
         assert(param_info.ptr_idx < params_set.size());
         params_set[param_info.ptr_idx] = param_info;
       }
 
       // check static params
+      debugInfo("5) Check STATIC params");
       for (const auto &param_info : params_set) {
         debugLifetimes("Checking static params");
         if (param_info.param == nullptr) continue;
         // TODO delete this
         assert(!param_info.type.isNull());
-        assert(num_indirections == param_info.current_num_indirections);
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, num_indirections);
         if (param_lifetime.IsStatic()) {

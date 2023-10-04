@@ -389,7 +389,7 @@ void FunctionLifetimes::ProcessParams() {
     }
 
     ParamsInfo[num_indirections].emplace_back(ParamInfo{
-        type, param, ptr_idx, glb_idx, num_indirections, num_indirections});
+        type, param, ptr_idx, glb_idx, num_indirections});
     glb_idx++;
     if (type->isPointerType() || type->isReferenceType()) {
       ptr_idx++;
