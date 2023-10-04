@@ -12,13 +12,11 @@
 namespace clang {
 
 struct ParamInfo {
-  // TODO remove type from struct
   clang::QualType type;
   const clang::ParmVarDecl *param;
   unsigned int ptr_idx;  // includes only pointers/references
   unsigned int glb_idx;  // includes all args
   unsigned int original_num_indirections;
-  unsigned int current_num_indirections;
 };
 
 using LifetimeFactory = std::function<llvm::Expected<Lifetime>(
