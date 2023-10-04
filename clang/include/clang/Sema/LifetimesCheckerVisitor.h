@@ -15,18 +15,20 @@ using PrintNotesFactory = std::function<void(
     const clang::VarDecl *, const clang::Decl *, const clang::BinaryOperator *,
     const clang::Expr *, const clang::Stmt *, Lifetime &, Lifetime &)>;
 
+constexpr int MAX_NUM_NOTES = 9;
+
 class LifetimesCheckerVisitorFactory {
  public:
   LifetimesCheckerVisitorFactory(Sema &sema) : S(sema) {}
 
-  void PrintNotes(Lifetime &lifetime, const clang::Decl *var_decl,
-                  int msg) const;
-  void PrintNotes(Lifetime &lifetime, clang::SourceLocation loc,
-                  clang::SourceRange range, int msg) const;
-  void PrintNotes(Lifetime &lifetime, const clang::Decl *var_decl, int msg,
-                  char id) const;
-  void PrintNotes(Lifetime &lifetime, clang::SourceLocation Loc,
-                  clang::SourceRange range, int msg, char id) const;
+  int PrintNotes(Lifetime &lifetime, const clang::Decl *var_decl, int msg,
+                 int notes) const;
+  int PrintNotes(Lifetime &lifetime, clang::SourceLocation loc,
+                 clang::SourceRange range, int msg, int notes) const;
+  int PrintNotes(Lifetime &lifetime, const clang::Decl *var_decl, int msg,
+                 char id, int notes) const;
+  int PrintNotes(Lifetime &lifetime, clang::SourceLocation Loc,
+                 clang::SourceRange range, int msg, char id, int notes) const;
 
   PrintNotesFactory BinAssignFactory() const;
   PrintNotesFactory DeclStmtFactory() const;
@@ -102,11 +104,11 @@ class LifetimesCheckerVisitor
                        const clang::Stmt *stmt, const clang::BinaryOperator *op,
                        bool return_lifetime, PrintNotesFactory factory) const;
 
-  void PrintNotes(const clang::VarDecl *var_decl, Lifetime &lifetime,
-                  unsigned int num_indirections) const;
-  void PrintNotes(const clang::VarDecl *var_decl, Lifetime &lifetime, char id,
-                  unsigned int num_indirections) const;
-  void PrintNotes(const clang::VarDecl *var_decl, char id,
+  int GenerateNotes(const clang::VarDecl *var_decl, Lifetime &lifetime,
+                 unsigned int num_indirections, int notes) const;
+  int GenerateNotes(const clang::VarDecl *var_decl, Lifetime &lifetime, char id,
+                 unsigned int num_indirections, int notes) const;
+  void GenerateNotes(const clang::VarDecl *var_decl, char id,
                   unsigned int num_indirections) const;
 
  private:
