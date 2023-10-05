@@ -266,9 +266,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
     const auto *lhs_decl_ref_expr = dyn_cast<clang::DeclRefExpr>(expr);
     if (const auto *lhs_var_decl =
             dyn_cast<clang::VarDecl>(lhs_decl_ref_expr->getDecl())) {
-      clang::QualType lhs_type = PointsTo.GetExprType(deref_op);
-      lhs_type =
-          lhs_type.isNull() ? deref_op->getType().getCanonicalType() : lhs_type;
+      clang::QualType lhs_type = deref_op->getType().getCanonicalType();
       Lifetime &lhs_lifetime = State.GetLifetime(lhs_var_decl, lhs_type);
       if (lhs_lifetime.IsDead()) continue;
 
@@ -280,9 +278,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
                 dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
           if (!lhs_type->isPointerType() && !lhs_type->isReferenceType())
             continue;
-          clang::QualType rhs_type = PointsTo.GetExprType(rhs);
-          rhs_type = rhs_type.isNull() ? deref_op->getType().getCanonicalType()
-                                       : rhs_type;
+          clang::QualType rhs_type = deref_op->getType().getCanonicalType();
           char id = PointsTo.GetExprLifetime(rhs_decl_ref_expr);
           Lifetime rhs_lifetime =
               id != NOTSET ? Lifetime(id, rhs_type)
@@ -957,8 +953,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
         return std::nullopt;
       }
 
-      clang::QualType init_type = PointsTo.GetExprType(init);
-      init_type = init_type.isNull() ? var_decl_type : init_type;
       CompareAndCheck(var_decl, var_num_indirections, init, init,
                       var_num_indirections, nullptr, nullptr, false,
                       Factory.DeclStmtFactory());

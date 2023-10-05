@@ -95,14 +95,8 @@ void TransferMemberExpr(const clang::VarDecl *lhs,
 
 void TransferRHS(const clang::VarDecl *lhs, const clang::Expr *rhs,
                  unsigned int lhs_num_indirections,
-                 unsigned int base_num_indirections, const clang::Stmt *loc,
+                 unsigned int rhs_num_indirections, const clang::Stmt *loc,
                  PointsToMap &PointsTo, LifetimeAnnotationsAnalysis &state) {
-  // debugLifetimes("TransferRHS", lhs->getNameAsString());
-  clang::QualType rhs_type = PointsTo.GetExprType(rhs);
-  debugLifetimes("Type of rhs", rhs_type.getAsString());
-  unsigned int rhs_num_indirections =
-      rhs_type.isNull() ? base_num_indirections
-                        : Lifetime::GetNumIndirections(rhs_type);
 
   char maybe_lifetime = PointsTo.GetExprLifetime(rhs);
   if (maybe_lifetime != NOTSET) {
@@ -190,11 +184,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitArraySubscriptExpr(
   // debugLifetimes("Before insert call expr info (ArraySubscriptExpr)");
   PointsTo.InsertCallExprInfo(expr, base);
   // debugLifetimes("After insert call expr info (ArraySubscriptExpr)");
-
-  clang::QualType found_type = PointsTo.GetExprType(base);
-  if (!found_type.isNull()) {
-    PointsTo.InsertExprType(expr, found_type);
-  }
   return std::nullopt;
 }
 
@@ -310,10 +299,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
         if (!arg_type->isPointerType() && !arg_type->isReferenceType()) {
           continue;
         }
-        clang::QualType found_type = PointsTo.GetExprType(arg);
-        if (!found_type.isNull()) {
-          PointsTo.InsertExprType(arg, found_type);
-        }
       }
       return std::nullopt;
     }
@@ -401,10 +386,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
           // debugLifetimes("Before insert call expr info (DeclRef)");
           PointsTo.InsertCallExprInfo(cast, child_expr);
           // debugLifetimes("After insert call expr info (DeclRef)");
-          clang::QualType found_type = PointsTo.GetExprType(child_expr);
-          if (!found_type.isNull()) {
-            PointsTo.InsertExprType(cast, found_type);
-          }
         }
       }
       break;
@@ -473,13 +454,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCastExpr(
           // debugLifetimes("Before insert call expr info (CastExpr)");
           PointsTo.InsertCallExprInfo(cast, child_expr);
           // debugLifetimes("After insert call expr info (CastExpr)");
-
-          clang::QualType found_type = PointsTo.GetExprType(child_expr);
-          if (!found_type.isNull()) {
-            PointsTo.InsertExprType(cast, found_type);
-          } else {
-            PointsTo.InsertExprType(cast, child_expr->getType());
-          }
         }
       }
 
@@ -658,16 +632,6 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitReturnStmt(
   clang::QualType return_type = Func->getReturnType().IgnoreParens();
   if (!return_type->isPointerType() || return_type->isReferenceType()) {
     return std::nullopt;
-  }
-
-  if (clang::isa<clang::CastExpr>(return_value)) {
-    for (const auto &child : return_value->children()) {
-      if (child == nullptr) continue;
-      if (const auto *sub_cast_expr = clang::dyn_cast<clang::CastExpr>(child)) {
-        PointsTo.InsertExprType(return_stmt->getRetValue(),
-                                sub_cast_expr->getType());
-      }
-    }
   }
 
   return std::nullopt;

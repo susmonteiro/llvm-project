@@ -63,14 +63,6 @@ class PointsToMap {
   bool operator==(const PointsToMap& other) const;
   bool operator!=(const PointsToMap& other) const { return !(*this == other); }
 
-  // Returns a human-readable representation of this object.
-  void DebugExprToType() const {
-    for (const auto& [expr, type] : ExprToType) {
-      debugLifetimes("Expr");
-      expr->dump();
-      debugLifetimes("Type", type.getAsString());
-    }
-  }
   size_t PointsToSize() const { return ExprPointsTo.size(); }
 
   llvm::SmallSet<const clang::Expr*, 2>& GetExprPointsTo(
@@ -81,15 +73,6 @@ class PointsToMap {
   llvm::SmallSet<const clang::VarDecl*, 2>& GetExprDecls(
       const clang::Expr* expr) {
     return ExprToDecl[expr];
-  }
-
-  clang::QualType GetExprType(const clang::Expr* expr) {
-    auto it = ExprToType.find(expr);
-    if (it == ExprToType.end()) {
-      return clang::QualType();
-    } else {
-      return it->second;
-    }
   }
 
   char GetExprLifetime(const clang::Expr* expr) {
@@ -118,8 +101,6 @@ class PointsToMap {
   bool HasCallExprInfo(const clang::Expr* expr) {
     return CallExprToInfo.find(expr) != CallExprToInfo.end();
   }
-
-  void RemoveExprType(const clang::Expr* expr) { ExprToType.erase(expr); }
 
   bool IsEmpty(const clang::Expr* expr) { return ExprPointsTo[expr].empty(); }
 
@@ -150,13 +131,7 @@ class PointsToMap {
     }
   }
 
-  void InsertExprType(const clang::Expr* expr, clang::QualType type) {
-    ExprToType[expr] = type.getCanonicalType();
-  }
-
   void InsertExprLifetime(const clang::Expr* expr, char lifetime) {
-    // TODO delete this
-    assert(lifetime != NOTSET);
     ExprToLifetime[expr] = lifetime;
     // propagate downwards
     for (const auto& child : ExprPointsTo[expr]) {
@@ -188,7 +163,6 @@ class PointsToMap {
       CallExprPointsTo;
   llvm::DenseMap<const clang::Expr*, llvm::SmallSet<const clang::VarDecl*, 2>>
       ExprToDecl;
-  llvm::DenseMap<const clang::Expr*, clang::QualType> ExprToType;
   llvm::DenseMap<const clang::Expr*, char> ExprToLifetime;
   CallExprInfoMap CallExprToInfo;
 };
