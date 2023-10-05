@@ -934,7 +934,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
           !var_decl->getType()->isReferenceType()) {
         continue;
       }
-      clang::QualType var_decl_type = var_decl->getType().getCanonicalType();
       unsigned int var_num_indirections =
           Lifetime::GetNumIndirections(var_decl->getType().getCanonicalType());
       Lifetime &var_decl_lifetime =
@@ -946,12 +945,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitDeclStmt(
       const auto *init = var_decl->getInit()->IgnoreParens();
       Visit(const_cast<clang::Expr *>(init));
       const auto &init_points_to = PointsTo.GetExprPointsTo(init);
-
-      // TODO remove this
-      if (init_points_to.empty() && !clang::isa<clang::DeclRefExpr>(init)) {
-        debugWarn("Initializer is not in PointsToMap");
-        return std::nullopt;
-      }
 
       CompareAndCheck(var_decl, var_num_indirections, init, init,
                       var_num_indirections, nullptr, nullptr, false,

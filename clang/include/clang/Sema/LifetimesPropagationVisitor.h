@@ -17,6 +17,7 @@ namespace clang {
 class LifetimesPropagationVisitor
     : public clang::StmtVisitor<LifetimesPropagationVisitor,
                                 std::optional<std::string>> {
+
  public:
   LifetimesPropagationVisitor(const clang::FunctionDecl *func,
                               LifetimeAnnotationsAnalyzer *analyzer,
@@ -54,7 +55,8 @@ class LifetimesPropagationVisitor
   LifetimeAnnotationsAnalyzer *Analyzer;
   LifetimeAnnotationsAnalysis &State;
   PointsToMap &PointsTo;
-  bool debugEnabled = false;  // TODO delete this
+  bool debugEnabled = false;
+  
 };
 
 }  // namespace clang

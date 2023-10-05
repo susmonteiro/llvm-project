@@ -17,7 +17,6 @@
 namespace clang {
 
 typedef struct {
-  // decl = nullptr -> lifetime $local
   const clang::Expr* arg;
   unsigned int num_indirections;
 } CallExprInfo;
@@ -31,26 +30,6 @@ typedef struct {
 
 using TypeToSet = llvm::DenseMap<unsigned int, Dependencies>;
 using CallExprInfoMap = llvm::DenseMap<const clang::Expr*, TypeToSet>;
-
-// Maintains the points-to sets needed for the analysis of a function.
-// A `PointsToMap` stores points-to sets for
-// - Objects of reference-like type
-// - Expressions that are prvalues of pointer type or glvalues (glvalues are,
-//   in spirit, references to the object they refer to.)
-// - The function's return value, if it is of reference-like type
-//
-// Note that the relationship between an expression's type and the type of the
-// objects associated with it depends on whether the expression is a glvalue or
-// prvalue:
-// - glvalue expressions are associated with the object that is identified by
-//   the glvalue. This means that the object has the same type as the glvalue
-//   expression.
-// - prvalue expressions of pointer type as are associated with the object that
-//   the pointer points to. This means that if the prvalue expression has type
-//   `T *`, the object has type `T`.
-// The PointsToMap class does not enforce these type relationships because we
-// intend to allow type punning (at least within the implementations of
-// functions).
 class PointsToMap {
  public:
   PointsToMap() = default;
@@ -120,6 +99,19 @@ class PointsToMap {
                                     child_points_to.end());
   }
 
+  bool InsertCallExprInfo(const clang::Expr* parent, const clang::Expr* child) {
+    if (CallExprToInfo.find(parent) != CallExprToInfo.end()) {
+      return true;
+    }
+
+    auto it = CallExprToInfo.find(child);
+    if (it != CallExprToInfo.end()) {
+      CallExprToInfo[parent] = it->second;
+      return true;
+    }
+    return false;
+  }
+
   void InsertExprDecl(const clang::Expr* expr, const clang::VarDecl* decl) {
     ExprToDecl[expr].insert(decl);
   }
@@ -139,21 +131,11 @@ class PointsToMap {
     }
   }
 
-  bool InsertCallExprInfo(const clang::Expr* parent, const clang::Expr* child) {
-    if (CallExprToInfo.find(parent) != CallExprToInfo.end()) {
-      debugLifetimes("InsertCallExprInfo", "FOUND PARENT!");
-      return true;
-    }
-
-    auto it = CallExprToInfo.find(child);
-    if (it != CallExprToInfo.end()) {
-      debugLifetimes("InsertCallExprInfo", "FOUND CHILD!");
-      CallExprToInfo[parent] = it->second;
-      return true;
-    }
-    debugLifetimes("InsertCallExprInfo", "NOT FOUND...");
-
-    return false;
+  void InsertPointsTo(const clang::Expr* parent, const clang::Expr* child) {
+    // TODO check if these are called from anywhere else
+    InsertExprPointsTo(parent, child);
+    InsertExprDecl(parent, child);
+    InsertCallExprInfo(parent, child);
   }
 
  private:
