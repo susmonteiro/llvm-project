@@ -204,14 +204,14 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitBinAssign(
   assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS()->IgnoreParens();
-  const auto &rhs = op->getRHS()->IgnoreParens();
-
-  Visit(lhs);
-  Visit(rhs);
   
   if (!lhs->getType()->isPointerType() && !lhs->getType()->isReferenceType()) {
     return std::nullopt;
   }
+
+  const auto &rhs = op->getRHS()->IgnoreParens();
+  Visit(lhs);
+  Visit(rhs);
 
   PointsTo.InsertExprPointsTo(op, lhs);
   PointsTo.InsertExprDecl(op, lhs);
@@ -281,12 +281,8 @@ std::optional<std::string> LifetimesPropagationVisitor::VisitCallExpr(
       const auto *param = func_info.GetParam(param_idx);
       assert(param != nullptr);
       clang::QualType param_type = param->getType()->getPointeeType();
-      // if (param_type.isNull()) {
-      //   param->dump();
-      //   debugLifetimes("Num indirections", num_indirections);
-      // }
+
       assert(!param_type.isNull());
-      assert(num_indirections == Lifetime::GetNumIndirections(param_type) + 1);
       while (--num_indirections > 0) {
         if (param_type.isConstQualified()) {
           param_type->getPointeeType();
