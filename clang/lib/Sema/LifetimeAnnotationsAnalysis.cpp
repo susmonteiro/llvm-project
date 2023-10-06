@@ -29,7 +29,6 @@ ObjectLifetimes LifetimeAnnotationsAnalysis::GetVarDeclLifetime(
                             .moveInto(objectsLifetimes)) {
     // TODO error
     return ObjectLifetimes();
-    // return std::move(err);
   }
   return objectsLifetimes;
 }
@@ -174,10 +173,6 @@ void LifetimeAnnotationsAnalysis::CreateDependency(
                              to_num_indirections);
     CreateStmtDependency(loc, to);
   }
-
-  // TODO not necessarily true
-  // assert(from_num_indirections == to_num_indirections &&
-  //        "Indirections must be equal");
 
   if (from_num_indirections == 0 || to_num_indirections == 0) {
     return;

@@ -76,9 +76,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::BinAssignFactory() const {
                 const clang::BinaryOperator *op, const clang::Expr *expr,
                 const clang::Stmt *stmt, clang::Lifetime &lhs_lifetime,
                 Lifetime &rhs_lifetime) {
-    assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr && op != nullptr);
-    assert(lhs_lifetime.IsSet() && "BinAssignFactory");
-    debugInfo("BinAssignFactory");
+
     if (rhs_lifetime.IsNotSet()) {
       unsigned int possible_lifetimes_size =
           rhs_lifetime.GetDependencies().size();
@@ -114,9 +112,6 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::DeclStmtFactory() const {
              const clang::Decl *rhs_var_decl, const clang::BinaryOperator *op,
              const clang::Expr *expr, const clang::Stmt *stmt,
              Lifetime &lhs_lifetime, Lifetime &rhs_lifetime) {
-        assert(lhs_var_decl != nullptr && rhs_var_decl != nullptr);
-        assert(lhs_lifetime.IsSet() && "DeclStmtFactory");
-        debugInfo("DeclStmtFactory");
 
         if (rhs_lifetime.IsNotSet()) {
           unsigned int init_possible_lifetimes_size =
@@ -151,9 +146,7 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
                 const clang::Decl *var_decl, const clang::BinaryOperator *_op,
                 const clang::Expr *expr, const clang::Stmt *return_stmt,
                 Lifetime &return_lifetime, Lifetime &var_lifetime) {
-    debugInfo("ReturnStmtFactory");
-    assert(var_decl != nullptr && expr != nullptr && return_stmt != nullptr);
-    assert(return_lifetime.IsSet());
+
     if (var_lifetime.IsNotSet()) {
       unsigned int var_possible_lifetimes_size =
           var_lifetime.GetDependencies().size();
@@ -183,11 +176,9 @@ PrintNotesFactory LifetimesCheckerVisitorFactory::ReturnStmtFactory() const {
 const clang::VarDecl *LifetimesCheckerVisitor::GetDeclFromArg(
     const clang::Expr *arg) const {
   const auto &arg_points_to = PointsTo.GetExprDecls(arg->IgnoreParens());
-  assert(arg_points_to.size() <= 1U);
   for (const auto &decl : arg_points_to) {
     return decl;
   }
-  // debugWarn("Arg is not a declrefexpr or memberexpr");
   return nullptr;
 }
 
@@ -199,11 +190,8 @@ void LifetimesCheckerVisitor::VerifyBinAssign(
 
   // expr refers to lhs
   if (clang::isa<clang::MemberExpr>(expr)) {
-    // debugInfo("<Member Expr>");
     auto &points_to = PointsTo.GetExprDecls(expr);
-    // debugLifetimes("Points to", points_to.size());
-    // TODO delete this
-    assert(points_to.size() == 1 && "Handle multiple points to in MemberExpr");
+
     const auto *lhs_var_decl = *points_to.begin();
 
     unsigned int lhs_num_indirections = 1;
@@ -272,26 +260,31 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
 
       for (const auto &expr : rhs_points_to) {
         if (expr == nullptr || !clang::isa<clang::DeclRefExpr>(expr)) continue;
+        
         const auto *rhs_decl_ref_expr =
             clang::dyn_cast<clang::DeclRefExpr>(expr);
         if (const auto *rhs_var_decl =
                 dyn_cast<clang::VarDecl>(rhs_decl_ref_expr->getDecl())) {
           if (!lhs_type->isPointerType() && !lhs_type->isReferenceType())
             continue;
+          
           clang::QualType rhs_type = deref_op->getType().getCanonicalType();
           char id = PointsTo.GetExprLifetime(rhs_decl_ref_expr);
           Lifetime rhs_lifetime =
               id != NOTSET ? Lifetime(id, rhs_type)
                            : State.GetLifetimeOrLocal(rhs_var_decl, rhs_type);
+
           if (rhs_lifetime.IsDead()) continue;
           unsigned int i = LOCAL - 1;
           unsigned int lhs_possible_lifetimes_size =
               lhs_lifetime.GetDependencies().size();
+              
           while (++i < lhs_possible_lifetimes_size) {
             if (lhs_lifetime.GetPossibleLifetime(i).empty()) continue;
             Lifetime specific_lifetime(Lifetime::IdToChar(i));
             unsigned int lhs_num_indirections =
                 lhs_lifetime.GetNumIndirections();
+
             if (rhs_lifetime < specific_lifetime) {
               if (rhs_lifetime.IsNotSet()) {
                 unsigned int possible_lifetimes_size =
@@ -299,6 +292,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
                 const auto &stmts = lhs_lifetime.GetStmts(i);
                 unsigned int rhs_num_indirections =
                     rhs_lifetime.GetNumIndirections();
+
                 for (unsigned int j = OFFSET; j < possible_lifetimes_size;
                      j++) {
                   if (!rhs_lifetime.ContainsShortestLifetime(j) ||
@@ -312,6 +306,7 @@ void LifetimesCheckerVisitor::VerifyMaxLifetimes(
                                      diag::note_lifetime_declared_here, j,
                                      MAX_NUM_NOTES);
                 }
+
               } else {
                 S.Diag(op->getExprLoc(), diag::warn_assign_lifetimes_differ)
                     << GenerateLifetimeName(i, lhs_num_indirections)
@@ -401,12 +396,12 @@ void LifetimesCheckerVisitor::CallExprChecker(
     const clang::Expr *expr, unsigned int rhs_num_indirections,
     const clang::Stmt *stmt, const clang::BinaryOperator *op, bool is_return,
     clang::TypeToSet &call_info, PrintNotesFactory factory) const {
-  debugInfo("CallExprChecker");
+
   while (lhs_num_indirections > 0) {
     Lifetime &lhs_lifetime =
         is_return ? State.GetReturnLifetimeOrLocal(lhs_num_indirections)
                   : State.GetLifetime(lhs_var_decl, lhs_num_indirections);
-    debugLifetimes("LHS lifetime", lhs_lifetime.DebugString());
+
     if (lhs_lifetime.IsDead()) {
       lhs_num_indirections--;
       continue;
@@ -414,7 +409,7 @@ void LifetimesCheckerVisitor::CallExprChecker(
 
     auto &current_type_call_info = call_info[lhs_num_indirections];
     if (current_type_call_info.is_local) {
-      // debugLight("FuncCall is local");
+
       if (is_return) {
         S.Diag(expr->getExprLoc(), diag::warn_cannot_return_local)
             << std::string(rhs_num_indirections, '*') << expr->getSourceRange();
@@ -438,15 +433,13 @@ void LifetimesCheckerVisitor::CallExprChecker(
         const auto &arg_points_to = PointsTo.GetExprDecls(arg);
         for (const auto &decl : arg_points_to) {
           char id = PointsTo.GetExprLifetime(arg);
-          // debugLifetimes("DECL", decl->getNameAsString());
-          // debugLifetimes("ARG ID", id);
-          // debugLifetimes("ARG NUM INDIRECTIONS", arg_num_indiretions);
+
           Lifetime arg_lifetime =
               id != NOTSET && arg_num_indiretions ==
                                   Lifetime::GetNumIndirections(arg->getType())
                   ? Lifetime(id, arg_num_indiretions)
                   : State.GetLifetimeOrLocal(decl, arg_num_indiretions);
-          // debugLifetimes("ARG LIFETIME", arg_lifetime.DebugString());
+
           if (arg_lifetime < lhs_lifetime && !arg_lifetime.IsDead()) {
             factory(lhs_var_decl, decl, op, expr, stmt, lhs_lifetime,
                     arg_lifetime);
@@ -465,7 +458,7 @@ void LifetimesCheckerVisitor::DeclChecker(
     unsigned int rhs_num_indirections, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
-  debugInfo("DeclChecker");
+
   char id = PointsTo.GetExprLifetime(expr);
   if (id != NOTSET) {
     Lifetime &lhs_lifetime =
@@ -539,9 +532,7 @@ void LifetimesCheckerVisitor::CompareAndCheck(
     unsigned int rhs_num_indirections, const clang::Stmt *stmt,
     const clang::BinaryOperator *op, bool is_return,
     PrintNotesFactory factory) const {
-  debugInfo("CompareAndCheck");
-  // debugLifetimes("LHS num_indirections", lhs_num_indirections);
-  // debugLifetimes("RHS num_indirections", rhs_num_indirections);
+
   if (expr == nullptr) return;
   if (const auto *call_expr = clang::dyn_cast<clang::CallExpr>(expr)) {
     auto &call_info = PointsTo.GetCallExprInfo(call_expr);
@@ -550,7 +541,7 @@ void LifetimesCheckerVisitor::CompareAndCheck(
                     factory);
   } else if (const auto *member_expr =
                  clang::dyn_cast<clang::MemberExpr>(expr)) {
-    // debugInfo("<Member Expr>");
+
     rhs_num_indirections = 1;
     auto &member_expr_points_to = PointsTo.GetExprDecls(member_expr);
     if (member_expr_points_to.size() == 1) {
@@ -562,17 +553,6 @@ void LifetimesCheckerVisitor::CompareAndCheck(
       CallExprChecker(lhs_var_decl, lhs_num_indirections, expr,
                       rhs_num_indirections, stmt, op, is_return,
                       PointsTo.GetCallExprInfo(member_expr), factory);
-    } else {
-      // expr->dump();
-      // member_expr->dump();
-      // rhs->dump();
-      // debugLifetimes("Size of member_expr_points_to",
-      // member_expr_points_to.size()); for (const auto *decl :
-      // member_expr_points_to) {
-      //   debugLifetimes("RHS decl", decl->getNameAsString());
-      // }
-      // TODO uncomment assert
-      assert(false && "Should not reach here");
     }
   } else if (const auto *rhs_decl_ref_expr =
                  clang::dyn_cast<clang::DeclRefExpr>(expr)) {
@@ -624,12 +604,10 @@ void LifetimesCheckerVisitor::GenerateNotes(
 std::optional<std::string> LifetimesCheckerVisitor::VisitBinAssign(
     const clang::BinaryOperator *op) {
   if (debugEnabled) debugLifetimes("[VisitBinAssign]");
-  assert(op->getLHS()->isGLValue());
 
   const auto &lhs = op->getLHS()->IgnoreParens();
   clang::QualType lhs_type = lhs->getType().getCanonicalType();
   if (!lhs_type->isPointerType() && !lhs_type->isReferenceType()) {
-    // debugWarn("LHS of bin_op is not pointer type");
     return std::nullopt;
   }
 
@@ -650,10 +628,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
 
   const clang::FunctionDecl *direct_callee = call->getDirectCallee();
   if (direct_callee) {
-    debugInfo(direct_callee->getNameAsString());
     auto it = FuncInfo.find(direct_callee);
-    // TODO remove this assert
-    assert(it != FuncInfo.end());
 
     auto &func_info = it->second;
     const auto &params_info_vec = func_info.GetParamsInfo();
@@ -669,22 +644,17 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
     unsigned int num_indirections = params_info_vec.size();
 
     while (num_indirections-- > 1) {
-      debugLifetimes("Num indirections", num_indirections);
       llvm::SmallVector<llvm::SmallVector<ParamInfo>> param_lifetimes;
 
       // get lifetimes for the current indirection level
-      debugInfo("1) Params for current indirection level");
       for (const auto &param_info : params_set) {
-        debugLifetimes("Inside first loop");
         if (param_info.param == nullptr) continue;
-        // TODO delete this (3 lines)
-        assert(!param_info.type.isNull());
+
         clang::QualType param_type = param_info.type->getPointeeType();
         params_set[param_info.ptr_idx].type = param_type;
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, num_indirections);
-        debugLifetimes("Param", param_info.param->getNameAsString());
-        debugLifetimes("Param lifetime", param_lifetime.DebugString());
+
         char lifetime_id = param_lifetime.GetId();
         if ((unsigned int)lifetime_id >= param_lifetimes.size()) {
           param_lifetimes.resize(lifetime_id + 1);
@@ -693,10 +663,7 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of higher indirections
-      debugInfo("2) Check params for HIGHER indirection level");
-      debugLifetimes("Size of param_lifetimes", param_lifetimes.size());
       for (const auto &params : param_lifetimes) {
-        debugLifetimes("Size of params", params.size());
         if (params.size() < 2) continue;
 
         // param_lifetimes have ParamInfo sorted
@@ -763,7 +730,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // check lifetimes of current indirection level
-      debugInfo("3) Check params for CURRENT indirection level");
       if (!param_lifetimes.empty()) {
         for (const auto &first_param_info : params_info_vec[num_indirections]) {
           Lifetime &param_lifetime = func_info.GetParamLifetime(
@@ -820,19 +786,13 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitCallExpr(
       }
 
       // insert params for the next indirection level
-      debugInfo("4) Insert params for NEXT indirection level");
       for (const auto &param_info : params_info_vec[num_indirections]) {
-        assert(param_info.ptr_idx < params_set.size());
         params_set[param_info.ptr_idx] = param_info;
       }
 
       // check static params
-      debugInfo("5) Check STATIC params");
       for (const auto &param_info : params_set) {
-        debugLifetimes("Checking static params");
         if (param_info.param == nullptr) continue;
-        // TODO delete this
-        assert(!param_info.type.isNull());
         Lifetime &param_lifetime =
             func_info.GetParamLifetime(param_info.param, num_indirections);
         if (param_lifetime.IsStatic()) {
@@ -983,12 +943,6 @@ std::optional<std::string> LifetimesCheckerVisitor::VisitReturnStmt(
   }
 
   const auto &return_value = return_stmt->getRetValue()->IgnoreParens();
-  // TODO remove this
-  if (PointsTo.IsEmpty(return_value) &&
-      !clang::isa<clang::DeclRefExpr>(return_value)) {
-    debugWarn("Return expr is not in PointsToMap");
-    Visit(const_cast<clang::Expr *>(return_value));
-  }
 
   CompareAndCheck(nullptr, return_num_indirections, return_value, return_value,
                   return_num_indirections, return_stmt, nullptr, true,
