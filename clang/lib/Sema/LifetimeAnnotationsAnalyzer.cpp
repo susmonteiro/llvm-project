@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-#include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTDiagnostic.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/DiagnosticIDs.h"
@@ -13,14 +12,12 @@
 #include "clang/Sema/IdentifierResolver.h"
 #include "clang/Sema/LifetimesCheckerVisitor.h"
 #include "clang/Sema/LifetimesPropagationVisitor.h"
-#include "clang/Sema/PointsToMap.h"
 #include "llvm/Support/Error.h"
 
 namespace clang {
 
 // Process functions' headers
 void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
-  debugImportant("ANALYZING FUNCTION", func->getNameAsString());
   func = func->getCanonicalDecl();
 
   FunctionLifetimeFactory function_lifetime_factory(func);
@@ -29,7 +26,7 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
       FunctionLifetimes::CreateForDecl(func, function_lifetime_factory);
 
   if (!expected_func_lifetimes) {
-    // TODO
+    // TODO error
     return;
   }
 
@@ -55,8 +52,6 @@ void LifetimeAnnotationsAnalyzer::GetLifetimes(const FunctionDecl *func) {
     }
   }
 
-  // DEBUG
-  // debugLifetimes(func_lifetimes.DebugString());
   func_lifetimes.ProcessParams();
   FunctionInfo[func] = func_lifetimes;
 }
@@ -69,22 +64,22 @@ void LifetimeAnnotationsAnalyzer::AnalyzeFunctionBody(
   std::string func_name = func->getNameAsString();
 
   // step 1
-  debugInfo("\n====== START STEP 1 - " + func_name + " ======\n");
+  // debugInfo("\n====== START STEP 1 - " + func_name + " ======\n");
   GetLifetimeDependencies(func);
-  debugInfo("\n====== FINISH STEP 1 - " + func_name + " ======\n");
-  debugLifetimes(State.DebugString());
+  // debugInfo("\n====== FINISH STEP 1 - " + func_name + " ======\n");
+  // debugLifetimes(State.DebugString());
 
   // step 2
-  debugInfo("\n====== START STEP 2 - " + func_name + " ======\n");
+  // debugInfo("\n====== START STEP 2 - " + func_name + " ======\n");
   PropagateLifetimes();
-  debugInfo("\n====== FINISH STEP 2 - " + func_name + " ======\n");
-  debugLifetimes(State.DebugString());
+  // debugInfo("\n====== FINISH STEP 2 - " + func_name + " ======\n");
+  // debugLifetimes(State.DebugString());
 
   // step 3
-  debugInfo("\n====== START STEP 3 - " + func_name + " ======\n");
+  // debugInfo("\n====== START STEP 3 - " + func_name + " ======\n");
   CheckLifetimes(func);
-  debugInfo("\n====== FINISH STEP 3 - " + func_name + " ======\n");
-  debugLifetimes(State.DebugString());
+  // debugInfo("\n====== FINISH STEP 3 - " + func_name + " ======\n");
+  // debugLifetimes(State.DebugString());
 }
 
 void LifetimeAnnotationsAnalyzer::GetLifetimeDependencies(
@@ -98,49 +93,24 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
   auto new_children = State.GetLifetimeDependencies();
   auto stmt_dependencies = State.GetStmtDependencies();
   auto parents = std::move(State.TransposeDependencies());
-
-  // DEBUG
-  debugLifetimes("=== dependencies_ ===");
-  for (const auto &pair : children) {
-    debugLifetimes(DebugDependencies(pair.first.var_decl,
-                                     pair.first.num_indirections, pair.second,
-                                     stmt_dependencies));
-  }
-
   auto worklist = State.InitializeWorklist();
 
-  // DEBUG
-  int i = 1;
-
   while (!worklist.empty()) {
-    debugInfo("---> Iteration", i++);
-    // DEBUG
-    // debugLifetimes("=== worklist ===");
-    // debugLifetimes(LifetimeAnnotationsAnalysis::WorklistDebugString(worklist));
-
     auto &el = worklist.back();
     worklist.pop_back();
 
     auto *current_var = el.var_decl;
     unsigned int lhs_num_indirections = el.num_indirections;
-    // DEBUG
-
-    debugLifetimes("\nPropagation of", std::string(lhs_num_indirections, '*') +
-                                           ' ' +
-                                           current_var->getNameAsString());
 
     // each entry of the vector corresponds to a lifetime char
     llvm::SmallVector<llvm::DenseSet<const clang::Stmt *>> possible_lifetimes;
     llvm::DenseSet<RHSTypeStruct> stmts;
 
-    // ObjectLifetimes objectLifetimes = State.GetObjectLifetimes(el);
-    // debugLifetimes("Processing " + objectLifetimes.DebugString());
-
     for (auto &rhs_info : children[el]) {
       unsigned int rhs_num_indirections = rhs_info.num_indirections;
       stmts.insert(rhs_info);
 
-      // This should be correct -> don't want to propagate $dead
+      // don't want to propagate $dead
       if (rhs_info.extra_lifetime >= LOCAL) {
         Lifetime::InsertDependencies(rhs_info.extra_lifetime,
                                           rhs_info.stmt, possible_lifetimes);
@@ -169,10 +139,7 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
         }
       }
     }
-    // debugLifetimes("Original shortest lifetimes",
-    //                State.GetPossibleLifetimes(el, el_type).size());
-    // debugLifetimes("New shortest lifetimes", possible_lifetimes.size());
-    // TODO this is not perfect
+
     if (new_children[el] != stmts ||
         State.GetPossibleLifetimes(current_var, lhs_num_indirections) !=
             possible_lifetimes) {
@@ -182,14 +149,6 @@ void LifetimeAnnotationsAnalyzer::PropagateLifetimes() {
       for (const auto &parent : parents[el]) {
         worklist.emplace_back(parent);
       }
-    }
-
-    // DEBUG
-    debugLifetimes("=== children ===");
-    for (const auto &pair : new_children) {
-      debugLifetimes(DebugDependencies(pair.first.var_decl,
-                                       pair.first.num_indirections, pair.second,
-                                       stmt_dependencies));
     }
   }
 

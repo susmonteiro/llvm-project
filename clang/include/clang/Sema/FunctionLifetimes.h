@@ -3,11 +3,8 @@
 
 #include <iostream>
 
-#include "clang/Sema/Lifetime.h"
 #include "clang/Sema/ObjectLifetimes.h"
 #include "clang/Sema/PointeeType.h"
-// DEBUG
-#include "clang/Sema/DebugLifetimes.h"
 
 namespace clang {
 

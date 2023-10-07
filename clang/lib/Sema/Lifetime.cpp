@@ -22,7 +22,6 @@ Lifetime::Lifetime(llvm::StringRef name, clang::QualType type)
     Id = CharToId(name.front());
   } else {
     // TODO error
-    // TODO change this
     Id = NOTSET;
   }
 }
@@ -39,7 +38,6 @@ void Lifetime::InitializeId(char id) {
     Id = CharToId(id);
   } else {
     // TODO error
-    // TODO change this
     Id = NOTSET;
   }
 }
@@ -83,7 +81,6 @@ unsigned int Lifetime::GetNumIndirections(clang::QualType type) {
 clang::QualType Lifetime::GetTypeFromNumberIndirections(
     clang::QualType type, unsigned int number_indirections) {
   while (number_indirections > 0) {
-    assert(type->isPointerType() || type->isReferenceType());
     type = type->getPointeeType();
     --number_indirections;
   }
@@ -152,8 +149,6 @@ bool Lifetime::EmptyDependencies() const {
 }
 
 void Lifetime::ProcessDependencies() {
-  // should only reach this if lifetime is not set
-  assert(IsNotSet());
   if (ContainsDead()) {
     SetDead();
     return;
@@ -191,17 +186,28 @@ void Lifetime::ProcessDependencies() {
   // outlives which, then all of them are considered the shortest
 }
 
+void Lifetime::InsertDependencies(char id, const clang::Stmt *stmt) {
+  InsertDependencies(id, stmt, Dependencies);
+}
+
+void Lifetime::InsertDependencies(LifetimesVector dependencies) {
+  if (dependencies.size() > Dependencies.size())
+    Dependencies.resize(dependencies.size());
+  for (unsigned int i = 0; i < dependencies.size(); i++) {
+    Dependencies[i].insert(GetPossibleLifetime(i, dependencies).begin(),
+                           GetPossibleLifetime(i, dependencies).end());
+  }
+}
+
 std::optional<StmtDenseSet> Lifetime::GetStmts(char id) {
-  assert(id != NOTSET);
-  return (unsigned int)id >= Dependencies.size() ||
-                 Dependencies[id].empty()
+  return (unsigned int)id >= Dependencies.size() || Dependencies[id].empty()
              ? std::nullopt
              : std::optional(Dependencies[id]);
 }
 
 bool Lifetime::operator==(const Lifetime &Other) const {
   if (IsNull() || Other.IsNull()) return false;
-  
+
   if (Id != Other.GetId()) {
     return (Id == NOTSET && EmptyDependencies()) ||
            (Other.GetId() == NOTSET && Other.EmptyDependencies());
@@ -231,8 +237,6 @@ bool Lifetime::operator==(const Lifetime &Other) const {
 
 bool Lifetime::operator!=(const Lifetime &Other) const {
   if (IsDead() && Other.IsDead()) {
-    // TODO delete this
-    assert(true && "Should not reach this");
     return GetPossibleLifetime(DEAD) == Other.GetPossibleLifetime(DEAD);
   }
   return !operator==(Other);
@@ -241,7 +245,6 @@ bool Lifetime::operator!=(const Lifetime &Other) const {
 bool Lifetime::operator<(const Lifetime &Other) const {
   // $static outlives all lifetimes and all lifetimes outlive $local
   if (IsDead() && Other.IsDead()) {
-    // TODO delete this
     const auto &this_dependencies = GetPossibleLifetime(DEAD);
     const auto &other_dependencies = Other.GetPossibleLifetime(DEAD);
     if (this_dependencies.size() < other_dependencies.size()) {

@@ -9,7 +9,6 @@
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallVector.h"
-// TODO delete this file
 
 void debugLifetimes(std::string txt);
 void debugLifetimes(std::string txt1, std::string txt2);

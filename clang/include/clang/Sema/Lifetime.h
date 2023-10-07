@@ -1,7 +1,6 @@
 #ifndef LIFETIME_ANNOTATIONS_LIFETIME_H_
 #define LIFETIME_ANNOTATIONS_LIFETIME_H_
 
-#include <set>
 #include <string>
 
 #include "clang/Sema/DebugLifetimes.h"
@@ -80,19 +79,19 @@ class Lifetime {
   char GetId() const { return Id; }
   void SetId(char id) { Id = id; }
   clang::QualType GetType() const { return LifetimeType; }
+
   void SetNumIndirections(clang::QualType type) {
     NumIndirections = Lifetime::GetNumIndirections(type);
   }
+
   void SetNumIndirections(unsigned int num_indirections) {
     NumIndirections = num_indirections;
   }
+
   void SetType(clang::QualType type) {
     LifetimeType = type;
     SetNumIndirections(type);
   }
-
-  bool EmptyDependencies() const;
-  void ProcessDependencies();
 
   std::string DebugString() const;
 
@@ -102,8 +101,8 @@ class Lifetime {
 
   StmtDenseSet GetPossibleLifetime(char id) const { return Dependencies[id]; }
 
-  static StmtDenseSet &GetPossibleLifetime(
-      char id, LifetimesVector &dependencies) {
+  static StmtDenseSet &GetPossibleLifetime(char id,
+                                           LifetimesVector &dependencies) {
     return dependencies[id];
   }
 
@@ -122,38 +121,28 @@ class Lifetime {
     return dependencies[id];
   }
 
-  const LifetimesVector &GetDependencies() const {
-    return Dependencies;
-  }
+  const LifetimesVector &GetDependencies() const { return Dependencies; }
 
   int GetShortestLifetimes() const { return ShortestLifetimes; }
 
   std::optional<StmtDenseSet> GetStmts(char id);
 
   static void InsertDependencies(char id, const clang::Stmt *stmt,
-                                      LifetimesVector &dependencies) {
+                                 LifetimesVector &dependencies) {
     Lifetime::GetAndResizePossibleLifetime(id, dependencies).insert(stmt);
   }
 
-  void InsertDependencies(char id, const clang::Stmt *stmt) {
-    InsertDependencies(id, stmt, Dependencies);
-  }
-
-  void InsertDependencies(LifetimesVector dependencies) {
-    if (dependencies.size() > Dependencies.size())
-      Dependencies.resize(dependencies.size());
-    for (unsigned int i = 0; i < dependencies.size(); i++) {
-      Dependencies[i].insert(
-          GetPossibleLifetime(i, dependencies).begin(),
-          GetPossibleLifetime(i, dependencies).end());
-    }
-  }
+  void InsertDependencies(char id, const clang::Stmt *stmt);
+  void InsertDependencies(LifetimesVector dependencies);
 
   void SetDependencies(LifetimesVector dependencies) {
     Dependencies = dependencies;
   }
 
   void RemoveFromDependencies(char id) { Dependencies[id].clear(); }
+
+  bool EmptyDependencies() const;
+  void ProcessDependencies();
 
   bool ContainsShortestLifetime(unsigned int id) const {
     return is_in_shortest(ShortestLifetimes, id);

@@ -7,12 +7,8 @@
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/TypeOrdering.h"
 #include "clang/Sema/FunctionLifetimes.h"
-#include "clang/Sema/Lifetime.h"
-#include "clang/Sema/PointeeType.h"
 #include "clang/Sema/PointsToMap.h"
 #include "llvm/ADT/DenseMap.h"
-// DEBUG
-#include "clang/Sema/DebugLifetimes.h"
 
 namespace clang {
 
@@ -160,9 +156,7 @@ class LifetimeAnnotationsAnalysis {
   static std::string WorklistDebugString(std::vector<LHSTypeStruct> &worklist);
 
  private:
-  static LHSTypeStruct InvalidEmpty();
-  static LHSTypeStruct InvalidTombstone();
-
+ 
   friend class llvm::DenseMapInfo<LHSTypeStruct>;
 
   VariableLifetimesVector VariableLifetimes;

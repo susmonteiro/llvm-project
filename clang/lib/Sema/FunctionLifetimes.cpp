@@ -70,6 +70,7 @@ clang::TypeLoc StripAttributes(clang::TypeLoc type_loc,
       //
       // We reverse the attributes so that we obtain the more intuitive ordering
       // "a, b".
+      //
       std::reverse(attrs.begin(), attrs.end());
       return type_loc;
     }
@@ -107,15 +108,11 @@ llvm::Expected<llvm::SmallVector<const clang::Expr*>> GetAttributeLifetimes(
 llvm::SmallVector<std::string> GetLifetimeParameters(clang::QualType type) {
   auto record = type->getAs<clang::RecordType>();
   if (!record) {
-    // DEBUG
-    // debugInfo("Not a record");
     return {};
   }
 
   auto cxx_record = record->getAsCXXRecordDecl();
   if (!cxx_record) {
-    // DEBUG
-    // debugInfo("Not a cxxrecord");
     return {};
   }
 
@@ -170,11 +167,6 @@ QualType Undecay(clang::QualType type) {
 }
 
 bool SameType(clang::QualType type1, clang::QualType type2) {
-  // If both types are an AutoType, ignore the actual type and assume theyc're
-  // the same.
-  // An `AutoType` that came from a TypeLoc will have type `auto` (i.e. as
-  // written), whereas an `AutoType` that didn't come from a `TypeLoc` will be
-  // the actual deduced type. We still want these to compare equal though.
   if (type1->getAs<clang::AutoType>() && type2->getAs<clang::AutoType>()) {
     return true;
   }
@@ -221,9 +213,6 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
   llvm::SmallVector<const clang::Attr*> attrs;
   if (!type_loc.isNull()) {
     type_loc = StripAttributes(type_loc, attrs);
-    // DEBUG
-    // debugLifetimes("Attributes");
-    // debugLifetimes(attrs);
   }
 
   llvm::SmallVector<const clang::Expr*> lifetime_names;
@@ -231,30 +220,15 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
     return std::move(err);
   }
 
-  // DEBUG
-  // debugLifetimes("Lifetime names");
-  // debugLifetimes(lifetime_names);
-
   llvm::SmallVector<std::string> lifetime_params =
       GetLifetimeParameters(qualtype);
-
-  // DEBUG
-  // debugLifetimes("Lifetime parameters");
-  // debugLifetimes(lifetime_params);
 
   if (!lifetime_params.empty() && !lifetime_names.empty() &&
       lifetime_names.size() != lifetime_params.size()) {
     return llvm::createStringError(
         llvm::inconvertibleErrorCode(),
-        "Number of types and lifetimes not the same"
-        // TODO abseil
-        /* absl::StrCat("Type has ", lifetime_params.size(),
-                     " lifetime parameters but ", lifetime_names.size(),
-                     " lifetime arguments were given") */);
+        "Number of types and lifetimes not the same");
   }
-
-  // FIXME cannot remove this line
-  // debugLifetimes("Size of lifetime_params", lifetime_params.size());
 
   for (size_t i = 0; i < lifetime_params.size(); ++i) {
     Lifetime l(NOTSET, canonical_type);
@@ -268,21 +242,14 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
     }
   }
 
-  // TODO this is already done in the previous function
   clang::QualType pointee = PointeeType(qualtype);
-  // TODO change this
   if (pointee.isNull()) return ObjectLifetimes();
 
   clang::TypeLoc pointee_type_loc;
   if (type_loc) {
     pointee_type_loc = PointeeTypeLoc(type_loc);
-    // Note: We can't assert that `pointee_type_loc` is non-null here. If
-    // `type_loc` is a `TypedefTypeLoc`, then there will be no `TypeLoc` for
-    // the pointee type because the pointee type never got spelled out at the
-    // location of the original `TypeLoc`.
   }
 
-  // TODO is this ok?
   // recursive call
   ObjectLifetimes retObjectLifetimes;
   if (llvm::Error err =
@@ -291,19 +258,12 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
     return std::move(err);
   }
 
-  // debugLifetimes("Created the ObjectLifetime with type " +
-  // pointee.getAsString() + " and with lifetime " +
-  // retObjectLifetimes.GetLifetime().DebugString());
-
   const clang::Expr* lifetime_name = nullptr;
   if (!lifetime_names.empty()) {
     if (lifetime_names.size() != 1) {
       return llvm::createStringError(
           llvm::inconvertibleErrorCode(),
-          // TODO abseil
-          "Expected a single lifetime but multiple were given"
-          /* absl::StrCat("Expected a single lifetime but ", lifetime_names.size(),
-                       " were given") */);
+          "Expected a single lifetime but multiple were given");
     }
     lifetime_name = lifetime_names.front();
   }
@@ -315,9 +275,6 @@ llvm::Expected<ObjectLifetimes> FunctionLifetimeFactory::CreateLifetime(
   }
 
   retObjectLifetimes.InsertPointeeObject(lifetime);
-
-  // debugLifetimes("The outer pointee has lifetime",
-  // retObjectLifetimes.GetLifetime().DebugString());
 
   return retObjectLifetimes;
 }
@@ -458,8 +415,6 @@ llvm::Expected<FunctionLifetimes> FunctionLifetimes::Create(
       func->getType()->getAs<clang::FunctionProtoType>();
   FunctionLifetimes ret(func->getID());
   if (type == nullptr) {
-    // DEBUG
-    // debugWarn("FunctionProtoType is null");
     return ret;
   }
 

@@ -6,16 +6,9 @@
 #include <vector>
 
 #include "clang/AST/Decl.h"
-#include "clang/Sema/FunctionLifetimes.h"
-#include "clang/Sema/Lifetime.h"
 #include "clang/Sema/LifetimeAnnotationsAnalysis.h"
-#include "clang/Sema/PointsToMap.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/DenseMap.h"
-
-// DEBUG
-#include "clang/AST/ASTContext.h"
-#include "clang/Sema/DebugLifetimes.h"
 
 namespace clang {
 

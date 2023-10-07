@@ -116,22 +116,13 @@ void LifetimeAnnotationsAnalysis::CreateVariableIfNotFound(
   if (it == VariableLifetimes.end()) {
     if (var_decl->isStaticLocal() ||
         var_decl->isDefinedOutsideFunctionOrMethod()) {
-      // TODO delete
-      // debugLifetimes("Var decl is static", var_decl->getNameAsString());
-      // var_decl->dump();
-      // debugLifetimes("Var decl type", var_decl->getType().getAsString());
-      // debugLifetimes("Num indirections", num_indirections);
       ObjectLifetimes ol(true, Lifetime::GetNumIndirections(var_decl->getType()) + 2);
       CreateVariable(var_decl, ol);
     } else {
-      // TODO delete
-      // debugLifetimes("Var decl is NOT static", var_decl->getNameAsString());
       ObjectLifetimes ol = GetVarDeclLifetime(var_decl, Factory);
       CreateVariable(var_decl, ol);
     }
-    // debugLifetimes("Created variable with lifetimes", ol.DebugString());
   }
-  // debugLifetimes(DebugString());
 }
 
 void LifetimeAnnotationsAnalysis::CreateDependencySimple(

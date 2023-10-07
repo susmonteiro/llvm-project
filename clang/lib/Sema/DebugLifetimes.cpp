@@ -2,8 +2,6 @@
 
 #include <iostream>
 
-// TODO delete this file
-
 bool stop_debug = true;
 
 void debugLifetimes(std::string txt) {

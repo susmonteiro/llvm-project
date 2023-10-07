@@ -3,7 +3,6 @@
 
 #include <string>
 
-#include "clang/Sema/DebugLifetimes.h"
 #include "clang/Sema/Lifetime.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Error.h"
@@ -19,7 +18,6 @@ class ObjectLifetimes {
   }
   ObjectLifetimes(bool is_static, unsigned int num_indirections)
       : IsStatic(is_static) {
-    assert(is_static);
     while (num_indirections > 0) {
       InsertPointeeObject(Lifetime(STATIC, --num_indirections));
     }
