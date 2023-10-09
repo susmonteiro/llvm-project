@@ -132,7 +132,6 @@ class PointsToMap {
   }
 
   void InsertPointsTo(const clang::Expr* parent, const clang::Expr* child) {
-    // TODO check if these are called from anywhere else
     InsertExprPointsTo(parent, child);
     InsertExprDecl(parent, child);
     InsertCallExprInfo(parent, child);
