@@ -155,7 +155,6 @@ void Lifetime::ProcessDependencies() {
   }
 
   if (ContainsLocal()) {
-    // lifetime $local is the shortest possible
     SetLocal();
     return;
   }

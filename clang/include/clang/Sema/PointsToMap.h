@@ -1,13 +1,9 @@
-// Part of the Crubit project, under the Apache License v2.0 with LLVM
-// Exceptions. See /LICENSE for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef LIFETIMES_POINTS_TO_MAP_H_
 #define LIFETIMES_POINTS_TO_MAP_H_
 
 #include <string>
 
-// #include "lifetime_analysis/object_set.h"
 #include "clang/AST/Expr.h"
 #include "clang/Sema/Lifetime.h"
 #include "clang/Sema/ObjectLifetimes.h"
