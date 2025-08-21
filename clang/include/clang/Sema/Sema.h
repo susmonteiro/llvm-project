@@ -694,6 +694,8 @@ public:
   ASTConsumer &getASTConsumer() const { return Consumer; }
   ASTMutationListener *getASTMutationListener() const;
   ExternalSemaSource *getExternalSource() const { return ExternalSource.get(); }
+  bool isIgnoreDiagsMode() const { return ignoreDiagsMode; }
+  void setIgnoreDiagsMode(bool V = false) { ignoreDiagsMode = V; }
 
   DarwinSDKInfo *getDarwinSDKInfoForAvailabilityChecking(SourceLocation Loc,
                                                          StringRef Platform);
@@ -1079,6 +1081,7 @@ public:
   DiagnosticsEngine &Diags;
   SourceManager &SourceMgr;
   api_notes::APINotesManager APINotes;
+  bool ignoreDiagsMode = false;
 
   /// A RAII object to enter scope of a compound statement.
   class CompoundScopeRAII {

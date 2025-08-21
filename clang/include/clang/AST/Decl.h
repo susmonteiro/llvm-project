@@ -2252,9 +2252,10 @@ public:
   /// parser reaches the definition, if called before, this function will return
   /// `false`.
   bool isThisDeclarationADefinition() const {
-    return isDeletedAsWritten() || isDefaulted() ||
-           doesThisDeclarationHaveABody() || hasSkippedBody() ||
-           willHaveBody() || hasDefiningAttr();
+    return !RequiresReinstantiation() &&
+           (isDeletedAsWritten() || isDefaulted() ||
+            doesThisDeclarationHaveABody() || hasSkippedBody() ||
+            willHaveBody() || hasDefiningAttr());
   }
 
   /// Determine whether this specific declaration of the function is a friend
@@ -2593,6 +2594,18 @@ public:
   /// Determine whether a function is a friend function that cannot be
   /// redeclared outside of its class, per C++ [temp.friend]p9.
   bool isMemberLikeConstrainedFriend() const;
+
+  /// Set that the cached definition of this function is not valid and we need
+  /// to reinstantiate it
+  void setRequiresReinstantiation(bool V = false) {
+    getCanonicalDecl()->FunctionDeclBits.RequiresReinstantiation = V;
+  }
+
+  /// True if we should ignore the cached function definition and instantiate
+  /// this function again
+  bool RequiresReinstantiation() const {
+    return getCanonicalDecl()->FunctionDeclBits.RequiresReinstantiation;
+  }
 
   /// Gets the kind of multiversioning attribute this declaration has. Note that
   /// this can return a value even if the function is not multiversion, such as

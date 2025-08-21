@@ -4968,9 +4968,28 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
     // If we're asked to instantiate a function whose body comes from an
     // instantiated friend declaration, attach the instantiated body to the
     // corresponding declaration of the function.
-    assert(ExistingDefn->isThisDeclarationInstantiatedFromAFriendDefinition());
-    Function = const_cast<FunctionDecl*>(ExistingDefn);
+    // assert(ExistingDefn->isThisDeclarationInstantiatedFromAFriendDefinition());
+    Function = const_cast<FunctionDecl *>(ExistingDefn);
+    llvm::errs() << "[InstantiateFunctionDefinition] "
+                 << Function->getQualifiedNameAsString()
+                 << " is defined but requires reinstantiation\n";
   }
+
+  auto ResetFunctionDefinition = [&]() {
+    if (isIgnoreDiagsMode()) {
+      Function->setBody(nullptr);
+      Function->getCanonicalDecl()->setRequiresReinstantiation(true);
+      // Function->setHasSkippedBody(false);
+      // Function->setWillHaveBody(false);
+      // Function->setInvalidDecl(false);
+
+      llvm::errs() << "[InstantiateFunctionDefinition] "
+                   << Function->getQualifiedNameAsString()
+                   << ": Setting ctor to "
+                      "requiring reinstantiation (!!): "
+                   << isIgnoreDiagsMode() << "\n";
+    }
+  };
 
   // Find the function body that we'll be substituting.
   const FunctionDecl *PatternDecl = Function->getTemplateInstantiationPattern();
@@ -5245,8 +5264,12 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
       // Instantiate the function body.
       Body = SubstStmt(Pattern, TemplateArgs);
 
-      if (Body.isInvalid())
-        Function->setInvalidDecl();
+      if (Body.isInvalid()) {
+        if (isIgnoreDiagsMode())
+          ResetFunctionDefinition();
+        else
+          Function->setInvalidDecl();
+      }
     }
     // FIXME: finishing the function body while in an expression evaluation
     // context seems wrong. Investigate more.
@@ -5265,9 +5288,13 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
 
   // This class may have local implicit instantiations that need to be
   // instantiation within this scope.
+  clang::DiagnosticErrorTrap Trap(getDiagnostics());
   LocalInstantiations.perform();
   Scope.Exit();
   GlobalInstantiations.perform();
+  if (Trap.hasErrorOccurred()) {
+    ResetFunctionDefinition();
+  }
 }
 
 VarTemplateSpecializationDecl *Sema::BuildVarTemplateInstantiation(
