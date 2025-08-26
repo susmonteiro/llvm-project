@@ -25,6 +25,7 @@
 #include "clang/AST/TypeLoc.h"
 #include "clang/AST/TypeVisitor.h"
 #include "clang/Basic/LangOptions.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Basic/Stack.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/Sema/DeclSpec.h"
@@ -3414,6 +3415,8 @@ Sema::InstantiateClass(SourceLocation PointOfInstantiation,
                        const MultiLevelTemplateArgumentList &TemplateArgs,
                        TemplateSpecializationKind TSK,
                        bool Complain) {
+  llvm::errs() << "[InstantiateClass] "
+               << Instantiation->getQualifiedNameAsString() << "\n";
   CXXRecordDecl *PatternDef
     = cast_or_null<CXXRecordDecl>(Pattern->getDefinition());
   if (DiagnoseUninstantiableTemplate(PointOfInstantiation, Instantiation,
@@ -3552,8 +3555,20 @@ Sema::InstantiateClass(SourceLocation PointOfInstantiation,
           MightHaveConstexprVirtualFunctions = true;
       }
 
-      if (NewMember->isInvalidDecl())
+      if (NewMember->isInvalidDecl()) {
+        if (isIgnoreDiagsMode()) {
+          // NewMember->setInvalidDecl(false);
+          // Member->setInvalidDecl(false);
+          // Instantiation->setInvalidDecl(false);
+
+          // If we aren't going to emit a diagnosic, abort the instantiation and
+          // set it to undeclared again, so that it may be reinstantiated if
+          // needed, in the future, when we expect to emit a diagnostic
+          Instantiation->setTemplateSpecializationKind(TSK_Undeclared);
+          return true;
+        }
         Instantiation->setInvalidDecl();
+      }
     } else {
       // FIXME: Eventually, a NULL return will mean that one of the
       // instantiations was a semantic disaster, and we'll want to mark the
@@ -3959,6 +3974,8 @@ bool Sema::InstantiateClassTemplateSpecialization(
     ClassTemplateSpecializationDecl *ClassTemplateSpec,
     TemplateSpecializationKind TSK, bool Complain) {
   // Perform the actual instantiation on the canonical declaration.
+  llvm::errs() << "[InstantiateClassTemplateSpecialization] "
+               << ClassTemplateSpec->getQualifiedNameAsString() << "\n";
   ClassTemplateSpec = cast<ClassTemplateSpecializationDecl>(
       ClassTemplateSpec->getCanonicalDecl());
   if (ClassTemplateSpec->isInvalidDecl())
@@ -4209,6 +4226,8 @@ Sema::InstantiateClassTemplateSpecializationMembers(
                                            SourceLocation PointOfInstantiation,
                             ClassTemplateSpecializationDecl *ClassTemplateSpec,
                                                TemplateSpecializationKind TSK) {
+  llvm::errs() << "[InstantiateClassTemplateSpecializationMembers] "
+               << ClassTemplateSpec->getQualifiedNameAsString() << "\n";
   // C++0x [temp.explicit]p7:
   //   An explicit instantiation that names a class template
   //   specialization is an explicit instantion of the same kind

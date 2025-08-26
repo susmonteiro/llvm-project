@@ -2114,7 +2114,12 @@ Decl *TemplateDeclInstantiator::VisitCXXRecordDecl(CXXRecordDecl *D) {
 
     // This class may have local implicit instantiations that need to be
     // performed within this scope.
+    clang::DiagnosticErrorTrap Trap(SemaRef.getDiagnostics());
     LocalInstantiations.perform();
+    if (Trap.hasErrorOccurred()) {
+      // ResetFunctionDefinition();
+      llvm::errs() << "<<Error occurred during [VisitCXXRecordDec]\n";
+    }
   }
 
   SemaRef.DiagnoseUnusedNestedTypedefs(Record);
@@ -4942,6 +4947,8 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
                                          bool Recursive,
                                          bool DefinitionRequired,
                                          bool AtEndOfTU) {
+  llvm::errs() << "[InstantiateFunctionDefinition] "
+               << Function->getQualifiedNameAsString() << "\n";
   if (Function->isInvalidDecl() || isa<CXXDeductionGuideDecl>(Function))
     return;
 
@@ -5304,6 +5311,9 @@ VarTemplateSpecializationDecl *Sema::BuildVarTemplateInstantiation(
     SmallVectorImpl<TemplateArgument> &Converted,
     SourceLocation PointOfInstantiation, LateInstantiatedAttrVec *LateAttrs,
     LocalInstantiationScope *StartingScope) {
+
+  llvm::errs() << "[BuildVarTemplateInstantiation] "
+               << FromVar->getQualifiedNameAsString() << "\n";
   if (FromVar->isInvalidDecl())
     return nullptr;
 
@@ -5382,6 +5392,9 @@ void Sema::BuildVariableInstantiation(
     LocalInstantiationScope *StartingScope,
     bool InstantiatingVarTemplate,
     VarTemplateSpecializationDecl *PrevDeclForVarTemplateSpecialization) {
+  llvm::errs() << "[BuildVariableInstantiation] "
+               << NewVar->getQualifiedNameAsString() << "\n";
+  OldVar->dump();
   // Instantiating a partial specialization to produce a partial
   // specialization.
   bool InstantiatingVarTemplatePartialSpec =
@@ -5508,6 +5521,8 @@ void Sema::BuildVariableInstantiation(
 void Sema::InstantiateVariableInitializer(
     VarDecl *Var, VarDecl *OldVar,
     const MultiLevelTemplateArgumentList &TemplateArgs) {
+  llvm::errs() << "[InstantiateVariableInitializer] "
+               << Var->getQualifiedNameAsString() << "\n";
   if (ASTMutationListener *L = getASTContext().getASTMutationListener())
     L->VariableDefinitionInstantiated(Var);
 
@@ -5534,6 +5549,7 @@ void Sema::InstantiateVariableInitializer(
     }
 
     if (!Init.isInvalid()) {
+      llvm::errs() << "This init is valid!\n";
       Expr *InitExpr = Init.get();
 
       if (Var->hasAttr<DLLImportAttr>() &&
@@ -5548,9 +5564,16 @@ void Sema::InstantiateVariableInitializer(
     } else {
       // FIXME: Not too happy about invalidating the declaration
       // because of a bogus initializer.
-      Var->setInvalidDecl();
+      if (!isIgnoreDiagsMode()) {
+        Var->setInvalidDecl();
+        llvm::errs() << "Setting as invalid decl\n";
+      } else {
+        Var->setInit(nullptr);
+        llvm::errs() << "Deleting the initializer\n";
+      }
     }
   } else {
+    llvm::errs() << "OldVar doesn't have init\n";
     // `inline` variables are a definition and declaration all in one; we won't
     // pick up an initializer from anywhere else.
     if (Var->isStaticDataMember() && !Var->isInline()) {
@@ -5577,6 +5600,9 @@ void Sema::InstantiateVariableInitializer(
 void Sema::InstantiateVariableDefinition(SourceLocation PointOfInstantiation,
                                          VarDecl *Var, bool Recursive,
                                       bool DefinitionRequired, bool AtEndOfTU) {
+
+  llvm::errs() << "[InstantiateVariableDefinition] "
+               << Var->getQualifiedNameAsString() << "\n";
   if (Var->isInvalidDecl())
     return;
 
@@ -5634,9 +5660,15 @@ void Sema::InstantiateVariableDefinition(SourceLocation PointOfInstantiation,
 
       // This variable may have local implicit instantiations that need to be
       // instantiated within this scope.
+      clang::DiagnosticErrorTrap Trap(getDiagnostics());
       LocalInstantiations.perform();
       Local.Exit();
       GlobalInstantiations.perform();
+      if (Trap.hasErrorOccurred()) {
+        llvm::errs()
+            << "<<Error occurred during [InstantiateVariableDefinition]\n";
+        // ResetFunctionDefinition();
+      }
     }
   } else {
     assert(Var->isStaticDataMember() && PatternDecl->isStaticDataMember() &&
@@ -5785,9 +5817,15 @@ void Sema::InstantiateVariableDefinition(SourceLocation PointOfInstantiation,
 
   // This variable may have local implicit instantiations that need to be
   // instantiated within this scope.
+  clang::DiagnosticErrorTrap Trap(getDiagnostics());
   LocalInstantiations.perform();
   Local.Exit();
   GlobalInstantiations.perform();
+  if (Trap.hasErrorOccurred()) {
+    // ResetFunctionDefinition();
+    llvm::errs()
+        << "<<Error occurred during [InstantiateVariableDefinition] - 2.0\n";
+  }
 }
 
 void

@@ -14807,11 +14807,16 @@ void Sema::ActOnInitializerError(Decl *D) {
 
 void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
   // If there is no declaration, there was an error parsing it. Just ignore it.
+  llvm::errs() << "[ActOnUninitializedDecl]\n";
   if (!RealDecl)
     return;
 
   if (VarDecl *Var = dyn_cast<VarDecl>(RealDecl)) {
     QualType Type = Var->getType();
+    if (Var->getNameAsString() == "templateTypeArrayT" ||
+        Var->getNameAsString() == "anotherArrayT") {
+      llvm::errs() << "[ActOnUninitializedDecl] cast to VarDecl\n";
+    }
 
     /* TO_UPSTREAM(BoundsSafety) ON*/
     if (getLangOpts().BoundsSafety)
@@ -15009,15 +15014,33 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
     if (Type->isDependentType())
       return;
 
-    if (Var->isInvalidDecl())
+    if (Var->isInvalidDecl()) {
+      if (isIgnoreDiagsMode()) {
+        Var->setInit(nullptr);
+        Var->setInvalidDecl(false);
+        llvm::errs() << "Resetting state of var initializer\n";
+      }
       return;
+    }
 
     if (!Var->hasAttr<AliasAttr>()) {
       if (RequireCompleteType(Var->getLocation(),
                               Context.getBaseElementType(Type),
                               diag::err_typecheck_decl_incomplete_type)) {
+        // llvm::errs() << "Requires complete type!\n";
+        // if (isIgnoreDiagsMode()) {
+        // Var->setInit(nullptr);
+        // Var->setInvalidDecl(false);
+        // Type->getAsTagDecl()->setCompleteDefinitionRequired(false);
+        // Type->getAsTagDecl()->setCompleteDefinition(false);
+        // Type->getAsTagDecl()->setInvalidDecl(false);
+        // RecordDecl *Rec =
+        //     cast<RecordType>(Type.getCanonicalType())->getDecl();
+        // llvm::errs() << "Resetting state of var initializer\n";
+        // } else {
         Var->setInvalidDecl();
-        return;
+          // }
+          return;
       }
     } else {
       return;
