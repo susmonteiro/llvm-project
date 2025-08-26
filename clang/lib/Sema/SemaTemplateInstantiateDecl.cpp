@@ -5222,6 +5222,8 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
     Parm->setTypeSourceInfo(NewParmSI);
   };
 
+  clang::DiagnosticErrorTrap Trap(getDiagnostics());
+
   if (PatternDecl->isDefaulted()) {
     RebuildTypeSourceInfoForDefaultSpecialMembers();
     SetDeclDefaulted(Function, PatternDecl->getLocation());
@@ -5295,7 +5297,6 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
 
   // This class may have local implicit instantiations that need to be
   // instantiation within this scope.
-  clang::DiagnosticErrorTrap Trap(getDiagnostics());
   LocalInstantiations.perform();
   Scope.Exit();
   GlobalInstantiations.perform();
@@ -6506,8 +6507,17 @@ NamedDecl *Sema::FindInstantiatedDecl(SourceLocation Loc, NamedDecl *D,
 
 void Sema::PerformPendingInstantiations(bool LocalOnly) {
   std::deque<PendingImplicitInstantiation> delayedPCHInstantiations;
+  // clang::DiagnosticErrorTrap Trap(getDiagnostics());
+
   while (!PendingLocalImplicitInstantiations.empty() ||
          (!LocalOnly && !PendingInstantiations.empty())) {
+    // if (isIgnoreDiagsMode() && Trap.hasErrorOccurred()) {
+    //   // If we are not going to emit any diagnostics, don't bother instantiate
+    //   // the rest
+    //   PendingLocalImplicitInstantiations.clear();
+    //   PendingInstantiations.clear();
+    //   return; // TODO is it a problem if we don't make the instantiations empty?
+    // }
     PendingImplicitInstantiation Inst;
 
     if (PendingLocalImplicitInstantiations.empty()) {

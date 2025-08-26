@@ -9993,7 +9993,8 @@ bool Sema::RequireCompleteType(SourceLocation Loc, QualType T,
   if (RequireCompleteTypeImpl(Loc, T, Kind, &Diagnoser))
     return true;
   if (const TagType *Tag = T->getAs<TagType>()) {
-    if (!Tag->getDecl()->isCompleteDefinitionRequired()) {
+    if (!Tag->getDecl()->isCompleteDefinitionRequired() &&
+        !isIgnoreDiagsMode()) {
       Tag->getDecl()->setCompleteDefinitionRequired();
       Consumer.HandleTagDeclRequiredDefinition(Tag->getDecl());
     }

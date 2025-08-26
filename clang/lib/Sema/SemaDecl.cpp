@@ -15038,7 +15038,15 @@ void Sema::ActOnUninitializedDecl(Decl *RealDecl) {
         //     cast<RecordType>(Type.getCanonicalType())->getDecl();
         // llvm::errs() << "Resetting state of var initializer\n";
         // } else {
-        Var->setInvalidDecl();
+        if (isIgnoreDiagsMode()) {
+          Var->setInvalidDecl(false);
+          Var->setInit(nullptr);
+          Type->getAsTagDecl()->setInvalidDecl(false);
+          Type->getAsTagDecl()->setCompleteDefinition(false);
+          Type->getAsTagDecl()->setCompleteDefinitionRequired(false);
+        } else {
+          Var->setInvalidDecl();
+        }
           // }
           return;
       }
@@ -20303,7 +20311,8 @@ void Sema::ActOnFields(Scope *S, SourceLocation RecLoc, Decl *EnclosingDecl,
     }
 
     if (!Completed)
-      Record->completeDefinition();
+      Record->completeDefinition(); // DEBUG -> if all fields succeed, then set
+                                    // as complete definition
 
     // Handle attributes before checking the layout.
     ProcessDeclAttributeList(S, Record, Attrs);

@@ -3565,6 +3565,8 @@ Sema::InstantiateClass(SourceLocation PointOfInstantiation,
           // set it to undeclared again, so that it may be reinstantiated if
           // needed, in the future, when we expect to emit a diagnostic
           Instantiation->setTemplateSpecializationKind(TSK_Undeclared);
+          // Instantiation->setInvalidDecl();
+          // break;
           return true;
         }
         Instantiation->setInvalidDecl();
@@ -3719,6 +3721,11 @@ bool Sema::InstantiateEnum(SourceLocation PointOfInstantiation,
 
   // Exit the scope of this instantiation.
   SavedContext.pop();
+
+  if (isIgnoreDiagsMode() && Instantiation->isInvalidDecl()) {
+    Instantiation->setInvalidDecl(false);
+    return true;
+  }
 
   return Instantiation->isInvalidDecl();
 }
