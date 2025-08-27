@@ -5300,7 +5300,7 @@ void Sema::InstantiateFunctionDefinition(SourceLocation PointOfInstantiation,
   LocalInstantiations.perform();
   Scope.Exit();
   GlobalInstantiations.perform();
-  if (Trap.hasErrorOccurred()) {
+  if (Trap.hasErrorOccurred() && isIgnoreDiagsMode()) {
     ResetFunctionDefinition();
   }
 }
