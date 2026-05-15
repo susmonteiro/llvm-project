@@ -162,12 +162,25 @@ void SwiftAggLowering::addTypedData(const RecordDecl *record, CharUnits begin,
 
   // Add fields.
   for (auto *field : record->fields()) {
+    if (field->isZeroSize(CGM.getContext()))
+      continue;
     auto fieldOffsetInBits = layout.getFieldOffset(field->getFieldIndex());
     if (field->isBitField()) {
       addBitFieldData(field, begin, fieldOffsetInBits);
     } else {
-      addTypedData(field->getType(),
-              begin + CGM.getContext().toCharUnitsFromBits(fieldOffsetInBits));
+      auto fieldBegin =
+          begin + CGM.getContext().toCharUnitsFromBits(fieldOffsetInBits);
+      auto fieldType = field->getType();
+      if (auto *recType = fieldType->getAs<RecordType>())
+        if (auto *cxxRec = dyn_cast<CXXRecordDecl>(recType->getDecl());
+            cxxRec && cxxRec->isEmpty()) {
+          // Empty fields need to be represented by a blob of 1 byte
+          addOpaqueData(fieldBegin,
+                        fieldBegin +
+                            CGM.getContext().getTypeSizeInChars(fieldType));
+          continue;
+        }
+      addTypedData(fieldType, fieldBegin);
     }
   }
 
